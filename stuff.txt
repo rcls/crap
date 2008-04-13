@@ -1,0 +1,19 @@
+* Creation of new versions is driven off log data.
+
+* Log data can be obtained by:
+
+- rlog
+- log following an update.
+
+* For a log-following-an-update, we do the update, store the new file
+  versions (if available), and then log the changed files.
+
+
+* Keep CVS/CrapEntries in git (looks like CVS/Entries except for
+  timestamps).  CVS/Entries is not in git.  CVS/Repository and CVS/Tag
+  are in git.
+
+* CVS/CrapSync is CrapEntries last synchronised with CVS/Entries.
+  I.e., diff between CVS/CrapSync and CVS/Entries is what has been
+  done by CVS behind our back.
+
