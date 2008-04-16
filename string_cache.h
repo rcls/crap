@@ -3,12 +3,14 @@
 
 #include <stddef.h>
 
-/** Cache unique copies of strings.  */
+/** Cache unique copy of a string.  */
 const char * cache_string (const char * str);
 
+/** Cache unique copy of a string.  */
+const char * cache_string_n (const char * str, size_t len); 
 
 /** Hash function.  */
-unsigned long string_hash (const char * str);
+unsigned long string_hash (const char * str, size_t len);
 
 
 /** Look-up hash of cached string.  */

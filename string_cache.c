@@ -1,6 +1,7 @@
 #include "xmalloc.h"
 #include "string_cache.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 typedef struct string_entry_t {
@@ -14,21 +15,31 @@ typedef struct string_entry_t {
 static string_entry_t * hash_table[HASH_SIZE];
 
 
-const char * cache_string (const char * s)
+const char * cache_string_n (const char * s, size_t len)
 {
-    unsigned long hash = string_hash (s);
+    assert (memchr (s, 0, len) == NULL);
+
+    unsigned long hash = string_hash (s, len);
     string_entry_t ** bucket = hash_table + hash % HASH_SIZE;
     for (; *bucket; bucket = &(*bucket)->next)
-        if ((*bucket)->hash == hash && strcmp ((*bucket)->data, s) == 0)
+        if ((*bucket)->hash == hash
+            && strlen ((*bucket)->data) == len
+            && memcmp ((*bucket)->data, s, len) == 0)
             return (*bucket)->data;
 
-    string_entry_t * b = xmalloc (offsetof (string_entry_t, data)
-                                  + strlen (s) + 1);
+    string_entry_t * b = xmalloc (offsetof (string_entry_t, data) + len + 1);
     *bucket = b;
     b->next = NULL;
     b->hash = hash;
-    strcpy (b->data, s);
+    memcpy (b->data, s, len);
+    b->data[len] = 0;
     return b->data;
+}
+
+
+const char * cache_string (const char * s)
+{
+    return cache_string_n (s, strlen (s));
 }
 
 
@@ -38,10 +49,10 @@ unsigned long string_hash_get (const char * s)
 }
 
 
-unsigned long string_hash (const char * str)
+unsigned long string_hash (const char * str, size_t len)
 {
     unsigned long hash = 0;
-    while (*str)
-        hash = hash * 31 + (unsigned char) *str++;
+    for (int i = 0; i != len; ++i)
+        hash = hash * 31 + str[i];
     return hash;
 }
