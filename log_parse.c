@@ -96,6 +96,40 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
     if (*d == ':') {
         dtm.tm_sec = strtoul (++d, &d, 10);
         if (dtm.tm_sec < 0 || dtm.tm_sec > 61)
+            return false;
+    }
+    else
+        dtm.tm_sec = 0;
+
+    if (*d == 0) {
+        *time = timegm (&dtm);
+        *offset = 0;
+        return true;
+    }
+
+    int sign;
+    if (*d == '+')
+        sign = 1;
+    else if (*d == '-')
+        sign = -1;
+    else
+        return false;
+
+    if (!isdigit (d[1]) || !isdigit (d[2]))
+        return false;
+
+    time_t off = (d[1] - '0') * 36000 + (d[2] - '0') * 3600;
+    d += 3;
+
+    if (*d != 0) {
+        if (!isdigit (d[0]) || !isdigit (d[1]))
+            return false;
+        off += (d[1] - '0') * 600 + (d[2] - '0') * 60;
+    }
+
+    *time = timegm (&dtm) - sign * off;
+    *offset = off;
+    return true;
 }
 
 
