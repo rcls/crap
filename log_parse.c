@@ -4,10 +4,13 @@
 #include "string_cache.h"
 #include "xmalloc.h"
 
+#include <assert.h>
+#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 
 #define REV_BOUNDARY "M ----------------------------"
@@ -71,30 +74,31 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
         dtm.tm_year = -1900;
 
     char * d;
-    unsigned long years = strtoul (date, &d, 10);
-    if (years >= 10000 || *d != ':')
+    unsigned long year = strtoul (date, &d, 10);
+    if (year >= 10000 || *d++ != '-')
         return false;
 
-    dtm.tm_year += years;
+    dtm.tm_year += year;
 
-    dtm.tm_mon = strltoul (++d, &d, 10) - 1;
-    if (dtm.tm_mon < 0 || dtm.tm_mod > 11 || *d != ':')
+    dtm.tm_mon = strtoul (d, &d, 10) - 1;
+    if (dtm.tm_mon < 0 || dtm.tm_mon > 11 || *d++ != '-')
         return false;
 
-    dtm.tm_mday = strtoul (++d, &d, 10);
-    if (dtm.tm_mday < 1 || dtm.tm_mday > 31 || *d != ' ')
+    dtm.tm_mday = strtoul (d, &d, 10);
+    if (dtm.tm_mday < 1 || dtm.tm_mday > 31 || *d++ != ' ')
         return false;
 
-    dtm.tm_hour = strtoul (++d, &d, 10);
-    if (dtm.tm_hour < 0 || dtm.tm_hour > 24 || *d != ':')
+    dtm.tm_hour = strtoul (d, &d, 10);
+    if (dtm.tm_hour < 0 || dtm.tm_hour > 24 || *d++ != ':')
         return false;
 
-    dtm.tm_min = strtoul (++d, &d, 10);
+    dtm.tm_min = strtoul (d, &d, 10);
     if (dtm.tm_min < 0 || dtm.tm_min > 59)
         return false;
 
     if (*d == ':') {
-        dtm.tm_sec = strtoul (++d, &d, 10);
+        ++d;
+        dtm.tm_sec = strtoul (d, &d, 10);
         if (dtm.tm_sec < 0 || dtm.tm_sec > 61)
             return false;
     }
@@ -106,6 +110,8 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
         *offset = 0;
         return true;
     }
+    if (*d++ != ' ')
+        return false;
 
     int sign;
     if (*d == '+')
@@ -124,8 +130,10 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
     if (*d != 0) {
         if (!isdigit (d[0]) || !isdigit (d[1]))
             return false;
-        off += (d[1] - '0') * 600 + (d[2] - '0') * 60;
+        off += (d[0] - '0') * 600 + (d[1] - '0') * 60;
     }
+    if (d[3] != 0)
+        return false;
 
     *time = timegm (&dtm) - sign * off;
     *offset = off;
@@ -143,7 +151,9 @@ void read_file_version (const char * rcs_file,
 
     const char * revision = cache_string (*l + 11);
     const char * author = NULL;
-    const char * date = NULL;
+    time_t time = 0;
+    time_t offset = 0;
+    bool have_date = false;
     bool dead = false;
 
     bool state_next = false;
@@ -151,8 +161,12 @@ void read_file_version (const char * rcs_file,
 
     size_t len = next_line (l, buffer_len, f);
     while (starts_with (*l, "MT ")) {
-        if (starts_with (*l, "MT date "))
-            date = cache_string (*l + 8);
+        if (starts_with (*l, "MT date ")) {
+            if (!parse_cvs_date (&time, &offset, *l + 8))
+                bugger ("Log (%s) date line has unknown format: %s\n",
+                        rcs_file, *l);
+            have_date = true;
+        }
         if (author_next) {
             if (!starts_with (*l, "MT text "))
                 bugger ("Log (%s) author line is not text: %s\n",
@@ -175,6 +189,12 @@ void read_file_version (const char * rcs_file,
         len = next_line (l, buffer_len, f);
     }
 
+    if (!have_date)
+        bugger ("Log (%s) does not have date.\n", rcs_file);
+
+    if (author == NULL)
+        bugger ("Log (%s) does not have author.\n", rcs_file);
+
     // Snarf the log entry.
     char * log = NULL;
     size_t log_len = 0;
@@ -196,8 +216,27 @@ void read_file_version (const char * rcs_file,
     if (nl == NULL)
         nl = clog;
 
-    printf ("%s %s %s %s %.*s\n",
-            rcs_file, revision, date, author, nl - clog, clog);
+    char off_sign = '+';
+    if (offset < 0) {
+        offset = -offset;
+        off_sign = '-';
+    }
+
+    struct tm dtm;
+    char date[32];
+    size_t dl = strftime (date, sizeof (date), "%F %T %Z",
+                          localtime_r (&time, &dtm));
+    if (dl == 0) {
+        // Maybe someone gave us a crap timezone?
+        dl = strftime (date, sizeof (date), "%F %T %Z",
+                       gmtime_r (&time, &dtm));
+        assert (dl != 0);
+    }
+        
+    printf ("%s %s %s %s %c%02lu%02lu %.*s\n",
+            rcs_file, revision, author, date,
+            off_sign, offset / 3600, offset / 60 % 60,
+            nl - clog, clog);
 }
 
 
@@ -275,7 +314,7 @@ void read_files_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
 {
     next_line (l, buffer_len, f);
 
-    while (strcmp (*l, "ok ") != 0) {
+    while (strcmp (*l, "ok") != 0) {
         if (strcmp (*l, "M ") == 0) {
             next_line (l, buffer_len, f);
             continue;
