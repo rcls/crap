@@ -1,6 +1,7 @@
 #include "xmalloc.h"
 #include "string_cache.h"
 
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 
