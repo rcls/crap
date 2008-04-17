@@ -54,6 +54,52 @@ static inline bool ends_with (const char * haystack, const char * needle)
 }
 
 
+// Parse a date string into a time_t and an offset; the filled in time
+// includes the offset and hence is a real Unix time.
+static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
+{
+    // We parse (YY|YYYY)-MM-DD HH:MM(:SS)?( (+|-)HH(MM?))?
+    // This is just like cvsps.  We are a little looser about the digit
+    // sequences.  Due to the vagaries of the format we specify
+    if (!isdigit (date[0]) || !isdigit (date[1]))
+        return false;
+
+    struct tm dtm;
+
+    dtm.tm_year = 0;
+    if (date[2] != ':')
+        dtm.tm_year = -1900;
+
+    char * d;
+    unsigned long years = strtoul (date, &d, 10);
+    if (years >= 10000 || *d != ':')
+        return false;
+
+    dtm.tm_year += years;
+
+    dtm.tm_mon = strltoul (++d, &d, 10) - 1;
+    if (dtm.tm_mon < 0 || dtm.tm_mod > 11 || *d != ':')
+        return false;
+
+    dtm.tm_mday = strtoul (++d, &d, 10);
+    if (dtm.tm_mday < 1 || dtm.tm_mday > 31 || *d != ' ')
+        return false;
+
+    dtm.tm_hour = strtoul (++d, &d, 10);
+    if (dtm.tm_hour < 0 || dtm.tm_hour > 24 || *d != ':')
+        return false;
+
+    dtm.tm_min = strtoul (++d, &d, 10);
+    if (dtm.tm_min < 0 || dtm.tm_min > 59)
+        return false;
+
+    if (*d == ':') {
+        dtm.tm_sec = strtoul (++d, &d, 10);
+        if (dtm.tm_sec < 0 || dtm.tm_sec > 61)
+}
+
+
+
 void read_file_version (const char * rcs_file,
                         char ** __restrict__ l, size_t * buffer_len, FILE * f)
 {
