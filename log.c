@@ -5,6 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+void warning (const char * f, ...)
+{
+    va_list l;
+    va_start (l, f);
+    vfprintf (stderr, f, l);
+    va_end (l);
+}
+
 void bugger (const char * f, ...)
 {
     va_list l;

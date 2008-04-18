@@ -193,7 +193,7 @@ bool predecessor (char * s)
         l = strrchr (s, '.');
         if (l == NULL)
             return false;
-        l = 0;
+        *l = 0;
         return true;
     }
 
@@ -211,6 +211,14 @@ bool predecessor (char * s)
         end[-1] = 0;
     }
     return true;
+}
+
+
+static bool tag_is_branch (const file_tag_t * t)
+{
+    char * l = strrchr (t->vers, '.');
+    assert (l);
+    return l - t->vers > 2 && l[-1] == '0' && l[-2] == '.';
 }
 
 
@@ -250,6 +258,30 @@ static void fill_in_versions_and_parents (file_t * file)
                 break;
             }
         }
+    }
+
+    for (size_t i = 0; i != file->num_file_tags; ++i) {
+        file_tag_t * ft = file->file_tags + i;
+        if (tag_is_branch (ft)) {
+            /* We try and find a predecessor version, to use as the branch
+             * point.  If none exists, that's fine, it makes sense as a branch
+             * addition.  */
+            char vers[1 + strlen (ft->vers)];
+            strcpy (vers, ft->vers);
+            ft->version = NULL;
+            while (predecessor (vers)) {
+                version_t * v = file_find_version (file, vers);
+                if (v != NULL) {
+                    ft->version = v;
+                    break;
+                }
+            }
+            continue;
+        }
+        ft->version = file_find_version (file, ft->vers);
+        if (ft->version == NULL)
+            warning ("%s: Tag %s version %s does not exist.\n",
+                     file->rcs_path, ft->tag->tag, ft->vers);
     }
 }
 
@@ -412,9 +444,13 @@ static file_t * read_file_versions (string_hash_t * tags,
 
         file_tag_t * file_tag = file_new_file_tag (result);
 
-        tag_t tag;
-        tag.tag = cache_string_n (*l + 3, colon - *l - 3);
-        file_tag->tag = string_hash_insert (tags, &tag, sizeof (tag));
+        const char * tag = cache_string_n (*l + 3, colon - *l - 3);
+        bool n;
+        file_tag->tag = string_hash_insert (tags, tag, sizeof (tag_t), &n);
+        if (n) {
+            file_tag->tag->num_tag_files = 0;
+            file_tag->tag->tag_files = NULL;
+        }
 
         ++colon;
         if (*colon == ' ')
@@ -424,7 +460,7 @@ static file_t * read_file_versions (string_hash_t * tags,
         file_tag->vers = cache_string (colon);
 
         printf ("File %s tag %s version %s\n",
-                result->rcs_path, tag.tag, file_tag->vers);
+                result->rcs_path, file_tag->tag->tag, file_tag->vers);
 
         len = next_line (l, buffer_len, f);
     };

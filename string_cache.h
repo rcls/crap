@@ -1,6 +1,7 @@
 #ifndef STRING_CACHE_H
 #define STRING_CACHE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /** Cache unique copy of a string.  */
@@ -34,11 +35,12 @@ typedef struct string_hash {
 void string_hash_init (string_hash_t * hash);
 void string_hash_destroy (string_hash_t * hash);
 
-/* Returns existing bucket if found, otherwise inserts new bucket and returns
- * pointer to it.  The pointers should be to objects starting with the
- * struct string_hash_head.  */
+/* Creates a new bucket for the cached string @c s and returns a pointer to it.
+ * pointer to it.  If the bucket already exists, return pointer to that instead.
+ * @c *n is set to @c true if a new bucket is created, @c false if an existing
+ * bucket is returned.  */
 void * string_hash_insert (string_hash_t * hash,
-                           const void * entry, size_t entry_size);
+                           const char * s, size_t entry_size, bool * n);
 /* String need not be cached.  */
 void * string_hash_find (const string_hash_t * hash, const char * string);
 

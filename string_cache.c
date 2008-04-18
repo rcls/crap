@@ -162,22 +162,24 @@ static string_hash_head_t ** bucket_find (const string_hash_t * hash,
 
 
 void * string_hash_insert (string_hash_t * hash,
-                           const void * entry, size_t size)
+                           const char * s, size_t size, bool * n)
 {
-    const string_hash_head_t * e = entry;
-    string_hash_head_t ** p = bucket_find (hash, e->string,
-                                           string_hash_get (e->string));
-    if (*p)
+    string_hash_head_t ** p = bucket_find (hash, s, string_hash_get (s));
+    if (*p) {
+        *n = false;
         return *p;
+    }
+
+    *n = true;
 
     if (hash->num_entries >= hash->num_buckets) {
         string_hash_resize (hash);
-        p = bucket_find (hash, e->string, string_hash_get (e->string));
+        p = bucket_find (hash, s, string_hash_get (s));
     }
 
     string_hash_head_t * pp = xmalloc (size);
     *p = pp;
-    memcpy (pp, e, size);
+    pp->string = s;
     pp->next = NULL;
     return pp;
 }
