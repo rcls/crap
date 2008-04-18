@@ -9,4 +9,7 @@ void * xmalloc (size_t size)
 void * xrealloc (void * ptr, size_t size)
     __attribute__ ((__warn_unused_result__));
 
+void * xcalloc (size_t size)
+    __attribute__ ((__malloc__, __warn_unused_result__));
+
 #endif

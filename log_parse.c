@@ -1,4 +1,5 @@
 
+#include "file.h"
 #include "log.h"
 #include "log_parse.h"
 #include "string_cache.h"
@@ -17,11 +18,10 @@
 #define FILE_BOUNDARY "M ============================================================================="
 
 
-typedef struct file_version_t {
-    struct file_version_t * parent;     /* Parent version.  */
-    const char * version;               /* Version, cached.  */
-    const char * log;                   /* Log info, cached.  */
-} file_version_t;
+typedef struct tag_hash_item {
+    string_hash_head_t head;
+    tag_t * tag;
+} tag_hash_item_t;
 
 
 static size_t next_line (char ** line, size_t * len, FILE * stream)
@@ -57,13 +57,12 @@ static inline bool ends_with (const char * haystack, const char * needle)
 }
 
 
-// Parse a date string into a time_t and an offset; the filled in time
-// includes the offset and hence is a real Unix time.
+/* Parse a date string into a time_t and an offset; the filled in time includes
+ * the offset and hence is a real Unix time.  */
 static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 {
-    // We parse (YY|YYYY)-MM-DD HH:MM(:SS)?( (+|-)HH(MM?))?
-    // This is just like cvsps.  We are a little looser about the digit
-    // sequences.  Due to the vagaries of the format we specify
+    /* We parse (YY|YYYY)-MM-DD HH:MM(:SS)?( (+|-)HH(MM?))?  This is just like
+     * cvsps.  We are a little looser about the digit sequences.  */
     if (!isdigit (date[0]) || !isdigit (date[1]))
         return false;
 
@@ -141,20 +140,137 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 }
 
 
+/* Is a version string value?  I.e., non-empty even-length '.' separated
+ * numbers.  */
+bool valid_version (const char * s)
+{
+    size_t position = 0;
+    size_t zero_position = 0;
 
-void read_file_version (const char * rcs_file,
-                        char ** __restrict__ l, size_t * buffer_len, FILE * f)
+    do {
+        if (s[0] == '0') {
+            // Forbid extraneous leading zeros.
+            if (s[1] != '.')
+                return false;
+            if (zero_position != 0)
+                return false;           /* Only one component can be zero.  */
+            if ((position & 1) == 0)
+                return false;           /* Must be in even position.  */
+            zero_position = position;
+        }
+
+        if (!isdigit (*s))
+            return false;               /* Must be at least one digit.  */
+
+        while (isdigit (*++s));
+        ++position;
+    }
+    while (*s++ == '.');
+
+    if (s[-1] != 0)
+        return false;                   /* Illegal character.  */
+
+    if (position & 1)
+        return false;                  /* Must be even number of components.  */
+
+    if (zero_position != 0 && zero_position + 2 != position)
+        return false;                   /* A zero must be second-to-last.  */
+
+    return true;
+}
+
+
+bool predecessor (char * s)
+{
+    /* Check to see if we should just remove the last two components.  This is
+     * the case if we are a branch tag (.0.x) or the first rev on a branch
+     * (.x.1).  */
+    char * l = strrchr (s, '.');
+    assert (l);
+    if ((l - s > 2 && l[-1] == '0' && l[-2] == '.')
+        || (l[1] == '1' && l[2] == 0)) {
+        *l = 0;
+        l = strrchr (s, '.');
+        if (l == NULL)
+            return false;
+        l = 0;
+        return true;
+    }
+
+    /* Decrement the last component.  */
+    char * end = s + strlen (s);
+    char * p = end;
+    while (*--p == '0')
+        *p = '9';
+
+    assert (isdigit (*p));
+    assert (p != s);
+    if (--*p == '0') {
+        /* Rewrite 09999 to 9999 etc.  */
+        *p = '9';
+        end[-1] = 0;
+    }
+    return true;
+}
+
+
+static int version_compare (const void * AA, const void * BB)
+{
+    const version_t * A = AA;
+    const version_t * B = BB;
+    return strcasecmp (A->version, B->version);
+}
+
+
+static int file_tag_compare (const void * AA, const void * BB)
+{
+    const file_tag_t * A = AA;
+    const file_tag_t * B = BB;
+    return strcasecmp (A->tag->tag, B->tag->tag);
+}
+
+
+static void fill_in_versions_and_parents (file_t * file)
+{
+    qsort (file->versions, file->num_versions,
+           sizeof (version_t), version_compare);
+    qsort (file->file_tags, file->num_file_tags,
+           sizeof (file_tag_t), file_tag_compare);
+
+    for (size_t i = 0; i != file->num_versions; ++i) {
+        version_t * v = file->versions + i;
+        char vers[1 + strlen (v->version)];
+        strcpy (vers, v->version);
+        v->parent = NULL;
+        while (predecessor (vers)) {
+            v->parent = file_find_version (file, vers);
+            if (v->parent)
+                break;
+        }
+    }
+}
+
+
+static void read_file_version (file_t * result,
+                               char ** __restrict__ l, size_t * buffer_len,
+                               FILE * f)
 {
     if (!starts_with (*l, "M revision "))
         bugger ("Log (%s) did not have expected 'revision' line: %s\n",
-                rcs_file, *l);
+                result->rcs_path, *l);
 
-    const char * revision = cache_string (*l + 11);
-    const char * author = NULL;
-    time_t time = 0;
-    time_t offset = 0;
+    version_t * version = file_new_version (result);
+
+    version->version = cache_string (*l + 11);
+    if (!valid_version (version->version))
+        bugger ("Log (%s) has malformed version %s\n",
+                result->rcs_path, version->version);
+
+    version->author = NULL;
+/*     version->time = 0; */
+/*     version->offset = 0; */
     bool have_date = false;
-    bool dead = false;
+    version->dead = false;
 
     bool state_next = false;
     bool author_next = false;
@@ -162,23 +278,23 @@ void read_file_version (const char * rcs_file,
     size_t len = next_line (l, buffer_len, f);
     while (starts_with (*l, "MT ")) {
         if (starts_with (*l, "MT date ")) {
-            if (!parse_cvs_date (&time, &offset, *l + 8))
+            if (!parse_cvs_date (&version->time, &version->offset, *l + 8))
                 bugger ("Log (%s) date line has unknown format: %s\n",
-                        rcs_file, *l);
+                        result->rcs_path, *l);
             have_date = true;
         }
         if (author_next) {
             if (!starts_with (*l, "MT text "))
                 bugger ("Log (%s) author line is not text: %s\n",
-                        rcs_file, *l);
-            author = cache_string (*l + 8);
+                        result->rcs_path, *l);
+            version->author = cache_string (*l + 8);
             author_next = false;
         }
         if (state_next) {
             if (!starts_with (*l, "MT text "))
                 bugger ("Log (%s) state line is not text: %s\n",
-                        rcs_file, *l);
-            dead = starts_with (*l, "MT text dead");
+                        result->rcs_path, *l);
+            version->dead = starts_with (*l, "MT text dead");
             state_next = false;
         }
         if (ends_with (*l, " author: "))
@@ -190,12 +306,12 @@ void read_file_version (const char * rcs_file,
     }
 
     if (!have_date)
-        bugger ("Log (%s) does not have date.\n", rcs_file);
+        bugger ("Log (%s) does not have date.\n", result->rcs_path);
 
-    if (author == NULL)
-        bugger ("Log (%s) does not have author.\n", rcs_file);
+    if (version->author == NULL)
+        bugger ("Log (%s) does not have author.\n", result->rcs_path);
 
-    // Snarf the log entry.
+    /* Snarf the log entry.  */
     char * log = NULL;
     size_t log_len = 0;
     while (strcmp (*l, REV_BOUNDARY) != 0 &&
@@ -208,15 +324,16 @@ void read_file_version (const char * rcs_file,
         len = next_line (l, buffer_len, f);
     }        
 
-    const char * clog = cache_string_n (log, log_len);
+    version->log = cache_string_n (log, log_len);
     free (log);
 
-    // Now print what we've got.
-    const char * nl = memchr (clog, '\n', log_len);
+    /* Now print what we've got.  */
+    const char * nl = memchr (version->log, '\n', log_len);
     if (nl == NULL)
-        nl = clog;
+        nl = version->log + strlen (version->log);
 
     char off_sign = '+';
+    time_t offset = version->offset;
     if (offset < 0) {
         offset = -offset;
         off_sign = '-';
@@ -225,22 +342,24 @@ void read_file_version (const char * rcs_file,
     struct tm dtm;
     char date[32];
     size_t dl = strftime (date, sizeof (date), "%F %T %Z",
-                          localtime_r (&time, &dtm));
+                          localtime_r (&version->time, &dtm));
     if (dl == 0) {
-        // Maybe someone gave us a crap timezone?
+        /* Maybe someone gave us a crap timezone?  */
         dl = strftime (date, sizeof (date), "%F %T %Z",
-                       gmtime_r (&time, &dtm));
+                       gmtime_r (&version->time, &dtm));
         assert (dl != 0);
     }
         
     printf ("%s %s %s %s %c%02lu%02lu %.*s\n",
-            rcs_file, revision, author, date,
+            result->rcs_path, version->version, version->author, date,
             off_sign, offset / 3600, offset / 60 % 60,
-            nl - clog, clog);
+            nl - version->log, version->log);
 }
 
 
-void read_file_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
+static file_t * read_file_versions (string_hash_t * tags,
+                                    char ** restrict l, size_t * buffer_len,
+                                    FILE * f)
 {
     if (!starts_with (*l, "M RCS file: /"))
         bugger ("Expected RCS file line, not %s\n", *l);
@@ -249,7 +368,13 @@ void read_file_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
     if ((*l)[len - 1] != 'v' || (*l)[len - 2] != ',')
         bugger ("RCS file name does not end with ',v': %s\n", *l);
 
-    const char * rcs_file = cache_string_n (*l + 12, len - 14);
+    file_t * result = malloc (sizeof (file_t));
+
+    result->rcs_path = cache_string_n (*l + 12, len - 14);
+    result->num_versions = 0;
+    result->versions = NULL;
+    result->num_file_tags = 0;
+    result->file_tags = NULL;
 
     do {
         len = next_line (l, buffer_len, f);
@@ -261,24 +386,30 @@ void read_file_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
 
     if (!starts_with (*l, "M symbolic names:"))
         bugger ("Log (%s) did not have expected tag list: %s\n",
-                rcs_file, *l);
+                result->rcs_path, *l);
 
     len = next_line (l, buffer_len, f);
     while (starts_with (*l, "M \t")) {
         const char * colon = strrchr (*l, ':');
         if (colon == NULL)
-            bugger ("Tag on (%s) did not have version: %s\n", rcs_file, *l);
+            bugger ("Tag on (%s) did not have version: %s\n",
+                    result->rcs_path, *l);
 
-        const char * tag_name = cache_string_n (*l + 3, colon - *l - 3);
+        file_tag_t * file_tag = file_new_file_tag (result);
+
+        tag_t tag;
+        tag.tag = cache_string_n (*l + 3, colon - *l - 3);
+        file_tag->tag = string_hash_insert (tags, &tag, sizeof (tag));
+
         ++colon;
         if (*colon == ' ')
             ++colon;
 
-        // FIXME - check that version string is a version.
-        const char * version = cache_string (colon);
+        /* FIXME - check that version string is a valid version.  */
+        file_tag->vers = cache_string (colon);
 
-        // FIXME - record it.
-        printf ("File %s tag %s version %s\n", rcs_file, tag_name, version);
+        printf ("File %s tag %s version %s\n",
+                result->rcs_path, tag.tag, file_tag->vers);
 
         len = next_line (l, buffer_len, f);
     };
@@ -289,29 +420,36 @@ void read_file_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
 
     if (!starts_with (*l, "M description:"))
         bugger ("Log (%s) did not have expected 'description' item: %s\n",
-                rcs_file, *l);
+                result->rcs_path, *l);
 
-    // Just skip until a boundary.  Too bad if a log entry contains one of
-    // the boundary strings.
+    /* Just skip until a boundary.  Too bad if a log entry contains one of
+     * the boundary strings.  */
     while (strcmp (*l, REV_BOUNDARY) != 0 &&
            strcmp (*l, FILE_BOUNDARY) != 0) {
         if (!starts_with (*l, "M "))
             bugger ("Log (%s) description incorrectly terminated\n",
-                    rcs_file);
+                    result->rcs_path);
         len = next_line (l, buffer_len, f);
     }
 
     while (strcmp (*l, FILE_BOUNDARY) != 0) {
         len = next_line (l, buffer_len, f);
-        read_file_version (rcs_file, l, buffer_len, f);
+        read_file_version (result, l, buffer_len, f);
     }
 
     next_line (l, buffer_len, f);
+
+    fill_in_versions_and_parents (result);
+
+    return result;
 }
 
 
 void read_files_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
 {
+    string_hash_t tags;
+    string_hash_init (&tags);
+
     next_line (l, buffer_len, f);
 
     while (strcmp (*l, "ok") != 0) {
@@ -320,6 +458,6 @@ void read_files_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
             continue;
         }
 
-        read_file_versions (l, buffer_len, f);
+        read_file_versions (&tags, l, buffer_len, f);
     }
 }
