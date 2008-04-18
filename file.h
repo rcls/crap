@@ -30,8 +30,11 @@ struct version {
     bool dead;
 
     version_t * parent;
+    version_t * children;               /* A child, or NULL.  */
+    version_t * sibling;                /* A sibling, or NULL.  */
 
     const char * author;
+    const char * commitid;
     time_t time;
     time_t offset;
     const char * log;
@@ -39,6 +42,7 @@ struct version {
 
 
 struct file_tag {
+    file_t * file;
     tag_t * tag;
     /* vers is the version information stored in cvs.  For a branch, version is
      * the version to use as the branch point.  Version may be null.  */
@@ -47,18 +51,14 @@ struct file_tag {
 };
 
 
-typedef struct tag_and_file {
-    file_t * file;
-    file_tag_t * file_tag;
-} tag_and_file_t;
-
-
 struct tag {
     const char * tag;
     
-    size_t num_tag_and_files;
-    tag_and_file_t * tag_and_files;
+    size_t num_tag_files;
+    file_tag_t ** tag_files;
 };
+
+file_tag_t ** tag_new_tag_file (tag_t * tag);
 
 
 #endif

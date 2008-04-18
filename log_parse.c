@@ -218,7 +218,7 @@ static int version_compare (const void * AA, const void * BB)
 {
     const version_t * A = AA;
     const version_t * B = BB;
-    return strcasecmp (A->version, B->version);
+    return strcmp (A->version, B->version);
 }
 
 
@@ -226,7 +226,7 @@ static int file_tag_compare (const void * AA, const void * BB)
 {
     const file_tag_t * A = AA;
     const file_tag_t * B = BB;
-    return strcasecmp (A->tag->tag, B->tag->tag);
+    return strcmp (A->tag->tag, B->tag->tag);
 }
 
 
@@ -237,15 +237,18 @@ static void fill_in_versions_and_parents (file_t * file)
     qsort (file->file_tags, file->num_file_tags,
            sizeof (file_tag_t), file_tag_compare);
 
-    for (size_t i = 0; i != file->num_versions; ++i) {
-        version_t * v = file->versions + i;
+    for (size_t i = file->num_versions; i != 0;) {
+        version_t * v = file->versions + --i;
         char vers[1 + strlen (v->version)];
         strcpy (vers, v->version);
         v->parent = NULL;
         while (predecessor (vers)) {
             v->parent = file_find_version (file, vers);
-            if (v->parent)
+            if (v->parent) {
+                v->sibling = v->parent->children;
+                v->parent->children = v->sibling;
                 break;
+            }
         }
     }
 }
@@ -267,13 +270,17 @@ static void read_file_version (file_t * result,
                 result->rcs_path, version->version);
 
     version->author = NULL;
+    version->commitid = cache_string ("");
 /*     version->time = 0; */
 /*     version->offset = 0; */
     bool have_date = false;
     version->dead = false;
+    version->children = NULL;
+    version->sibling = NULL;
 
     bool state_next = false;
     bool author_next = false;
+    bool commitid_next = false;
 
     size_t len = next_line (l, buffer_len, f);
     while (starts_with (*l, "MT ")) {
@@ -297,10 +304,19 @@ static void read_file_version (file_t * result,
             version->dead = starts_with (*l, "MT text dead");
             state_next = false;
         }
+        if (commitid_next) {
+            if (!starts_with (*l, "MT text "))
+                bugger ("Log (%s) commitid line is not text: %s\n",
+                        result->rcs_path, *l);
+            version->commitid = cache_string (*l + 8);
+            commitid_next = false;
+        }
         if (ends_with (*l, " author: "))
             author_next = true;
         if (ends_with (*l, " state: "))
             state_next = true;
+        if (ends_with (*l, " commitid: "))
+            commitid_next = true;
 
         len = next_line (l, buffer_len, f);
     }
@@ -314,8 +330,7 @@ static void read_file_version (file_t * result,
     /* Snarf the log entry.  */
     char * log = NULL;
     size_t log_len = 0;
-    while (strcmp (*l, REV_BOUNDARY) != 0 &&
-           strcmp (*l, FILE_BOUNDARY) != 0) {
+    while (strcmp (*l, REV_BOUNDARY) != 0 && strcmp (*l, FILE_BOUNDARY) != 0) {
         log = xrealloc (log, log_len + len + 1);
         memcpy (log + log_len, *l + 2, len - 2);
         log_len += len - 1;

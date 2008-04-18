@@ -43,3 +43,11 @@ version_t * file_find_version (const file_t * f, const char * s)
 
     return NULL;
 }
+
+
+file_tag_t ** tag_new_tag_file (tag_t * t)
+{
+    t->tag_files = xrealloc (t->tag_files,
+                             ++t->num_tag_files * sizeof (file_tag_t *));
+    return t->tag_files + t->num_tag_files - 1;
+}

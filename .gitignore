@@ -2,3 +2,4 @@
 *~
 *.a
 rlog_parse
+.deps
