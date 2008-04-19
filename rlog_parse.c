@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 
+#include "database.h"
 #include "log_parse.h"
 
 int main()

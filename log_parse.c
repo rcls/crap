@@ -1,4 +1,5 @@
 
+#include "database.h"
 #include "file.h"
 #include "log.h"
 #include "log_parse.h"

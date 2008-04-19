@@ -4,9 +4,9 @@
 #include <stdio.h>
 #include <sys/types.h>
 
-#include "file.h"
+struct file_database;
 
-void read_files_versions (file_database_t * database,
+void read_files_versions (struct file_database * database,
                           char ** restrict l, size_t * l_len, FILE * f);
 
 #endif
