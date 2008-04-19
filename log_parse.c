@@ -20,7 +20,7 @@
 
 typedef struct tag_hash_item {
     string_hash_head_t head;
-    tag_t * tag;
+    tag_t tag;
 } tag_hash_item_t;
 
 
@@ -262,27 +262,26 @@ static void fill_in_versions_and_parents (file_t * file)
 
     for (size_t i = 0; i != file->num_file_tags; ++i) {
         file_tag_t * ft = file->file_tags + i;
-        if (tag_is_branch (ft)) {
-            /* We try and find a predecessor version, to use as the branch
-             * point.  If none exists, that's fine, it makes sense as a branch
-             * addition.  */
-            char vers[1 + strlen (ft->vers)];
-            strcpy (vers, ft->vers);
-            ft->version = NULL;
-            while (predecessor (vers)) {
-                version_t * v = file_find_version (file, vers);
-                if (v != NULL) {
-                    ft->version = v;
-                    break;
-                }
-            }
+        if (!tag_is_branch (ft)) {
+            ft->version = file_find_version (file, ft->vers);
+            if (ft->version == NULL)
+                warning ("%s: Tag %s version %s does not exist.\n",
+                         file->rcs_path, ft->tag->tag, ft->vers);
             continue;
         }
-        ft->version = file_find_version (file, ft->vers);
-        if (ft->version == NULL)
-            warning ("%s: Tag %s version %s does not exist.\n",
-                     file->rcs_path, ft->tag->tag, ft->vers);
-    }
+        /* We try and find a predecessor version, to use as the branch point.
+         * If none exists, that's fine, it makes sense as a branch addition.  */
+        char vers[1 + strlen (ft->vers)];
+        strcpy (vers, ft->vers);
+        ft->version = NULL;
+        while (predecessor (vers)) {
+            version_t * v = file_find_version (file, vers);
+            if (v != NULL) {
+                ft->version = v;
+                break;
+            }
+        }
+   }
 }
 
 
@@ -404,9 +403,10 @@ static void read_file_version (file_t * result,
 }
 
 
-static file_t * read_file_versions (string_hash_t * tags,
-                                    char ** restrict l, size_t * buffer_len,
-                                    FILE * f)
+static void read_file_versions (file_database_t * db,
+                                string_hash_t * tags,
+                                char ** restrict l, size_t * buffer_len,
+                                FILE * f)
 {
     if (!starts_with (*l, "M RCS file: /"))
         bugger ("Expected RCS file line, not %s\n", *l);
@@ -415,13 +415,12 @@ static file_t * read_file_versions (string_hash_t * tags,
     if ((*l)[len - 1] != 'v' || (*l)[len - 2] != ',')
         bugger ("RCS file name does not end with ',v': %s\n", *l);
 
-    file_t * result = malloc (sizeof (file_t));
-
-    result->rcs_path = cache_string_n (*l + 12, len - 14);
-    result->num_versions = 0;
-    result->versions = NULL;
-    result->num_file_tags = 0;
-    result->file_tags = NULL;
+    file_t * file = file_database_new_file (db);
+    file->rcs_path = cache_string_n (*l + 12, len - 14);
+    file->num_versions = 0;
+    file->versions = NULL;
+    file->num_file_tags = 0;
+    file->file_tags = NULL;
 
     do {
         len = next_line (l, buffer_len, f);
@@ -433,23 +432,25 @@ static file_t * read_file_versions (string_hash_t * tags,
 
     if (!starts_with (*l, "M symbolic names:"))
         bugger ("Log (%s) did not have expected tag list: %s\n",
-                result->rcs_path, *l);
+                file->rcs_path, *l);
 
     len = next_line (l, buffer_len, f);
     while (starts_with (*l, "M \t")) {
         const char * colon = strrchr (*l, ':');
         if (colon == NULL)
             bugger ("Tag on (%s) did not have version: %s\n",
-                    result->rcs_path, *l);
+                    file->rcs_path, *l);
 
-        file_tag_t * file_tag = file_new_file_tag (result);
+        file_tag_t * file_tag = file_new_file_tag (file);
 
-        const char * tag = cache_string_n (*l + 3, colon - *l - 3);
+        const char * tag_name = cache_string_n (*l + 3, colon - *l - 3);
         bool n;
-        file_tag->tag = string_hash_insert (tags, tag, sizeof (tag_t), &n);
+        tag_hash_item_t * tag = string_hash_insert (
+            tags, tag_name, sizeof (tag_hash_item_t), &n);
         if (n) {
-            file_tag->tag->num_tag_files = 0;
-            file_tag->tag->tag_files = NULL;
+            tag->tag.tag = tag_name;
+            tag->tag.num_tag_files = 0;
+            tag->tag.tag_files = NULL;
         }
 
         ++colon;
@@ -458,9 +459,10 @@ static file_t * read_file_versions (string_hash_t * tags,
 
         /* FIXME - check that version string is a valid version.  */
         file_tag->vers = cache_string (colon);
+        file_tag->tag = &tag->tag;
 
         printf ("File %s tag %s version %s\n",
-                result->rcs_path, file_tag->tag->tag, file_tag->vers);
+                file->rcs_path, file_tag->tag->tag, file_tag->vers);
 
         len = next_line (l, buffer_len, f);
     };
@@ -471,7 +473,7 @@ static file_t * read_file_versions (string_hash_t * tags,
 
     if (!starts_with (*l, "M description:"))
         bugger ("Log (%s) did not have expected 'description' item: %s\n",
-                result->rcs_path, *l);
+                file->rcs_path, *l);
 
     /* Just skip until a boundary.  Too bad if a log entry contains one of
      * the boundary strings.  */
@@ -479,27 +481,45 @@ static file_t * read_file_versions (string_hash_t * tags,
            strcmp (*l, FILE_BOUNDARY) != 0) {
         if (!starts_with (*l, "M "))
             bugger ("Log (%s) description incorrectly terminated\n",
-                    result->rcs_path);
+                    file->rcs_path);
         len = next_line (l, buffer_len, f);
     }
 
     while (strcmp (*l, FILE_BOUNDARY) != 0) {
         len = next_line (l, buffer_len, f);
-        read_file_version (result, l, buffer_len, f);
+        read_file_version (file, l, buffer_len, f);
     }
 
     next_line (l, buffer_len, f);
 
-    fill_in_versions_and_parents (result);
-
-    return result;
+    fill_in_versions_and_parents (file);
 }
 
 
-void read_files_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
+static int file_compare (const void * AA, const void * BB)
+{
+    const file_t * A = AA;
+    const file_t * B = BB;
+    return strcmp (A->rcs_path, B->rcs_path);
+}
+
+
+static int tag_compare (const void * AA, const void * BB)
+{
+    const tag_t * A = AA;
+    const tag_t * B = BB;
+    return strcmp (A->tag, B->tag);
+}
+
+
+void read_files_versions (file_database_t * db,
+                          char ** __restrict__ l, size_t * buffer_len, FILE * f)
 {
     string_hash_t tags;
     string_hash_init (&tags);
+
+    db->num_files = 0;
+    db->files = NULL;
 
     next_line (l, buffer_len, f);
 
@@ -509,6 +529,42 @@ void read_files_versions (char ** __restrict__ l, size_t * buffer_len, FILE * f)
             continue;
         }
 
-        read_file_versions (&tags, l, buffer_len, f);
+        read_file_versions (db, &tags, l, buffer_len, f);
+    }
+
+    /* Sort the list of files.  */
+    qsort (db->files, db->num_files, sizeof (file_t), file_compare);
+
+    /* Set the pointers from file_tags to files.  Add the file_tags to the tags.
+     * The latter will be sorted as we have already sorted the files.  */
+    for (size_t i = 0; i != db->num_files; ++i) {
+        file_t * f = db->files + i;
+        for (size_t j = 0; j != f->num_file_tags; ++j) {
+            file_tag_t * ft = f->file_tags + j;
+            ft->file = f;
+            tag_new_tag_file (ft->tag, ft);
+        }
+    }
+
+    /* Flatten the hash of tags to an array.  */
+    db->num_tags = 0;
+    db->tags = xmalloc (tags.num_entries * sizeof (tag_t));
+
+    for (tag_hash_item_t * i = string_hash_begin (&tags);
+         i; i = string_hash_next (&tags, i))
+        db->tags[db->num_tags++] = i->tag;
+
+    assert (db->num_tags == tags.num_entries);
+
+    string_hash_destroy (&tags);
+
+    /* Sort the list of tags.  */
+    qsort (db->tags, db->num_tags, sizeof (tag_t), tag_compare);
+
+    /* Update the pointers from file_tags to tags.  */
+    for (size_t i = 0; i != db->num_tags; ++i) {
+        tag_t * t = db->tags + i;
+        for (size_t j = 0; j != t->num_tag_files; ++j)
+            t->tag_files[i]->tag = t;
     }
 }

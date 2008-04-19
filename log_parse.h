@@ -6,6 +6,7 @@
 
 #include "file.h"
 
-void read_files_versions (char ** restrict l, size_t * l_len, FILE * f);
+void read_files_versions (file_database_t * database,
+                          char ** restrict l, size_t * l_len, FILE * f);
 
 #endif

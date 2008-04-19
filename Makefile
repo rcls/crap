@@ -21,3 +21,5 @@ CC=gcc
 .PHONY: all clean
 clean:
 	rm *.a *.o
+
+-include .deps/*.d

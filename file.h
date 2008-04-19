@@ -58,7 +58,18 @@ struct tag {
     file_tag_t ** tag_files;
 };
 
-file_tag_t ** tag_new_tag_file (tag_t * tag);
+void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);
 
+
+typedef struct file_database {
+    size_t num_files;
+    file_t * files;
+
+    size_t num_tags;
+    tag_t * tags;
+} file_database_t;
+
+file_t * file_database_new_file (file_database_t * db);
+tag_t * file_database_new_tag (file_database_t * db);
 
 #endif

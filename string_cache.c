@@ -181,6 +181,7 @@ void * string_hash_insert (string_hash_t * hash,
     *p = pp;
     pp->string = s;
     pp->next = NULL;
+    ++hash->num_entries;
     return pp;
 }
 
@@ -206,7 +207,8 @@ void * string_hash_next (const string_hash_t * hash, void * i)
     if (ii->next != NULL)
         return ii->next;
 
-    for (size_t j = string_hash_get (ii->string) & (hash->num_buckets - 1);
+    for (size_t j =
+             (string_hash_get (ii->string) & (hash->num_buckets - 1)) + 1;
          j != hash->num_buckets; ++j)
         if (hash->buckets[j])
             return hash->buckets[j];

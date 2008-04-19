@@ -8,7 +8,9 @@ int main()
     char * line = NULL;
     size_t len = 0;
 
-    read_files_versions (&line, &len, stdin);
+    file_database_t db;
+
+    read_files_versions (&db, &line, &len, stdin);
 
     return 0;
 }

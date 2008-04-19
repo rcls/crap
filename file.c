@@ -34,10 +34,10 @@ version_t * file_find_version (const file_t * f, const char * s)
 
         if (c < 0) {
             base += mid + 1;
-            count = count - mid - 1;
+            count -= mid + 1;
         }
         else {
-            count = mid - 1;
+            count = mid;
         }
     }
 
@@ -45,9 +45,24 @@ version_t * file_find_version (const file_t * f, const char * s)
 }
 
 
-file_tag_t ** tag_new_tag_file (tag_t * t)
+void tag_new_tag_file (tag_t * t, file_tag_t * ft)
 {
     t->tag_files = xrealloc (t->tag_files,
                              ++t->num_tag_files * sizeof (file_tag_t *));
-    return t->tag_files + t->num_tag_files - 1;
+    t->tag_files [t->num_tag_files - 1] = ft;
 }
+
+
+file_t * file_database_new_file (file_database_t * db)
+{
+    db->files = xrealloc (db->files, ++db->num_files * sizeof (file_t));
+    return &db->files[db->num_files - 1];
+}
+
+
+tag_t * file_database_new_tag (file_database_t * db)
+{
+    db->tags = xrealloc (db->tags, ++db->num_tags * sizeof (tag_t));
+    return &db->tags[db->num_tags - 1];
+}
+
