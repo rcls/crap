@@ -566,6 +566,6 @@ void read_files_versions (file_database_t * db,
     for (size_t i = 0; i != db->num_tags; ++i) {
         tag_t * t = db->tags + i;
         for (size_t j = 0; j != t->num_tag_files; ++j)
-            t->tag_files[i]->tag = t;
+            t->tag_files[j]->tag = t;
     }
 }
