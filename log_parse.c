@@ -375,32 +375,32 @@ static void read_file_version (file_t * result,
     free (log);
 
     /* Now print what we've got.  */
-    const char * nl = memchr (version->log, '\n', log_len);
-    if (nl == NULL)
-        nl = version->log + strlen (version->log);
+/*     const char * nl = memchr (version->log, '\n', log_len); */
+/*     if (nl == NULL) */
+/*         nl = version->log + strlen (version->log); */
 
-    char off_sign = '+';
-    time_t offset = version->offset;
-    if (offset < 0) {
-        offset = -offset;
-        off_sign = '-';
-    }
+/*     char off_sign = '+'; */
+/*     time_t offset = version->offset; */
+/*     if (offset < 0) { */
+/*         offset = -offset; */
+/*         off_sign = '-'; */
+/*     } */
 
-    struct tm dtm;
-    char date[32];
-    size_t dl = strftime (date, sizeof (date), "%F %T %Z",
-                          localtime_r (&version->time, &dtm));
-    if (dl == 0) {
-        /* Maybe someone gave us a crap timezone?  */
-        dl = strftime (date, sizeof (date), "%F %T %Z",
-                       gmtime_r (&version->time, &dtm));
-        assert (dl != 0);
-    }
+/*     struct tm dtm; */
+/*     char date[32]; */
+/*     size_t dl = strftime (date, sizeof (date), "%F %T %Z", */
+/*                           localtime_r (&version->time, &dtm)); */
+/*     if (dl == 0) { */
+/*         /\* Maybe someone gave us a crap timezone?  *\/ */
+/*         dl = strftime (date, sizeof (date), "%F %T %Z", */
+/*                        gmtime_r (&version->time, &dtm)); */
+/*         assert (dl != 0); */
+/*     } */
         
-    printf ("%s %s %s %s %c%02lu%02lu %.*s\n",
-            result->rcs_path, version->version, version->author, date,
-            off_sign, offset / 3600, offset / 60 % 60,
-            nl - version->log, version->log);
+/*     printf ("%s %s %s %s %c%02lu%02lu %.*s\n", */
+/*             result->rcs_path, version->version, version->author, date, */
+/*             off_sign, offset / 3600, offset / 60 % 60, */
+/*             nl - version->log, version->log); */
 }
 
 
@@ -461,9 +461,6 @@ static void read_file_versions (file_database_t * db,
         /* FIXME - check that version string is a valid version.  */
         file_tag->vers = cache_string (colon);
         file_tag->tag = &tag->tag;
-
-        printf ("File %s tag %s version %s\n",
-                file->rcs_path, file_tag->tag->tag, file_tag->vers);
 
         len = next_line (l, buffer_len, f);
     };
@@ -541,7 +538,7 @@ void read_files_versions (file_database_t * db,
     for (size_t i = 0; i != db->num_files; ++i) {
         file_t * f = db->files + i;
         for (size_t j = 0; j != f->num_versions; ++j)
-            f->versions[i].file = f;
+            f->versions[j].file = f;
 
         for (size_t j = 0; j != f->num_file_tags; ++j) {
             file_tag_t * ft = f->file_tags + j;

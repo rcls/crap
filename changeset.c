@@ -108,11 +108,14 @@ void create_changesets (file_database_t * db)
         if (strings_match (current, next) && next->time - time < FUZZ_TIME)
             current->cs_sibling = next;
         else {
+            current->cs_sibling = NULL;
             file_database_new_changeset (db, next);
             time = next->time;
         }
         current = next;
     }
+
+    current->cs_sibling = NULL;
 
     free (version_list);
 
