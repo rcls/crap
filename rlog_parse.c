@@ -60,6 +60,9 @@ int main()
     fflush (NULL);
     fprintf (stderr, "Emitted %u of %u changesets.\n",
              emitted_changesets, db.num_changesets);
+    if (db.ready_versions.num_entries)
+        fprintf (stderr, "Versions ready but unemitted: %u\n",
+                 db.ready_versions.num_entries);
     string_cache_stats (stderr);
 
     database_destroy (&db);

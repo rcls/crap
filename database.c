@@ -121,7 +121,9 @@ void version_release (database_t * db, version_t * version)
 void changeset_emitted (database_t * db, changeset_t * changeset)
 {
     for (version_t * cs_v = changeset->versions;
-         cs_v; cs_v = cs_v->cs_sibling)
+         cs_v; cs_v = cs_v->cs_sibling) {
+        heap_remove (&db->ready_versions, cs_v);
         for (version_t * v = cs_v->children; v; v = v->sibling)
             version_release (db, v);
+    }
 }
