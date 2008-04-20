@@ -3,6 +3,7 @@
 #include "file.h"
 #include "utils.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,8 +23,8 @@ static int compare_version (const void * AA, const void * BB)
 
 static int compare_changset (const void * AA, const void * BB)
 {
-    const version_t * A = AA;
-    const version_t * B = BB;
+    const version_t * A = ((const changeset_t *) AA)->versions;
+    const version_t * B = ((const changeset_t *) BB)->versions;
 
     if (A->time != B->time)
         return A->time > B->time;
@@ -54,12 +55,13 @@ void database_init (database_t * db)
     db->num_tags = 0;
     db->tags = NULL;
     db->num_changesets = 0;
+    db->max_changesets = 0;
     db->changesets = NULL;
 
     heap_init (&db->ready_versions,
-               offsetof (version_t, v_ready_index), compare_version);
+               offsetof (version_t, ready_index), compare_version);
     heap_init (&db->ready_changesets,
-               offsetof (version_t, cs_ready_index), compare_changset);
+               offsetof (changeset_t, ready_index), compare_changset);
 }
 
 
@@ -95,7 +97,8 @@ file_t * database_new_file (database_t * db)
 
 void database_new_changeset (database_t * db, version_t * v)
 {
-    db->changesets = xrealloc (db->changesets,
-                               ++db->num_changesets * sizeof (version_t *));
-    db->changesets[db->num_changesets - 1] = v;
+    ARRAY_EXTEND (db->changesets, db->num_changesets, db->max_changesets);
+
+    db->changesets[db->num_changesets - 1].ready_index = SIZE_MAX;
+    db->changesets[db->num_changesets - 1].versions = v;
 }

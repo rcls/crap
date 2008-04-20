@@ -44,8 +44,7 @@ struct version {
 
     version_t * cs_sibling;             /* Sibling in changeset.  */
 
-    size_t v_ready_index;               /* Heap index for emitting versions.  */
-    size_t cs_ready_index;              /* Changeset emitting heap index.  */
+    size_t ready_index;                 /* Heap index for emitting versions.  */
 };
 
 

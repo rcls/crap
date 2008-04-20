@@ -66,13 +66,13 @@ static int version_compare (const void * AA, const void * BB)
 
 static int cs_compare (const void * AA, const void * BB)
 {
-    const version_t * A = * (version_t * const *) AA;
-    const version_t * B = * (version_t * const *) BB;
+    const version_t * A = ((const changeset_t *) AA)->versions;
+    const version_t * B = ((const changeset_t *) BB)->versions;
 
     if (A->time != B->time)
         return A->time < B->time ? -1 : 1;
     else
-        return version_compare (AA, BB);
+        return version_compare (&A, &B);
 }
 
 
@@ -83,11 +83,8 @@ void create_changesets (database_t * db)
     for (size_t i = 0; i != db->num_files; ++i)
         total_versions += db->files[i].num_versions;
 
-    if (total_versions == 0) {
-        db->num_changesets = 0;
-        db->changesets = NULL;
+    if (total_versions == 0)
         return;
-    }
 
     version_t ** version_list = xmalloc (total_versions * sizeof (version_t *));
     version_t ** vp = version_list;
@@ -120,5 +117,5 @@ void create_changesets (database_t * db)
     free (version_list);
 
     qsort (db->changesets, db->num_changesets,
-           sizeof (version_t *), cs_compare);
+           sizeof (changeset_t), cs_compare);
 }

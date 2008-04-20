@@ -5,6 +5,8 @@
 
 #include <sys/types.h>
 
+struct version;
+
 typedef struct database {
     size_t num_files;
     struct file * files;
@@ -13,7 +15,8 @@ typedef struct database {
     struct tag * tags;
 
     size_t num_changesets;
-    struct version ** changesets;
+    size_t max_changesets;
+    struct changeset * changesets;
 
     heap_t ready_versions;
     heap_t ready_changesets;

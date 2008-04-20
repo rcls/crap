@@ -20,7 +20,7 @@ int main()
     create_changesets (&db);
 
     for (int i = 0; i != db.num_changesets; ++i) {
-        version_t * change = db.changesets[i];
+        version_t * change = db.changesets[i].versions;
 
         struct tm dtm;
         char date[32];
