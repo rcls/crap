@@ -21,8 +21,18 @@ int main()
 
     create_changesets (&db);
 
-    for (int i = 0; i != db.num_changesets; ++i) {
-        version_t * change = db.changesets[i].versions;
+    /* Mark the initial versions are ready to emit.  */
+    for (size_t i = 0; i != db.num_files; ++i) {
+        file_t * f = &db.files[i];
+        for (size_t j = 0; j != f->num_versions; ++j)
+            if (f->versions[j].parent == NULL)
+                version_release (&db, &f->versions[j]);
+    }
+
+    size_t emitted_changesets = 0;
+    while (db.ready_changesets.num_entries != 0) {
+        changeset_t * changeset = heap_pop (&db.ready_changesets);
+        version_t * change = changeset->versions;
 
         struct tm dtm;
         char date[32];
@@ -42,8 +52,14 @@ int main()
             printf ("\t%s %s\n", v->file->rcs_path, v->version);
 
         printf ("\n");
+
+        ++emitted_changesets;
+        changeset_emitted (&db, changeset);
     }
 
+    fflush (NULL);
+    fprintf (stderr, "Emitted %u of %u changesets.\n",
+             emitted_changesets, db.num_changesets);
     string_cache_stats (stderr);
 
     database_destroy (&db);

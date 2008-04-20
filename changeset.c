@@ -106,7 +106,7 @@ void create_changesets (database_t * db)
         if (strings_match (tail, next)
             && next->time - current->versions->time < FUZZ_TIME) {
             tail->cs_sibling = next;
-            ++db->changesets[db->num_changesets - 1].unready_versions;
+            ++current->unready_versions;
         }
         else {
             tail->cs_sibling = NULL;
@@ -123,4 +123,15 @@ void create_changesets (database_t * db)
 
     qsort (db->changesets, db->num_changesets,
            sizeof (changeset_t), cs_compare);
+
+    // FIXME - this is still not right; once we do change-set splitting, we'll
+    // have to be a bit more careful about changeset pointers.
+    for (size_t i = 0; i != db->num_changesets; ++i) {
+        size_t count = 0;
+        for (version_t * v = db->changesets[i].versions; v; v = v->cs_sibling) {
+            ++count;
+            v->changeset = &db->changesets[i];
+        }
+        assert (count == db->changesets[i].unready_versions);
+    }
 }

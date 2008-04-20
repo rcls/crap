@@ -1,13 +1,15 @@
 #include "file.h"
 #include "utils.h"
 
+#include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 
 version_t * file_new_version (file_t * f)
 {
     ARRAY_EXTEND (f->versions, f->num_versions, f->max_versions);
-    return f->versions + f->num_versions - 1;
+    f->versions[f->num_versions - 1].ready_index = SIZE_MAX;
+    return &f->versions[f->num_versions - 1];
 }
 
 

@@ -254,7 +254,7 @@ static void fill_in_versions_and_parents (file_t * file)
             v->parent = file_find_version (file, vers);
             if (v->parent) {
                 v->sibling = v->parent->children;
-                v->parent->children = v->sibling;
+                v->parent->children = v;
                 break;
             }
         }
@@ -377,34 +377,6 @@ static void read_file_version (file_t * result,
 
     version->log = cache_string_n (log, log_len);
     free (log);
-
-    /* Now print what we've got.  */
-/*     const char * nl = memchr (version->log, '\n', log_len); */
-/*     if (nl == NULL) */
-/*         nl = version->log + strlen (version->log); */
-
-/*     char off_sign = '+'; */
-/*     time_t offset = version->offset; */
-/*     if (offset < 0) { */
-/*         offset = -offset; */
-/*         off_sign = '-'; */
-/*     } */
-
-/*     struct tm dtm; */
-/*     char date[32]; */
-/*     size_t dl = strftime (date, sizeof (date), "%F %T %Z", */
-/*                           localtime_r (&version->time, &dtm)); */
-/*     if (dl == 0) { */
-/*         /\* Maybe someone gave us a crap timezone?  *\/ */
-/*         dl = strftime (date, sizeof (date), "%F %T %Z", */
-/*                        gmtime_r (&version->time, &dtm)); */
-/*         assert (dl != 0); */
-/*     } */
-
-/*     printf ("%s %s %s %s %c%02lu%02lu %.*s\n", */
-/*             result->rcs_path, version->version, version->author, date, */
-/*             off_sign, offset / 3600, offset / 60 % 60, */
-/*             nl - version->log, version->log); */
 }
 
 

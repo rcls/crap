@@ -42,6 +42,7 @@ struct version {
     time_t offset;
     const char * log;
 
+    struct changeset * changeset;
     version_t * cs_sibling;             /* Sibling in changeset.  */
 
     size_t ready_index;                 /* Heap index for emitting versions.  */
