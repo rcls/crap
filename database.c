@@ -95,10 +95,10 @@ file_t * database_new_file (database_t * db)
 }
 
 
-void database_new_changeset (database_t * db, version_t * v)
+changeset_t * database_new_changeset (database_t * db)
 {
     ARRAY_EXTEND (db->changesets, db->num_changesets, db->max_changesets);
 
     db->changesets[db->num_changesets - 1].ready_index = SIZE_MAX;
-    db->changesets[db->num_changesets - 1].versions = v;
+    return &db->changesets[db->num_changesets - 1];
 }

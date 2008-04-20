@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
 int main()
@@ -16,6 +17,7 @@ int main()
     database_t db;
 
     read_files_versions (&db, &line, &len, stdin);
+    free (line);
 
     create_changesets (&db);
 
@@ -42,9 +44,10 @@ int main()
         printf ("\n");
     }
 
-    database_destroy (&db);
-
     string_cache_stats (stderr);
+
+    database_destroy (&db);
+    string_cache_destroy();
 
     return 0;
 }

@@ -27,6 +27,9 @@ inline int cache_strcmp (const char * A, const char * B)
 /** Output statistics on the string cache.  */
 void string_cache_stats (FILE * f);
 
+/** Free all memory used by the string cache.  */
+void string_cache_destroy();
+
 
 /** Support for hashes indexed by a cached string.  */
 typedef struct string_hash_head {

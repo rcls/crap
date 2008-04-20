@@ -97,22 +97,27 @@ void create_changesets (database_t * db)
 
     qsort (version_list, total_versions, sizeof (version_t *), version_compare);
 
-    version_t * current = version_list[0];
-    time_t time = current->time;
-    database_new_changeset (db, current);
+    changeset_t * current = database_new_changeset (db);
+    version_t * tail = version_list[0];
+    current->versions = tail;
+    current->unready_versions = 1;
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
-        if (strings_match (current, next) && next->time - time < FUZZ_TIME)
-            current->cs_sibling = next;
-        else {
-            current->cs_sibling = NULL;
-            database_new_changeset (db, next);
-            time = next->time;
+        if (strings_match (tail, next)
+            && next->time - current->versions->time < FUZZ_TIME) {
+            tail->cs_sibling = next;
+            ++db->changesets[db->num_changesets - 1].unready_versions;
         }
-        current = next;
+        else {
+            tail->cs_sibling = NULL;
+            current = database_new_changeset (db);
+            current->versions = next;
+            current->unready_versions = 1;
+        }
+        tail = next;
     }
 
-    current->cs_sibling = NULL;
+    tail->cs_sibling = NULL;
 
     free (version_list);
 

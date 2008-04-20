@@ -111,6 +111,18 @@ void string_cache_stats (FILE * f)
 }
 
 
+void string_cache_destroy()
+{
+    for (size_t i = 0; i != cache_num_buckets; ++i)
+        for (string_entry_t * p = cache_table[i]; p; ) {
+            string_entry_t * prev = p;
+            p = p->next;
+            free (prev);
+        }
+    free (cache_table);
+}
+
+
 unsigned long string_hash_get (const char * s)
 {
     return ((string_entry_t *) (s - offsetof (string_entry_t, data)))->hash;

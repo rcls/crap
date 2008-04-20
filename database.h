@@ -27,6 +27,6 @@ void database_init (database_t * db);
 void database_destroy (database_t * db);
 
 struct file * database_new_file (database_t * db);
-void database_new_changeset (database_t * db, struct version * v);
+struct changeset * database_new_changeset (database_t * db);
 
 #endif
