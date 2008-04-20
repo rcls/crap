@@ -4,7 +4,7 @@
 #include <assert.h>
 
 #define INDEX(P) *((size_t *) (heap->index_offset + (char *) (P)))
-#define COMPARE(P,Q) (heap->compare (P, Q))
+#define LESS(P,Q) (heap->compare (Q, P) > 0)
 
 void heap_init (heap_t * heap, size_t offset, int (*compare) (void *, void *))
 {
@@ -27,10 +27,10 @@ static void shuffle_down (heap_t * heap, size_t position, void * item)
             break;
 
         if (child + 1 < heap->num_entries
-            && COMPARE (heap->entries[child + 1], heap->entries[child]))
+            && LESS (heap->entries[child + 1], heap->entries[child]))
             ++child;
         
-        if (COMPARE (item, heap->entries[child]))
+        if (LESS (item, heap->entries[child]))
             break;
 
         heap->entries[position] = heap->entries[child];
@@ -50,7 +50,7 @@ static void shuffle_up (heap_t * heap, size_t position, void * item)
 {
     while (position > 0) {
         size_t parent = (position - 1) >> 1;
-        if (!COMPARE (item, heap->entries[parent]))
+        if (!LESS (item, heap->entries[parent]))
             break;
 
         heap->entries[position] = heap->entries[parent];

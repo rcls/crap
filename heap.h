@@ -9,8 +9,8 @@ typedef struct heap {
     size_t max_entries;
     size_t index_offset;
     /**
-     * Compare should return >0 if first arg is greater than second, and <=0
-     * otherwise.  Thus either a strcmp or a '<' like predicate can be used.  */
+     * @c compare should return >0 if first arg is greater than second, and <=0
+     * otherwise.  Thus either a strcmp or a '>' like predicate can be used.  */
     int (*compare) (void *, void *);
 } heap_t;
 
