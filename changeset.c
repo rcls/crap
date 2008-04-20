@@ -2,7 +2,7 @@
 #include "database.h"
 #include "file.h"
 #include "string_cache.h"
-#include "xmalloc.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <stdbool.h>

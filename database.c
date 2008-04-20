@@ -1,7 +1,7 @@
 #include "changeset.h"
 #include "database.h"
 #include "file.h"
-#include "xmalloc.h"
+#include "utils.h"
 
 #include <stdlib.h>
 

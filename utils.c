@@ -1,7 +1,6 @@
-#include "xmalloc.h"
 #include "log.h"
+#include "utils.h"
 
-#include <stdio.h>
 #include <stdlib.h>
 
 void * xmalloc (size_t size)

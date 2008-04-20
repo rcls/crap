@@ -1,5 +1,5 @@
-#include "xmalloc.h"
 #include "string_cache.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <math.h>

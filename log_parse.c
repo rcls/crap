@@ -3,7 +3,7 @@
 #include "log.h"
 #include "log_parse.h"
 #include "string_cache.h"
-#include "xmalloc.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <ctype.h>

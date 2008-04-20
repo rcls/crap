@@ -1,6 +1,5 @@
 #include "file.h"
 #include "utils.h"
-#include "xmalloc.h"
 
 #include <string.h>
 #include <sys/types.h>
