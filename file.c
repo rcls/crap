@@ -1,4 +1,5 @@
 #include "file.h"
+#include "utils.h"
 #include "xmalloc.h"
 
 #include <string.h>
@@ -6,16 +7,14 @@
 
 version_t * file_new_version (file_t * f)
 {
-    f->versions = xrealloc (f->versions,
-                            ++f->num_versions * sizeof (version_t));
+    ARRAY_EXTEND (f->versions, f->num_versions, f->max_versions);
     return f->versions + f->num_versions - 1;
 }
 
 
 file_tag_t * file_new_file_tag (file_t * f)
 {
-    f->file_tags = xrealloc (f->file_tags,
-                             ++f->num_file_tags * sizeof (file_tag_t));
+    ARRAY_EXTEND (f->file_tags, f->num_file_tags, f->max_file_tags);
     return f->file_tags + f->num_file_tags - 1;
 }
 
@@ -47,7 +46,6 @@ version_t * file_find_version (const file_t * f, const char * s)
 
 void tag_new_tag_file (tag_t * t, file_tag_t * ft)
 {
-    t->tag_files = xrealloc (t->tag_files,
-                             ++t->num_tag_files * sizeof (file_tag_t *));
+    ARRAY_EXTEND (t->tag_files, t->num_tag_files, t->max_tag_files);
     t->tag_files [t->num_tag_files - 1] = ft;
 }

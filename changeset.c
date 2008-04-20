@@ -15,16 +15,16 @@
 
 static bool strings_match (const version_t * A, const version_t * B)
 {
-    if (strcmp (A->author, B->author) != 0)
+    if (cache_strcmp (A->author, B->author) != 0)
         return 0;
 
-    if (strcmp (A->commitid, B->commitid) != 0)
+    if (cache_strcmp (A->commitid, B->commitid) != 0)
         return 0;
 
     if (string_hash_get (A->log) != string_hash_get (B->log))
         return 0;
 
-    if (strcmp (A->log, B->log) != 0)
+    if (cache_strcmp (A->log, B->log) != 0)
         return 0;
 
     return 1;
@@ -36,11 +36,11 @@ static int version_compare (const void * AA, const void * BB)
     const version_t * A = * (version_t * const *) AA;
     const version_t * B = * (version_t * const *) BB;
 
-    int r = strcmp (A->author, B->author);
+    int r = cache_strcmp (A->author, B->author);
     if (r != 0)
         return r;
 
-    r = strcmp (A->commitid, B->commitid);
+    r = cache_strcmp (A->commitid, B->commitid);
     if (r != 0)
         return r;
 
@@ -49,7 +49,7 @@ static int version_compare (const void * AA, const void * BB)
     if (Alh != Blh)
         return Alh < Blh ? -1 : 1;
 
-    r = strcmp (A->log, B->log);
+    r = cache_strcmp (A->log, B->log);
     if (r != 0)
         return r;
 
@@ -73,7 +73,7 @@ static int cs_compare (const void * AA, const void * BB)
         return A->time < B->time ? -1 : 1;
     else
         return version_compare (AA, BB);
-}        
+}
 
 
 void create_changesets (file_database_t * db)

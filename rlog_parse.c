@@ -31,7 +31,7 @@ int main()
                            gmtime_r (&change->time, &dtm));
 
         assert (dl != 0);
-        
+
         printf ("%s %s %s\n%s\n",
                 date, change->author, change->commitid, change->log);
 

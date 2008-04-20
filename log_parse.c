@@ -1,4 +1,3 @@
-
 #include "database.h"
 #include "file.h"
 #include "log.h"
@@ -369,7 +368,7 @@ static void read_file_version (file_t * result,
         log[log_len - 1] = '\n';
 
         len = next_line (l, buffer_len, f);
-    }        
+    }
 
     version->log = cache_string_n (log, log_len);
     free (log);
@@ -396,7 +395,7 @@ static void read_file_version (file_t * result,
 /*                        gmtime_r (&version->time, &dtm)); */
 /*         assert (dl != 0); */
 /*     } */
-        
+
 /*     printf ("%s %s %s %s %c%02lu%02lu %.*s\n", */
 /*             result->rcs_path, version->version, version->author, date, */
 /*             off_sign, offset / 3600, offset / 60 % 60, */
@@ -418,10 +417,6 @@ static void read_file_versions (file_database_t * db,
 
     file_t * file = file_database_new_file (db);
     file->rcs_path = cache_string_n (*l + 12, len - 14);
-    file->num_versions = 0;
-    file->versions = NULL;
-    file->num_file_tags = 0;
-    file->file_tags = NULL;
 
     do {
         len = next_line (l, buffer_len, f);
@@ -451,6 +446,7 @@ static void read_file_versions (file_database_t * db,
         if (n) {
             tag->tag.tag = tag_name;
             tag->tag.num_tag_files = 0;
+            tag->tag.max_tag_files = 0;
             tag->tag.tag_files = NULL;
         }
 

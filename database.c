@@ -18,14 +18,14 @@ void file_database_init (file_database_t * db)
 file_t * file_database_new_file (file_database_t * db)
 {
     db->files = xrealloc (db->files, ++db->num_files * sizeof (file_t));
-    return &db->files[db->num_files - 1];
-}
-
-
-tag_t * file_database_new_tag (file_database_t * db)
-{
-    db->tags = xrealloc (db->tags, ++db->num_tags * sizeof (tag_t));
-    return &db->tags[db->num_tags - 1];
+    file_t * result = &db->files[db->num_files - 1];
+    result->num_versions = 0;
+    result->max_versions = 0;
+    result->versions = NULL;
+    result->num_file_tags = 0;
+    result->max_file_tags = 0;
+    result->file_tags = 0;
+    return result;
 }
 
 

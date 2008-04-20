@@ -5,6 +5,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern int cache_strcmp (const char * A, const char * B);
+
 typedef struct string_entry_t {
     struct string_entry_t * next;       /* Next in hash chain.  */
     unsigned long hash;                 /* hash.  */
@@ -23,7 +25,7 @@ static void cache_resize()
         cache_table = xcalloc (cache_num_buckets * sizeof (string_entry_t *));
         return;
     }
-    
+
     size_t new_size = cache_num_buckets * 2;
     cache_table = xrealloc (cache_table,
                             new_size * sizeof (string_entry_t *));

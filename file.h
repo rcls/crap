@@ -14,9 +14,11 @@ struct file {
     const char * rcs_path;
 
     size_t num_versions;
+    size_t max_versions;
     version_t * versions;
 
     size_t num_file_tags;
+    size_t max_file_tags;
     file_tag_t * file_tags;
 };
 
@@ -56,8 +58,9 @@ struct file_tag {
 
 struct tag {
     const char * tag;
-    
+
     size_t num_tag_files;
+    size_t max_tag_files;
     file_tag_t ** tag_files;
 };
 

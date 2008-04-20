@@ -3,12 +3,13 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <string.h>
 
 /** Cache unique copy of a string.  */
 const char * cache_string (const char * str);
 
 /** Cache unique copy of a string.  */
-const char * cache_string_n (const char * str, size_t len); 
+const char * cache_string_n (const char * str, size_t len);
 
 /** Hash function.  */
 unsigned long string_hash_func (const char * str, size_t len);
@@ -16,6 +17,11 @@ unsigned long string_hash_func (const char * str, size_t len);
 /** Look-up hash of cached string.  */
 unsigned long string_hash_get (const char * str);
 
+/** Compare of cached string, faster than strcmp when equality is likely.  */
+inline int cache_strcmp (const char * A, const char * B)
+{
+    return A == B ? 0 : strcmp (A, B);
+}
 
 
 /** Support for hashes indexed by a cached string.  */
