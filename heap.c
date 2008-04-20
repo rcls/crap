@@ -44,8 +44,8 @@ static void shuffle_down (heap_t * heap, size_t position, void * item)
 
 
 /**
- * The heap has a bubble at @c position; shuffle the bubble upwards as far as we
- * might need to insert @c item, and then call @c shuffle_down.  */
+ * The heap has a bubble at @c position; shuffle the bubble upwards as far as
+ * might be needed to insert @c item, and then call @c shuffle_down.  */
 static void shuffle_up (heap_t * heap, size_t position, void * item)
 {
     while (position > 0) {
@@ -68,6 +68,12 @@ void heap_insert (heap_t * heap, void * item)
     ARRAY_EXTEND (heap->entries, heap->num_entries, heap->max_entries);
 
     shuffle_up (heap, heap->num_entries - 1, item);
+}
+
+
+void heap_replace (heap_t * heap, void * old, void * new)
+{
+    shuffle_up (heap, INDEX (old), new);
 }
 
 
