@@ -1,6 +1,8 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
+#include "heap.h"
+
 #include <sys/types.h>
 
 typedef struct database {
@@ -12,6 +14,9 @@ typedef struct database {
 
     size_t num_changesets;
     struct version ** changesets;
+
+    heap_t ready_versions;
+    heap_t ready_changesets;
 
 } database_t;
 

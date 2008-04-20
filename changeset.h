@@ -3,7 +3,7 @@
 
 #include <time.h>
 
-struct file_database;
+struct database;
 
 typedef struct changeset {
     time_t time;                        /* Earliest version in changeset.  */
@@ -15,6 +15,6 @@ typedef struct changeset {
     struct version ** versions;
 } changeset_t;
 
-void create_changesets (struct file_database * db);
+void create_changesets (struct database * db);
 
 #endif

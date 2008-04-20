@@ -76,7 +76,7 @@ static int cs_compare (const void * AA, const void * BB)
 }
 
 
-void create_changesets (file_database_t * db)
+void create_changesets (database_t * db)
 {
     size_t total_versions = 0;
 
@@ -102,14 +102,14 @@ void create_changesets (file_database_t * db)
 
     version_t * current = version_list[0];
     time_t time = current->time;
-    file_database_new_changeset (db, current);
+    database_new_changeset (db, current);
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (strings_match (current, next) && next->time - time < FUZZ_TIME)
             current->cs_sibling = next;
         else {
             current->cs_sibling = NULL;
-            file_database_new_changeset (db, next);
+            database_new_changeset (db, next);
             time = next->time;
         }
         current = next;

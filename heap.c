@@ -2,11 +2,13 @@
 #include "utils.h"
 
 #include <assert.h>
+#include <stdint.h>
 
 #define INDEX(P) *((size_t *) (heap->index_offset + (char *) (P)))
 #define LESS(P,Q) (heap->compare (Q, P) > 0)
 
-void heap_init (heap_t * heap, size_t offset, int (*compare) (void *, void *))
+void heap_init (heap_t * heap, size_t offset,
+                int (*compare) (const void *, const void *))
 {
     heap->entries = NULL;
     heap->num_entries = 0;
@@ -64,6 +66,8 @@ static void shuffle_up (heap_t * heap, size_t position, void * item)
 
 void heap_insert (heap_t * heap, void * item)
 {
+    assert (INDEX (item) == SIZE_MAX);
+
     /* Create a bubble at the end.  */
     ARRAY_EXTEND (heap->entries, heap->num_entries, heap->max_entries);
 
@@ -73,16 +77,25 @@ void heap_insert (heap_t * heap, void * item)
 
 void heap_replace (heap_t * heap, void * old, void * new)
 {
+    assert (INDEX (old) != SIZE_MAX);
+    assert (INDEX (new) == SIZE_MAX);
+
     shuffle_up (heap, INDEX (old), new);
+
+    INDEX (old) = SIZE_MAX;
 }
 
 
 void heap_remove (heap_t * heap, void * item)
 {
+    assert (INDEX (item) != SIZE_MAX);
+
     --heap->num_entries;
     if (INDEX (item) != heap->num_entries)
         /* Shuffle the item from the end into the bubble.  */
         shuffle_up (heap, INDEX (item), heap->entries[heap->num_entries]);
+
+    INDEX (item) = SIZE_MAX;
 }
 
 

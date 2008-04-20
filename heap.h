@@ -12,12 +12,13 @@ typedef struct heap {
     /**
      * @c compare should return >0 if first arg is greater than second, and <=0
      * otherwise.  Thus either a strcmp or a '>' like predicate can be used.  */
-    int (*compare) (void *, void *);
+    int (*compare) (const void *, const void *);
 } heap_t;
 
 
 /** Initialise a new heap.  */
-void heap_init (heap_t * heap, size_t offset, int (*compare) (void *, void *));
+void heap_init (heap_t * heap, size_t offset,
+                int (*compare) (const void *, const void *));
 
 /** Destroy a heap.  */
 void heap_destroy (heap_t * heap);
