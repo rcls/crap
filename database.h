@@ -1,19 +1,24 @@
 #ifndef DATABASE_H
 #define DATABASE_H
 
-#include "file.h"
-
 #include <sys/types.h>
 
 typedef struct file_database {
     size_t num_files;
-    file_t * files;
+    struct file * files;
 
     size_t num_tags;
-    tag_t * tags;
+    struct tag * tags;
+
+    size_t num_changesets;
+    struct version ** changesets;
+
 } file_database_t;
 
-file_t * file_database_new_file (file_database_t * db);
-tag_t * file_database_new_tag (file_database_t * db);
+void file_database_init (file_database_t * db);
+
+struct file * file_database_new_file (file_database_t * db);
+struct tag * file_database_new_tag (file_database_t * db);
+void file_database_new_changeset (file_database_t * db, struct version * v);
 
 #endif

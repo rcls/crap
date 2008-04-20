@@ -26,6 +26,7 @@ version_t * file_find_version (const file_t * f, const char * s);
 file_tag_t * file_new_file_tag (file_t * f);
 
 struct version {
+    file_t * file;
     const char * version;
     bool dead;
 
@@ -38,6 +39,8 @@ struct version {
     time_t time;
     time_t offset;
     const char * log;
+
+    version_t * cs_sibling;             /* Sibling in changeset.  */
 };
 
 

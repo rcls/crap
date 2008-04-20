@@ -516,11 +516,10 @@ static int tag_compare (const void * AA, const void * BB)
 void read_files_versions (file_database_t * db,
                           char ** __restrict__ l, size_t * buffer_len, FILE * f)
 {
+    file_database_init (db);
+
     string_hash_t tags;
     string_hash_init (&tags);
-
-    db->num_files = 0;
-    db->files = NULL;
 
     next_line (l, buffer_len, f);
 
@@ -536,10 +535,14 @@ void read_files_versions (file_database_t * db,
     /* Sort the list of files.  */
     qsort (db->files, db->num_files, sizeof (file_t), file_compare);
 
-    /* Set the pointers from file_tags to files.  Add the file_tags to the tags.
-     * The latter will be sorted as we have already sorted the files.  */
+    /* Set the pointers from versions and file_tags to files.  Add the file_tags
+     * to the tags.  The latter will be sorted as we have already sorted the
+     * files.  */
     for (size_t i = 0; i != db->num_files; ++i) {
         file_t * f = db->files + i;
+        for (size_t j = 0; j != f->num_versions; ++j)
+            f->versions[i].file = f;
+
         for (size_t j = 0; j != f->num_file_tags; ++j) {
             file_tag_t * ft = f->file_tags + j;
             ft->file = f;
