@@ -3,6 +3,7 @@
 #include "file.h"
 #include "xmalloc.h"
 
+#include <stdlib.h>
 
 void file_database_init (file_database_t * db)
 {
@@ -12,6 +13,22 @@ void file_database_init (file_database_t * db)
     db->tags = NULL;
     db->num_changesets = 0;
     db->changesets = NULL;
+}
+
+
+void file_database_destroy (file_database_t * db)
+{
+    for (size_t i = 0; i != db->num_files; ++i) {
+        free (db->files[i].versions);
+        free (db->files[i].file_tags);
+    }
+
+    for (size_t i = 0; i != db->num_tags; ++i)
+        free (db->tags[i].tag_files);
+
+    free (db->files);
+    free (db->tags);
+    free (db->changesets);
 }
 
 

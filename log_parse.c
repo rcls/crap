@@ -352,6 +352,11 @@ static void read_file_version (file_t * result,
         len = next_line (l, buffer_len, f);
     }
 
+    /* We don't care about the 'branches:' annotation; we reconstruct the branch
+     * information ourselves.  */
+    if (starts_with (*l, "M branches: "))
+        len = next_line (l, buffer_len, f);
+
     if (!have_date)
         bugger ("Log (%s) does not have date.\n", result->rcs_path);
 

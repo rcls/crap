@@ -2,6 +2,7 @@
 #include "database.h"
 #include "file.h"
 #include "log_parse.h"
+#include "string_cache.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -41,8 +42,9 @@ int main()
         printf ("\n");
     }
 
-//    file_database_destroy (&db);
+    file_database_destroy (&db);
+
+    string_cache_stats (stderr);
 
     return 0;
 }
-

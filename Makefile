@@ -4,7 +4,7 @@ LD=gcc
 
 all: rlog_parse
 
-rlog_parse: rlog_parse.o libcrap.a
+rlog_parse: rlog_parse.o libcrap.a -lm
 	$(LD) $(LDFLAGS) -o $@ $+
 
 libcrap.a: changeset.o database.o file.o log.o log_parse.o \

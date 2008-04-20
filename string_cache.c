@@ -2,13 +2,14 @@
 #include "string_cache.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
 extern int cache_strcmp (const char * A, const char * B);
 
-typedef struct string_entry_t {
-    struct string_entry_t * next;       /* Next in hash chain.  */
+typedef struct string_entry {
+    struct string_entry * next;         /* Next in hash chain.  */
     unsigned long hash;                 /* hash.  */
     char data[1];                       /* Actual data.  */
 } string_entry_t;
@@ -26,9 +27,8 @@ static void cache_resize()
         return;
     }
 
-    size_t new_size = cache_num_buckets * 2;
     cache_table = xrealloc (cache_table,
-                            new_size * sizeof (string_entry_t *));
+                            2 * cache_num_buckets * sizeof (string_entry_t *));
 
     for (size_t i = 0; i != cache_num_buckets; ++i) {
         string_entry_t ** me = cache_table + i;
@@ -48,6 +48,8 @@ static void cache_resize()
         *me = NULL;
         *you = NULL;
     }
+
+    cache_num_buckets *= 2;
 }
 
 
@@ -70,6 +72,7 @@ const char * cache_string_n (const char * s, size_t len)
              *bucket; bucket = &(*bucket)->next);
     }
 
+    ++cache_entries;
     string_entry_t * b = xmalloc (offsetof (string_entry_t, data) + len + 1);
     *bucket = b;
     b->next = NULL;
@@ -83,6 +86,28 @@ const char * cache_string_n (const char * s, size_t len)
 const char * cache_string (const char * s)
 {
     return cache_string_n (s, strlen (s));
+}
+
+
+void string_cache_stats (FILE * f)
+{
+    size_t used = 0;
+    unsigned long long sumsq = 0;
+    for (size_t i = 0; i != cache_num_buckets; ++i) {
+        if (cache_table[i] == NULL)
+            continue;
+
+        ++used;
+        size_t len = 0;
+        for (string_entry_t * p = cache_table[i]; p; p = p->next)
+            ++len;
+
+        sumsq += len * (unsigned long long) len;
+    }
+
+    fprintf (f, "String cache: %u items, %u/%u buckets used, RMS len %g\n",
+             cache_entries, used, cache_num_buckets,
+             sqrt (sumsq / (double) used));
 }
 
 
