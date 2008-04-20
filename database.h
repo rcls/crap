@@ -3,7 +3,7 @@
 
 #include <sys/types.h>
 
-typedef struct file_database {
+typedef struct database {
     size_t num_files;
     struct file * files;
 
@@ -13,12 +13,12 @@ typedef struct file_database {
     size_t num_changesets;
     struct version ** changesets;
 
-} file_database_t;
+} database_t;
 
-void file_database_init (file_database_t * db);
-void file_database_destroy (file_database_t * db);
+void database_init (database_t * db);
+void database_destroy (database_t * db);
 
-struct file * file_database_new_file (file_database_t * db);
-void file_database_new_changeset (file_database_t * db, struct version * v);
+struct file * database_new_file (database_t * db);
+void database_new_changeset (database_t * db, struct version * v);
 
 #endif

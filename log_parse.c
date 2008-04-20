@@ -408,7 +408,7 @@ static void read_file_version (file_t * result,
 }
 
 
-static void read_file_versions (file_database_t * db,
+static void read_file_versions (database_t * db,
                                 string_hash_t * tags,
                                 char ** restrict l, size_t * buffer_len,
                                 FILE * f)
@@ -420,7 +420,7 @@ static void read_file_versions (file_database_t * db,
     if ((*l)[len - 1] != 'v' || (*l)[len - 2] != ',')
         bugger ("RCS file name does not end with ',v': %s\n", *l);
 
-    file_t * file = file_database_new_file (db);
+    file_t * file = database_new_file (db);
     file->rcs_path = cache_string_n (*l + 12, len - 14);
 
     do {
@@ -511,10 +511,10 @@ static int tag_compare (const void * AA, const void * BB)
 }
 
 
-void read_files_versions (file_database_t * db,
+void read_files_versions (database_t * db,
                           char ** __restrict__ l, size_t * buffer_len, FILE * f)
 {
-    file_database_init (db);
+    database_init (db);
 
     string_hash_t tags;
     string_hash_init (&tags);

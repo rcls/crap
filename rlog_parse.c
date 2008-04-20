@@ -13,7 +13,7 @@ int main()
     char * line = NULL;
     size_t len = 0;
 
-    file_database_t db;
+    database_t db;
 
     read_files_versions (&db, &line, &len, stdin);
 
@@ -42,7 +42,7 @@ int main()
         printf ("\n");
     }
 
-    file_database_destroy (&db);
+    database_destroy (&db);
 
     string_cache_stats (stderr);
 
