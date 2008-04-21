@@ -38,26 +38,45 @@ const version_t * cycle_find (const version_t * v)
 }
 
 
-void changeset_report (const changeset_t * cs)
+void cycle_split (database_t * db, changeset_t * cs)
 {
-    printf ("Changeset %s\n%s\n", cs->versions->author, cs->versions->log);
-    for (const version_t * v = cs->versions; v; v = v->cs_sibling)
-        printf ("    %s:%s\n", v->file->rcs_path, v->version);
-}
+    fprintf (stderr, "*********** CYCLE **********\n");
+    /* We split the changeset into to.  We leave all the blocked versions
+     * in cs, and put the ready-to-emit into nw.  */
 
-
-void cycle_report (const database_t * db, const version_t * v)
-{
-    printf ("*********** CYCLE **********\n");
-    printf ("File %s:%s", v->file->rcs_path, v->version);
-    changeset_report (v->changeset);
-    const version_t * u = v;
-    do {
-        u = preceed (u);
-        printf ("File %s:%s", u->file->rcs_path, u->version);
-        changeset_report (u->changeset);
+    changeset_t * new = database_new_changeset (db);
+    new->unready_versions = 0;
+    version_t ** cs_v = &cs->versions;
+    version_t ** new_v = &new->versions;
+    for (version_t * v = cs->versions; v; v = v->cs_sibling) {
+        if (v->ready_index == SIZE_MAX) {
+            /* Blocked; stays in cs.  */
+            *cs_v = v;
+            cs_v = &v->cs_sibling;
+        }
+        else {
+            /* Ready-to-emit; goes into new.  */
+            *new_v = v;
+            new_v = &v->cs_sibling;
+        }
     }
-    while (u != v);
+
+    *cs_v = NULL;
+    *new_v = NULL;
+    assert (cs->versions);
+    assert (new->versions);
+
+    heap_insert (&db->ready_changesets, new);
+
+    fprintf (stderr, "Changeset %s\n%s\n",
+            cs->versions->author, cs->versions->log);
+    for (const version_t * v = new->versions; v; v = v->cs_sibling)
+        fprintf (stderr, "    %s:%s\n", v->file->rcs_path, v->version);
+        
+    fprintf (stderr, "Deferring:\n");
+
+    for (const version_t * v = cs->versions; v; v = v->cs_sibling)
+        fprintf (stderr, "    %s:%s\n", v->file->rcs_path, v->version);
 }
 
 
@@ -82,7 +101,11 @@ int main()
     }
 
     size_t emitted_changesets = 0;
-    while (db.ready_changesets.num_entries != 0) {
+    while (db.ready_versions.num_entries) {
+        if (db.ready_changesets.num_entries == 0)
+            cycle_split (
+                &db, cycle_find (heap_front (&db.ready_versions))->changeset);
+
         changeset_t * changeset = heap_pop (&db.ready_changesets);
         version_t * change = changeset->versions;
 
@@ -112,13 +135,6 @@ int main()
     fflush (NULL);
     fprintf (stderr, "Emitted %u of %u changesets.\n",
              emitted_changesets, db.num_changesets);
-    if (db.ready_versions.num_entries)
-        fprintf (stderr, "Versions ready but unemitted: %u\n",
-                 db.ready_versions.num_entries);
-
-    if (db.ready_versions.num_entries)
-        // Presume we have a cycle; log a cycle.
-        cycle_report (&db, cycle_find (heap_front (&db.ready_versions)));
 
     string_cache_stats (stderr);
 
