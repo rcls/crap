@@ -99,6 +99,7 @@ void create_changesets (database_t * db)
 
     changeset_t * current = database_new_changeset (db);
     version_t * tail = version_list[0];
+    tail->changeset = current;
     current->versions = tail;
     current->unready_versions = 1;
     for (size_t i = 1; i < total_versions; ++i) {
@@ -114,6 +115,7 @@ void create_changesets (database_t * db)
             current->versions = next;
             current->unready_versions = 1;
         }
+        next->changeset = current;
         tail = next;
     }
 
@@ -123,16 +125,4 @@ void create_changesets (database_t * db)
 
     qsort (db->changesets, db->num_changesets,
            sizeof (changeset_t *), cs_compare);
-
-    // FIXME - this is still not right; once we do change-set splitting, we'll
-    // have to be a bit more careful about changeset pointers.
-    for (size_t i = 0; i != db->num_changesets; ++i) {
-        size_t count = 0;
-        for (version_t * v = db->changesets[i]->versions;
-             v; v = v->cs_sibling) {
-            ++count;
-            v->changeset = db->changesets[i];
-        }
-        assert (count == db->changesets[i]->unready_versions);
-    }
 }

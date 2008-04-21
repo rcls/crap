@@ -76,6 +76,9 @@ void database_destroy (database_t * db)
     for (size_t i = 0; i != db->num_tags; ++i)
         free (db->tags[i].tag_files);
 
+    for (size_t i = 0; i != db->num_changesets; ++i)
+        free (db->changesets[i]);
+
     free (db->files);
     free (db->tags);
     free (db->changesets);
