@@ -9,6 +9,58 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <stdint.h>
+const version_t * preceed (const version_t * v)
+{
+    // If cs is not ready to emit, then some version in cs is blocked.  The
+    // earliest un-emitted ancestor of that version will be ready to emit.
+    // Search for it.
+    for (version_t * csv = v->changeset->versions; csv; csv = csv->cs_sibling) {
+        if (csv->ready_index != SIZE_MAX)
+            continue;                   /* Not blocked.  */
+        for (version_t * v = csv->parent; v; v = v->parent)
+            if (v->ready_index != SIZE_MAX)
+                return v;
+    }
+    abort();
+}
+
+const version_t * cycle_find (const version_t * v)
+{
+    const version_t * slow = v;
+    const version_t * fast = v;
+    do {
+        slow = preceed (slow);
+        fast = preceed (preceed (fast));
+    }
+    while (slow != fast);
+    return slow;
+}
+
+
+void changeset_report (const changeset_t * cs)
+{
+    printf ("Changeset %s\n%s\n", cs->versions->author, cs->versions->log);
+    for (const version_t * v = cs->versions; v; v = v->cs_sibling)
+        printf ("    %s:%s\n", v->file->rcs_path, v->version);
+}
+
+
+void cycle_report (const database_t * db, const version_t * v)
+{
+    printf ("*********** CYCLE **********\n");
+    printf ("File %s:%s", v->file->rcs_path, v->version);
+    changeset_report (v->changeset);
+    const version_t * u = v;
+    do {
+        u = preceed (u);
+        printf ("File %s:%s", u->file->rcs_path, u->version);
+        changeset_report (u->changeset);
+    }
+    while (u != v);
+}
+
+
 int main()
 {
     char * line = NULL;
@@ -21,7 +73,7 @@ int main()
 
     create_changesets (&db);
 
-    /* Mark the initial versions are ready to emit.  */
+    /* Mark the initial versions as ready to emit.  */
     for (size_t i = 0; i != db.num_files; ++i) {
         file_t * f = &db.files[i];
         for (size_t j = 0; j != f->num_versions; ++j)
@@ -63,6 +115,11 @@ int main()
     if (db.ready_versions.num_entries)
         fprintf (stderr, "Versions ready but unemitted: %u\n",
                  db.ready_versions.num_entries);
+
+    if (db.ready_versions.num_entries)
+        // Presume we have a cycle; log a cycle.
+        cycle_report (&db, cycle_find (heap_front (&db.ready_versions)));
+
     string_cache_stats (stderr);
 
     database_destroy (&db);
