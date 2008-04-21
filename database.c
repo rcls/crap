@@ -100,10 +100,13 @@ file_t * database_new_file (database_t * db)
 
 changeset_t * database_new_changeset (database_t * db)
 {
+    changeset_t * result = xmalloc (sizeof (changeset_t));
+    result->ready_index = SIZE_MAX;
+
     ARRAY_EXTEND (db->changesets, db->num_changesets, db->max_changesets);
 
-    db->changesets[db->num_changesets - 1].ready_index = SIZE_MAX;
-    return &db->changesets[db->num_changesets - 1];
+    db->changesets[db->num_changesets - 1] = result;
+    return result;
 }
 
 

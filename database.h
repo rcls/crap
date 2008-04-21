@@ -16,7 +16,7 @@ typedef struct database {
 
     size_t num_changesets;
     size_t max_changesets;
-    struct changeset * changesets;
+    struct changeset ** changesets;
 
     heap_t ready_versions;
     heap_t ready_changesets;

@@ -66,8 +66,8 @@ static int version_compare (const void * AA, const void * BB)
 
 static int cs_compare (const void * AA, const void * BB)
 {
-    const version_t * A = ((const changeset_t *) AA)->versions;
-    const version_t * B = ((const changeset_t *) BB)->versions;
+    const version_t * A = (* (changeset_t * const *) AA)->versions;
+    const version_t * B = (* (changeset_t * const *) BB)->versions;
 
     if (A->time != B->time)
         return A->time < B->time ? -1 : 1;
@@ -122,16 +122,17 @@ void create_changesets (database_t * db)
     free (version_list);
 
     qsort (db->changesets, db->num_changesets,
-           sizeof (changeset_t), cs_compare);
+           sizeof (changeset_t *), cs_compare);
 
     // FIXME - this is still not right; once we do change-set splitting, we'll
     // have to be a bit more careful about changeset pointers.
     for (size_t i = 0; i != db->num_changesets; ++i) {
         size_t count = 0;
-        for (version_t * v = db->changesets[i].versions; v; v = v->cs_sibling) {
+        for (version_t * v = db->changesets[i]->versions;
+             v; v = v->cs_sibling) {
             ++count;
-            v->changeset = &db->changesets[i];
+            v->changeset = db->changesets[i];
         }
-        assert (count == db->changesets[i].unready_versions);
+        assert (count == db->changesets[i]->unready_versions);
     }
 }
