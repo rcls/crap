@@ -269,42 +269,52 @@ static void fill_in_versions_and_parents (file_t * file)
         }
     }
 
-    /* Fill in the tag version links.  */
+    /* Fill in the tag version links, and remove and tags to dead versions.  */
+    size_t offset = 0;
     for (size_t i = 0; i != file->num_file_tags; ++i) {
         file_tag_t * ft = file->file_tags + i;
+        if (offset) {
+            memcpy (ft - offset, ft, sizeof (file_tag_t));
+            ft -= offset;
+        }
+
         if (!tag_is_branch (ft)) {
             ft->version = file_find_version (file, ft->vers);
             if (ft->version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
                          file->rcs_path, ft->tag->tag, ft->vers);
+            else if (ft->version->dead) {
+                fprintf (stderr, "File %s tag %s has dead version %s\n",
+                         file->rcs_path, ft->tag->tag, ft->version->version);
+                ++offset;
+            }
             continue;
         }
 
         /* We try and find a predecessor version, to use as the branch point.
          * If none exists, that's fine, it makes sense as a branch addition.  */
-        // FIXME - this isn't right.  We shouldn't loop searching backwards,
-        // it could be a branch add following a deletion on the parent, where
-        // the parent deletion has been out-dated.
         char vers[1 + strlen (ft->vers)];
         strcpy (vers, ft->vers);
-        ft->version = NULL;
-        while (predecessor (vers)) {
-            version_t * v = file_find_version (file, vers);
-            if (v != NULL) {
-                ft->version = v;
-                break;
-            }
-        }
+        if (predecessor (vers))
+            ft->version = file_find_version (file, vers);
+        else
+            ft->version = NULL;
+
+        if (ft->version && ft->version->dead)
+            /* This hits for branch additions.  We don't log, and unlike tags
+             * on dead versions, we keep the file_tag.  */
+            ft->version = NULL;
 
         file_new_branch (file, ft);
     }
+    file->num_file_tags -= offset;
 
     /* Sort the branches by tag.  */
     qsort (file->branches, file->num_branches, sizeof (file_tag_t *),
            branch_compare);
 
     /* Check for duplicate branches.  */
-    size_t offset = 0;
+    offset = 0;
     for (size_t i = 1; i < file->num_branches; ++i) {
         assert (strcmp (file->branches[i - offset - 1]->vers,
                         file->branches[i]->vers) < 0);
@@ -549,9 +559,9 @@ void read_files_versions (database_t * db,
     /* Sort the list of files.  */
     qsort (db->files, db->num_files, sizeof (file_t), file_compare);
 
-    /* Set the pointers from versions and file_tags to files.  Add the file_tags
-     * to the tags.  The latter will be sorted as we have already sorted the
-     * files.  */
+    /* Set the pointers from versions to files and file_tags to files.  Add the
+     * file_tags to the tags.  The latter will be sorted as we have already
+     * sorted the files.  */
     for (size_t i = 0; i != db->num_files; ++i) {
         file_t * f = db->files + i;
         for (size_t j = 0; j != f->num_versions; ++j)
