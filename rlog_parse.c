@@ -68,8 +68,9 @@ void cycle_split (database_t * db, changeset_t * cs)
 
     heap_insert (&db->ready_changesets, new);
 
-    fprintf (stderr, "Changeset %s\n%s\n",
-            cs->versions->author, cs->versions->log);
+    fprintf (stderr, "Changeset %s %s\n%s\n",
+             cs->versions->branch ? cs->versions->branch->tag->tag : "",
+             cs->versions->author, cs->versions->log);
     for (const version_t * v = new->versions; v; v = v->cs_sibling)
         fprintf (stderr, "    %s:%s\n", v->file->rcs_path, v->version);
         
@@ -120,8 +121,9 @@ int main()
 
         assert (dl != 0);
 
-        printf ("%s %s %s\n%s\n",
-                date, change->author, change->commitid, change->log);
+        printf ("%s %s %s %s\n%s\n",
+                date, change->branch ? change->branch->tag->tag : "",
+                change->author, change->commitid, change->log);
 
         for (version_t * v = change; v; v = v->cs_sibling)
             printf ("\t%s %s\n", v->file->rcs_path, v->version);

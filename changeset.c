@@ -36,13 +36,25 @@ static int version_compare (const void * AA, const void * BB)
     const version_t * A = * (version_t * const *) AA;
     const version_t * B = * (version_t * const *) BB;
 
-    int r = cache_strcmp (A->author, B->author);
+    int r = cache_strcmp (A->commitid, B->commitid);
     if (r != 0)
         return r;
 
-    r = cache_strcmp (A->commitid, B->commitid);
+    r = cache_strcmp (A->author, B->author);
     if (r != 0)
         return r;
+
+    if (A->branch != NULL && B->branch == NULL)
+        return 1;
+
+    if (A->branch == NULL && B->branch != NULL)
+        return -1;
+
+    if (A->branch != NULL) {
+        r = cache_strcmp (A->branch->tag->tag, B->branch->tag->tag);
+        if (r != 0)
+            return r;
+    }
 
     unsigned long Alh = string_hash_get (A->log);
     unsigned long Blh = string_hash_get (B->log);
