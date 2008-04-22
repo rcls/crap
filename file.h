@@ -53,9 +53,9 @@ struct version {
     file_tag_t * branch;
 
     struct changeset * changeset;
-    version_t * cs_sibling;             /* Sibling in changeset.  */
+    version_t * cs_sibling;             /**< Sibling in changeset.  */
 
-    size_t ready_index;                 /* Heap index for emitting versions.  */
+    size_t ready_index;               /**< Heap index for emitting versions.  */
 };
 
 
@@ -70,11 +70,26 @@ struct file_tag {
 
 
 struct tag {
-    const char * tag;
+    const char * tag;                   /**< The tag name.  */
 
     size_t num_tag_files;
     size_t max_tag_files;
     file_tag_t ** tag_files;
+
+#if 0
+    /**
+     * This is non-NULL for branches, where a tag is considered a branch if the
+     * tag is a branch tag on any file.  It points to an array of versions, the
+     * same size as the database file array.  Each item in the slot is current
+     * version, in the emission of the branch, of the corresponding file.  */
+    version_t ** branch_versions;
+#endif
+
+    /**
+     * A sha-1 hash of the version information; this is used to identify when
+     * a set of versions exactly matching this tag has been emitted.
+     */
+    unsigned char hash[20];
 };
 
 void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);

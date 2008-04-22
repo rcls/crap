@@ -7,6 +7,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <openssl/sha.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -269,7 +270,7 @@ static void fill_in_versions_and_parents (file_t * file)
         }
     }
 
-    /* Fill in the tag version links, and remove and tags to dead versions.  */
+    /* Fill in the tag version links, and remove tags to dead versions.  */
     size_t offset = 0;
     for (size_t i = 0; i != file->num_file_tags; ++i) {
         file_tag_t * ft = file->file_tags + i;
@@ -589,10 +590,29 @@ void read_files_versions (database_t * db,
     /* Sort the list of tags.  */
     qsort (db->tags, db->num_tags, sizeof (tag_t), tag_compare);
 
-    /* Update the pointers from file_tags to tags.  */
+    /* Update the pointers from file_tags to tags, and compute the version
+     * hashes.  */
     for (size_t i = 0; i != db->num_tags; ++i) {
-        tag_t * t = db->tags + i;
+        tag_t * t = &db->tags[i];
         for (size_t j = 0; j != t->num_tag_files; ++j)
             t->tag_files[j]->tag = t;
+
+        SHA_CTX sha;
+        SHA_Init (&sha);
+        void * buffer[32];
+        int bi = 0;
+        for (size_t j = 0; j != t->num_tag_files; ++j) {
+            file_tag_t * ft = t->tag_files[j];
+            if (ft->version == NULL || ft->version->dead)
+                continue;
+            buffer[bi++] = ft->version;
+            if (bi == 32) {
+                SHA_Update (&sha, buffer, sizeof (buffer));
+                bi = 0;
+            }
+        }
+        if (bi)
+            SHA_Update (&sha, buffer, bi * sizeof (void *));
+        SHA1_Final (t->hash, &sha);
     }
 }
