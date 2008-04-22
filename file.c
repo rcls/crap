@@ -21,10 +21,10 @@ file_tag_t * file_new_file_tag (file_t * f)
 }
 
 
-void file_new_file_branch (file_t * f, file_tag_t * tag)
+void file_new_branch (file_t * f, file_tag_t * tag)
 {
-    ARRAY_EXTEND (f->file_branches, f->num_file_branches, f->max_file_branches);
-    f->file_branches[f->num_file_branches - 1] = tag;
+    ARRAY_EXTEND (f->branches, f->num_branches, f->max_branches);
+    f->branches[f->num_branches - 1] = tag;
 }
 
 
@@ -68,8 +68,8 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
     dot2[2] = 0;
 
     /* Now bsearch for the branch.  */
-    file_tag_t ** base = f->file_branches;
-    ssize_t count = f->num_file_branches;
+    file_tag_t ** base = f->branches;
+    ssize_t count = f->num_branches;
 
     while (count > 0) {
         size_t mid = count >> 1;

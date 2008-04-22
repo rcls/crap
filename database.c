@@ -71,7 +71,7 @@ void database_destroy (database_t * db)
     for (size_t i = 0; i != db->num_files; ++i) {
         free (db->files[i].versions);
         free (db->files[i].file_tags);
-        free (db->files[i].file_branches);
+        free (db->files[i].branches);
     }
 
     for (size_t i = 0; i != db->num_tags; ++i)
@@ -98,9 +98,9 @@ file_t * database_new_file (database_t * db)
     result->num_file_tags = 0;
     result->max_file_tags = 0;
     result->file_tags = NULL;
-    result->num_file_branches = 0;
-    result->max_file_branches = 0;
-    result->file_branches = NULL;
+    result->num_branches = 0;
+    result->max_branches = 0;
+    result->branches = NULL;
     return result;
 }
 

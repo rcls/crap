@@ -296,28 +296,28 @@ static void fill_in_versions_and_parents (file_t * file)
             }
         }
 
-        file_new_file_branch (file, ft);
+        file_new_branch (file, ft);
     }
 
     /* Sort the branches by tag.  */
-    qsort (file->file_branches, file->num_file_branches, sizeof (file_tag_t *),
+    qsort (file->branches, file->num_branches, sizeof (file_tag_t *),
            branch_compare);
 
     /* Check for duplicate branches.  */
     size_t offset = 0;
-    for (size_t i = 1; i < file->num_file_branches; ++i) {
-        assert (strcmp (file->file_branches[i - offset - 1]->vers,
-                        file->file_branches[i]->vers) < 0);
-        if (file->file_branches[i - offset - 1] != file->file_branches[i]) {
-            file->file_branches[i - offset] = file->file_branches[i];
+    for (size_t i = 1; i < file->num_branches; ++i) {
+        assert (strcmp (file->branches[i - offset - 1]->vers,
+                        file->branches[i]->vers) < 0);
+        if (file->branches[i - offset - 1] != file->branches[i]) {
+            file->branches[i - offset] = file->branches[i];
             continue;
         }
 
         fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
                  file->rcs_path,
-                 file->file_branches[i]->tag->tag,
-                 file->file_branches[i-1]->tag->tag,
-                 file->file_branches[i]->version->version);
+                 file->branches[i]->tag->tag,
+                 file->branches[i-1]->tag->tag,
+                 file->branches[i]->version->version);
         ++offset;
     }
 

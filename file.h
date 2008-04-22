@@ -21,15 +21,15 @@ struct file {
     size_t max_file_tags;
     file_tag_t * file_tags;
 
-    size_t num_file_branches;
-    size_t max_file_branches;
-    file_tag_t ** file_branches;
+    size_t num_branches;
+    size_t max_branches;
+    file_tag_t ** branches;
 };
 
 version_t * file_new_version (file_t * f);
 
 file_tag_t * file_new_file_tag (file_t * f);
-void file_new_file_branch (file_t *f, file_tag_t * tag);
+void file_new_branch (file_t *f, file_tag_t * tag);
 
 version_t * file_find_version (const file_t * f, const char * s);
 
