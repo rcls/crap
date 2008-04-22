@@ -253,7 +253,7 @@ static void fill_in_versions_and_parents (file_t * file)
     qsort (file->file_tags, file->num_file_tags,
            sizeof (file_tag_t), file_tag_compare);
 
-    /** Fill in the parent, sibling and children links.  */
+    /* Fill in the parent, sibling and children links.  */
     for (size_t i = file->num_versions; i != 0;) {
         version_t * v = file->versions + --i;
         char vers[1 + strlen (v->version)];
@@ -269,7 +269,7 @@ static void fill_in_versions_and_parents (file_t * file)
         }
     }
 
-    /** Fill in the tag version links.  */
+    /* Fill in the tag version links.  */
     for (size_t i = 0; i != file->num_file_tags; ++i) {
         file_tag_t * ft = file->file_tags + i;
         if (!tag_is_branch (ft)) {
@@ -283,7 +283,8 @@ static void fill_in_versions_and_parents (file_t * file)
         /* We try and find a predecessor version, to use as the branch point.
          * If none exists, that's fine, it makes sense as a branch addition.  */
         // FIXME - this isn't right.  We shouldn't loop searching backwards,
-        // it could be a branch add following a deletion on the parent.
+        // it could be a branch add following a deletion on the parent, where
+        // the parent deletion has been out-dated.
         char vers[1 + strlen (ft->vers)];
         strcpy (vers, ft->vers);
         ft->version = NULL;
@@ -298,11 +299,11 @@ static void fill_in_versions_and_parents (file_t * file)
         file_new_file_branch (file, ft);
     }
 
-    /** Sort the branches by tag.  */
+    /* Sort the branches by tag.  */
     qsort (file->file_branches, file->num_file_branches, sizeof (file_tag_t *),
            branch_compare);
 
-    /** Check for duplicate branches.  */
+    /* Check for duplicate branches.  */
     size_t offset = 0;
     for (size_t i = 1; i < file->num_file_branches; ++i) {
         assert (strcmp (file->file_branches[i - offset - 1]->vers,
@@ -320,7 +321,8 @@ static void fill_in_versions_and_parents (file_t * file)
         ++offset;
     }
 
-    /** Fill in the branch pointers on the versions.  */
+    /* Fill in the branch pointers on the versions.  FIXME - we should
+     * distinguish between trunk versions and missing branches.  */
     for (size_t i = 0; i != file->num_versions; ++i)
         file->versions[i].branch
             = file_find_branch (file, file->versions[i].version);

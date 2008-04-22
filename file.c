@@ -1,6 +1,7 @@
 #include "file.h"
 #include "utils.h"
 
+#include <stdio.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
@@ -83,6 +84,9 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
         else
             return base[mid];
     }
+
+    fprintf (stderr, "File %s version %s (%s) has no branch\n",
+             f->rcs_path, s, vers);
 
     return NULL;
 }
