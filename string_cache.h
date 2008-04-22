@@ -19,7 +19,7 @@ unsigned long string_hash_func (const char * str, size_t len);
 unsigned long string_hash_get (const char * str);
 
 /** Compare of cached string, faster than strcmp when equality is likely.  */
-inline int cache_strcmp (const char * A, const char * B)
+static inline int cache_strcmp (const char * A, const char * B)
 {
     return A == B ? 0 : strcmp (A, B);
 }

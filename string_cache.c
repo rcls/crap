@@ -6,8 +6,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-extern int cache_strcmp (const char * A, const char * B);
-
 typedef struct string_entry {
     struct string_entry * next;         /* Next in hash chain.  */
     unsigned long hash;                 /* hash.  */
