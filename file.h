@@ -20,12 +20,21 @@ struct file {
     size_t num_file_tags;
     size_t max_file_tags;
     file_tag_t * file_tags;
+
+    size_t num_file_branches;
+    size_t max_file_branches;
+    file_tag_t ** file_branches;
 };
 
 version_t * file_new_version (file_t * f);
-version_t * file_find_version (const file_t * f, const char * s);
 
 file_tag_t * file_new_file_tag (file_t * f);
+void file_new_file_branch (file_t *f, file_tag_t * tag);
+
+version_t * file_find_version (const file_t * f, const char * s);
+
+/** Find a branch on which version @c s of file @c lies.  */
+file_tag_t * file_find_branch (const file_t * f, const char * s);
 
 struct version {
     file_t * file;
@@ -41,6 +50,7 @@ struct version {
     time_t time;
     time_t offset;
     const char * log;
+    file_tag_t * branch;
 
     struct changeset * changeset;
     version_t * cs_sibling;             /* Sibling in changeset.  */

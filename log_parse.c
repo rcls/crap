@@ -238,6 +238,14 @@ static int file_tag_compare (const void * AA, const void * BB)
 }
 
 
+static int branch_compare (const void * AA, const void * BB)
+{
+    const file_tag_t * A = * (file_tag_t * const *) AA;
+    const file_tag_t * B = * (file_tag_t * const *) BB;
+    return strcmp (A->vers, B->vers);
+}
+
+
 static void fill_in_versions_and_parents (file_t * file)
 {
     qsort (file->versions, file->num_versions,
@@ -245,6 +253,7 @@ static void fill_in_versions_and_parents (file_t * file)
     qsort (file->file_tags, file->num_file_tags,
            sizeof (file_tag_t), file_tag_compare);
 
+    /** Fill in the parent, sibling and children links.  */
     for (size_t i = file->num_versions; i != 0;) {
         version_t * v = file->versions + --i;
         char vers[1 + strlen (v->version)];
@@ -260,6 +269,7 @@ static void fill_in_versions_and_parents (file_t * file)
         }
     }
 
+    /** Fill in the tag version links.  */
     for (size_t i = 0; i != file->num_file_tags; ++i) {
         file_tag_t * ft = file->file_tags + i;
         if (!tag_is_branch (ft)) {
@@ -269,8 +279,11 @@ static void fill_in_versions_and_parents (file_t * file)
                          file->rcs_path, ft->tag->tag, ft->vers);
             continue;
         }
+
         /* We try and find a predecessor version, to use as the branch point.
          * If none exists, that's fine, it makes sense as a branch addition.  */
+        // FIXME - this isn't right.  We shouldn't loop searching backwards,
+        // it could be a branch add following a deletion on the parent.
         char vers[1 + strlen (ft->vers)];
         strcpy (vers, ft->vers);
         ft->version = NULL;
@@ -281,7 +294,36 @@ static void fill_in_versions_and_parents (file_t * file)
                 break;
             }
         }
-   }
+
+        file_new_file_branch (file, ft);
+    }
+
+    /** Sort the branches by tag.  */
+    qsort (file->file_branches, file->num_file_branches, sizeof (file_tag_t *),
+           branch_compare);
+
+    /** Check for duplicate branches.  */
+    size_t offset = 0;
+    for (size_t i = 1; i < file->num_file_branches; ++i) {
+        assert (strcmp (file->file_branches[i - offset - 1]->vers,
+                        file->file_branches[i]->vers) < 0);
+        if (file->file_branches[i - offset - 1] != file->file_branches[i]) {
+            file->file_branches[i - offset] = file->file_branches[i];
+            continue;
+        }
+
+        fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
+                 file->rcs_path,
+                 file->file_branches[i]->tag->tag,
+                 file->file_branches[i-1]->tag->tag,
+                 file->file_branches[i]->version->version);
+        ++offset;
+    }
+
+    /** Fill in the branch pointers on the versions.  */
+    for (size_t i = 0; i != file->num_versions; ++i)
+        file->versions[i].branch
+            = file_find_branch (file, file->versions[i].version);
 }
 
 
