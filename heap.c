@@ -75,17 +75,6 @@ void heap_insert (heap_t * heap, void * item)
 }
 
 
-void heap_replace (heap_t * heap, void * old, void * new)
-{
-    assert (INDEX (old) != SIZE_MAX);
-    assert (INDEX (new) == SIZE_MAX);
-
-    shuffle_up (heap, INDEX (old), new);
-
-    INDEX (old) = SIZE_MAX;
-}
-
-
 void heap_remove (heap_t * heap, void * item)
 {
     assert (INDEX (item) != SIZE_MAX);

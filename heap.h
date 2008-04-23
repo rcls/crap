@@ -29,9 +29,6 @@ void heap_insert (heap_t * heap, void * item);
 /** Remove an item.  */
 void heap_remove (heap_t * heap, void * item);
 
-/** Remove one item and insert another.  */
-void heap_replace (heap_t * heap, void * old, void * new);
-
 /** Return least item from a heap.  */
 void * heap_front (heap_t * heap);
 
