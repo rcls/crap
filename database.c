@@ -51,8 +51,8 @@ static int compare_changset (const void * AA, const void * BB)
 
 void database_init (database_t * db)
 {
-    db->num_files = 0;
     db->files = NULL;
+    db->files_end = NULL;
     db->num_tags = 0;
     db->tags = NULL;
     db->num_changesets = 0;
@@ -68,10 +68,10 @@ void database_init (database_t * db)
 
 void database_destroy (database_t * db)
 {
-    for (size_t i = 0; i != db->num_files; ++i) {
-        free (db->files[i].versions);
-        free (db->files[i].file_tags);
-        free (db->files[i].branches);
+    for (file_t * i = db->files; i != db->files_end; ++i) {
+        free (i->versions);
+        free (i->file_tags);
+        free (i->branches);
     }
 
     for (size_t i = 0; i != db->num_tags; ++i)
@@ -90,8 +90,10 @@ void database_destroy (database_t * db)
 
 file_t * database_new_file (database_t * db)
 {
-    db->files = xrealloc (db->files, ++db->num_files * sizeof (file_t));
-    file_t * result = &db->files[db->num_files - 1];
+    size_t num = db->files_end - db->files + 1;
+    db->files = xrealloc (db->files, num * sizeof (file_t));
+    db->files_end = db->files + num;
+    file_t * result = &db->files_end[-1];
     result->versions = NULL;
     result->versions_end = NULL;
     result->versions_max = NULL;

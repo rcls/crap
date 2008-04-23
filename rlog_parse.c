@@ -94,12 +94,10 @@ int main()
     create_changesets (&db);
 
     /* Mark the initial versions as ready to emit.  */
-    for (size_t i = 0; i != db.num_files; ++i) {
-        file_t * f = &db.files[i];
+    for (file_t * f = db.files; f != db.files_end; ++f)
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             if (j->parent == NULL)
                 version_release (&db, j);
-    }
 
     size_t emitted_changesets = 0;
     while (db.ready_versions.num_entries) {

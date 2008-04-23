@@ -92,8 +92,8 @@ void create_changesets (database_t * db)
 {
     size_t total_versions = 0;
 
-    for (size_t i = 0; i != db->num_files; ++i)
-        total_versions += db->files[i].versions_end - db->files[i].versions;
+    for (file_t * i = db->files; i != db->files_end; ++i)
+        total_versions += i->versions_end - i->versions;
 
     if (total_versions == 0)
         return;
@@ -101,9 +101,8 @@ void create_changesets (database_t * db)
     version_t ** version_list = xmalloc (total_versions * sizeof (version_t *));
     version_t ** vp = version_list;
 
-    for (size_t i = 0; i != db->num_files; ++i)
-        for (version_t * j = db->files[i].versions;
-             j != db->files[i].versions_end; ++j)
+    for (file_t * i = db->files; i != db->files_end; ++i)
+        for (version_t * j = i->versions; j != i->versions_end; ++j)
             *vp++ = j;
 
     assert (vp == version_list + total_versions);

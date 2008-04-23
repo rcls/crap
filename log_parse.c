@@ -548,13 +548,12 @@ void read_files_versions (database_t * db,
     }
 
     /* Sort the list of files.  */
-    qsort (db->files, db->num_files, sizeof (file_t), file_compare);
+    qsort (db->files, db->files_end - db->files, sizeof (file_t), file_compare);
 
     /* Set the pointers from versions to files and file_tags to files.  Add the
      * file_tags to the tags.  The latter will be sorted as we have already
      * sorted the files.  */
-    for (size_t i = 0; i != db->num_files; ++i) {
-        file_t * f = db->files + i;
+    for (file_t * f = db->files; f != db->files_end; ++f) {
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             j->file = f;
 

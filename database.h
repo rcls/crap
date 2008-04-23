@@ -8,8 +8,8 @@
 struct version;
 
 typedef struct database {
-    size_t num_files;
     struct file * files;
+    struct file * files_end;
 
     size_t num_tags;
     struct tag * tags;
