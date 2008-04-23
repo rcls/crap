@@ -249,14 +249,14 @@ static int branch_compare (const void * AA, const void * BB)
 
 static void fill_in_versions_and_parents (file_t * file)
 {
-    qsort (file->versions, file->num_versions,
+    qsort (file->versions, file->versions_end - file->versions,
            sizeof (version_t), version_compare);
     qsort (file->file_tags, file->num_file_tags,
            sizeof (file_tag_t), file_tag_compare);
 
     /* Fill in the parent, sibling and children links.  */
-    for (size_t i = file->num_versions; i != 0;) {
-        version_t * v = file->versions + --i;
+    for (version_t * v = file->versions_end; v != file->versions;) {
+        --v;
         char vers[1 + strlen (v->version)];
         strcpy (vers, v->version);
         v->parent = NULL;
@@ -327,9 +327,8 @@ static void fill_in_versions_and_parents (file_t * file)
 
     /* Fill in the branch pointers on the versions.  FIXME - we should
      * distinguish between trunk versions and missing branches.  */
-    for (size_t i = 0; i != file->num_versions; ++i)
-        file->versions[i].branch
-            = file_find_branch (file, file->versions[i].version);
+    for (version_t * i = file->versions; i != file->versions_end; ++i)
+        i->branch = file_find_branch (file, i->version);
 }
 
 
@@ -558,8 +557,8 @@ void read_files_versions (database_t * db,
      * sorted the files.  */
     for (size_t i = 0; i != db->num_files; ++i) {
         file_t * f = db->files + i;
-        for (size_t j = 0; j != f->num_versions; ++j)
-            f->versions[j].file = f;
+        for (version_t * j = f->versions; j != f->versions_end; ++j)
+            j->file = f;
 
         for (size_t j = 0; j != f->num_file_tags; ++j) {
             file_tag_t * ft = f->file_tags + j;

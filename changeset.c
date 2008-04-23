@@ -93,7 +93,7 @@ void create_changesets (database_t * db)
     size_t total_versions = 0;
 
     for (size_t i = 0; i != db->num_files; ++i)
-        total_versions += db->files[i].num_versions;
+        total_versions += db->files[i].versions_end - db->files[i].versions;
 
     if (total_versions == 0)
         return;
@@ -102,8 +102,9 @@ void create_changesets (database_t * db)
     version_t ** vp = version_list;
 
     for (size_t i = 0; i != db->num_files; ++i)
-        for (size_t j = 0; j != db->files[i].num_versions; ++j)
-            *vp++ = &db->files[i].versions[j];
+        for (version_t * j = db->files[i].versions;
+             j != db->files[i].versions_end; ++j)
+            *vp++ = j;
 
     assert (vp == version_list + total_versions);
 

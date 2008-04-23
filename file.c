@@ -8,9 +8,9 @@
 
 version_t * file_new_version (file_t * f)
 {
-    ARRAY_EXTEND (f->versions, f->num_versions, f->max_versions);
-    f->versions[f->num_versions - 1].ready_index = SIZE_MAX;
-    return &f->versions[f->num_versions - 1];
+    ARRAY_EXTENDX (f->versions, f->versions_end, f->versions_max);
+    f->versions_end[-1].ready_index = SIZE_MAX;
+    return &f->versions_end[-1];
 }
 
 
@@ -31,7 +31,7 @@ void file_new_branch (file_t * f, file_tag_t * tag)
 version_t * file_find_version (const file_t * f, const char * s)
 {
     version_t * base = f->versions;
-    ssize_t count = f->num_versions;
+    ssize_t count = f->versions_end - f->versions;
 
     while (count > 0) {
         size_t mid = count >> 1;

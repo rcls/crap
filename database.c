@@ -92,15 +92,15 @@ file_t * database_new_file (database_t * db)
 {
     db->files = xrealloc (db->files, ++db->num_files * sizeof (file_t));
     file_t * result = &db->files[db->num_files - 1];
-    result->num_versions = 0;
-    result->max_versions = 0;
     result->versions = NULL;
+    result->versions_end = NULL;
+    result->versions_max = NULL;
     result->num_file_tags = 0;
     result->max_file_tags = 0;
     result->file_tags = NULL;
-    result->branches_end = 0;
-    result->branches_max = 0;
     result->branches = NULL;
+    result->branches_end = NULL;
+    result->branches_max = NULL;
     return result;
 }
 

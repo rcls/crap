@@ -13,9 +13,9 @@ struct file {
     const char * path;
     const char * rcs_path;
 
-    size_t num_versions;
-    size_t max_versions;
     version_t * versions;
+    version_t * versions_end;
+    version_t * versions_max;
 
     size_t num_file_tags;
     size_t max_file_tags;
