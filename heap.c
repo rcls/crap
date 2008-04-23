@@ -102,5 +102,7 @@ void * heap_pop (heap_t * heap)
     void * result = heap->entries[0];
     if (--heap->entries_end != heap->entries)
         shuffle_down (heap, 0, *heap->entries_end);
+
+    INDEX (result) = SIZE_MAX;
     return result;
 }
