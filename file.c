@@ -8,7 +8,7 @@
 
 version_t * file_new_version (file_t * f)
 {
-    ARRAY_EXTENDX (f->versions, f->versions_end, f->versions_max);
+    ARRAY_EXTEND (f->versions, f->versions_end, f->versions_max);
     f->versions_end[-1].ready_index = SIZE_MAX;
     return &f->versions_end[-1];
 }
@@ -16,14 +16,14 @@ version_t * file_new_version (file_t * f)
 
 file_tag_t * file_new_file_tag (file_t * f)
 {
-    ARRAY_EXTENDX (f->file_tags, f->file_tags_end, f->file_tags_max);
+    ARRAY_EXTEND (f->file_tags, f->file_tags_end, f->file_tags_max);
     return &f->file_tags_end[-1];
 }
 
 
 void file_new_branch (file_t * f, file_tag_t * tag)
 {
-    ARRAY_EXTENDX (f->branches, f->branches_end, f->branches_max);
+    ARRAY_EXTEND (f->branches, f->branches_end, f->branches_max);
     f->branches_end[-1] = tag;
 }
 
@@ -94,6 +94,6 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
 
 void tag_new_tag_file (tag_t * t, file_tag_t * ft)
 {
-    ARRAY_EXTENDX (t->tag_files, t->tag_files_end, t->tag_files_max);
+    ARRAY_EXTEND (t->tag_files, t->tag_files_end, t->tag_files_max);
     t->tag_files_end[-1] = ft;
 }
