@@ -54,8 +54,8 @@ void database_init (database_t * db)
     db->files = NULL;
     db->files_end = NULL;
     db->files_max = NULL;
-    db->num_tags = 0;
     db->tags = NULL;
+    db->tags_end = NULL;
     db->changesets = NULL;
     db->changesets_end = NULL;
     db->changesets_max = NULL;
@@ -75,8 +75,8 @@ void database_destroy (database_t * db)
         free (i->branches);
     }
 
-    for (size_t i = 0; i != db->num_tags; ++i)
-        free (db->tags[i].tag_files);
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+        free (i->tag_files);
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
         free (*i);

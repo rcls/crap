@@ -12,8 +12,8 @@ typedef struct database {
     struct file * files_end;
     struct file * files_max;
 
-    size_t num_tags;
     struct tag * tags;
+    struct tag * tags_end;
 
     struct changeset ** changesets;
     struct changeset ** changesets_end;

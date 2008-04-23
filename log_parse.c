@@ -564,24 +564,23 @@ void read_files_versions (database_t * db,
     }
 
     /* Flatten the hash of tags to an array.  */
-    db->num_tags = 0;
     db->tags = xmalloc (tags.num_entries * sizeof (tag_t));
+    db->tags_end = db->tags;
 
     for (tag_hash_item_t * i = string_hash_begin (&tags);
          i; i = string_hash_next (&tags, i))
-        db->tags[db->num_tags++] = i->tag;
+        *db->tags_end++ = i->tag;
 
-    assert (db->num_tags == tags.num_entries);
+    assert (db->tags_end == db->tags + tags.num_entries);
 
     string_hash_destroy (&tags);
 
     /* Sort the list of tags.  */
-    qsort (db->tags, db->num_tags, sizeof (tag_t), tag_compare);
+    qsort (db->tags, db->tags_end - db->tags, sizeof (tag_t), tag_compare);
 
     /* Update the pointers from file_tags to tags, and compute the version
      * hashes.  */
-    for (size_t i = 0; i != db->num_tags; ++i) {
-        tag_t * t = &db->tags[i];
+    for (tag_t * t = db->tags; t != db->tags_end; ++t) {
         for (file_tag_t ** j = t->tag_files; j != t->tag_files_end; ++j)
             (*j)->tag = t;
 
