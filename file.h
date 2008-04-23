@@ -72,9 +72,9 @@ struct file_tag {
 struct tag {
     const char * tag;                   /**< The tag name.  */
 
-    size_t num_tag_files;
-    size_t max_tag_files;
     file_tag_t ** tag_files;
+    file_tag_t ** tag_files_end;
+    file_tag_t ** tag_files_max;
 
 #if 0
     /**

@@ -94,6 +94,6 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
 
 void tag_new_tag_file (tag_t * t, file_tag_t * ft)
 {
-    ARRAY_EXTEND (t->tag_files, t->num_tag_files, t->max_tag_files);
-    t->tag_files [t->num_tag_files - 1] = ft;
+    ARRAY_EXTENDX (t->tag_files, t->tag_files_end, t->tag_files_max);
+    t->tag_files_end[-1] = ft;
 }

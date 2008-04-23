@@ -467,9 +467,9 @@ static void read_file_versions (database_t * db,
             tags, tag_name, sizeof (tag_hash_item_t), &n);
         if (n) {
             tag->tag.tag = tag_name;
-            tag->tag.num_tag_files = 0;
-            tag->tag.max_tag_files = 0;
             tag->tag.tag_files = NULL;
+            tag->tag.tag_files_end = NULL;
+            tag->tag.tag_files_max = NULL;
         }
 
         ++colon;
@@ -582,18 +582,17 @@ void read_files_versions (database_t * db,
      * hashes.  */
     for (size_t i = 0; i != db->num_tags; ++i) {
         tag_t * t = &db->tags[i];
-        for (size_t j = 0; j != t->num_tag_files; ++j)
-            t->tag_files[j]->tag = t;
+        for (file_tag_t ** j = t->tag_files; j != t->tag_files_end; ++j)
+            (*j)->tag = t;
 
         SHA_CTX sha;
         SHA_Init (&sha);
         void * buffer[32];
         int bi = 0;
-        for (size_t j = 0; j != t->num_tag_files; ++j) {
-            file_tag_t * ft = t->tag_files[j];
-            if (ft->version == NULL || ft->version->dead)
+        for (file_tag_t ** j = t->tag_files; j != t->tag_files_end; ++j) {
+            if ((*j)->version == NULL || (*j)->version->dead)
                 continue;
-            buffer[bi++] = ft->version;
+            buffer[bi++] = (*j)->version;
             if (bi == 32) {
                 SHA_Update (&sha, buffer, sizeof (buffer));
                 bi = 0;
