@@ -100,8 +100,8 @@ int main()
                 version_release (&db, j);
 
     size_t emitted_changesets = 0;
-    while (db.ready_versions.num_entries) {
-        if (db.ready_changesets.num_entries == 0)
+    while (db.ready_versions.entries != db.ready_versions.entries_end) {
+        if (db.ready_changesets.entries == db.ready_changesets.entries_end)
             cycle_split (
                 &db, cycle_find (heap_front (&db.ready_versions))->changeset);
 
