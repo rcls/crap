@@ -135,6 +135,6 @@ void create_changesets (database_t * db)
 
     free (version_list);
 
-    qsort (db->changesets, db->num_changesets,
+    qsort (db->changesets, db->changesets_end - db->changesets,
            sizeof (changeset_t *), cs_compare);
 }

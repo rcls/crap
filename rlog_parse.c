@@ -134,7 +134,7 @@ int main()
 
     fflush (NULL);
     fprintf (stderr, "Emitted %u of %u changesets.\n",
-             emitted_changesets, db.num_changesets);
+             emitted_changesets, db.changesets_end - db.changesets);
 
     string_cache_stats (stderr);
 

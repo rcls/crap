@@ -56,9 +56,9 @@ void database_init (database_t * db)
     db->files_max = NULL;
     db->num_tags = 0;
     db->tags = NULL;
-    db->num_changesets = 0;
-    db->max_changesets = 0;
     db->changesets = NULL;
+    db->changesets_end = NULL;
+    db->changesets_max = NULL;
 
     heap_init (&db->ready_versions,
                offsetof (version_t, ready_index), compare_version);
@@ -78,8 +78,8 @@ void database_destroy (database_t * db)
     for (size_t i = 0; i != db->num_tags; ++i)
         free (db->tags[i].tag_files);
 
-    for (size_t i = 0; i != db->num_changesets; ++i)
-        free (db->changesets[i]);
+    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
+        free (*i);
 
     free (db->files);
     free (db->tags);
@@ -111,9 +111,9 @@ changeset_t * database_new_changeset (database_t * db)
     changeset_t * result = xmalloc (sizeof (changeset_t));
     result->ready_index = SIZE_MAX;
 
-    ARRAY_EXTEND (db->changesets, db->num_changesets, db->max_changesets);
+    ARRAY_EXTENDX (db->changesets, db->changesets_end, db->changesets_max);
 
-    db->changesets[db->num_changesets - 1] = result;
+    db->changesets_end[-1] = result;
     return result;
 }
 

@@ -15,9 +15,9 @@ typedef struct database {
     size_t num_tags;
     struct tag * tags;
 
-    size_t num_changesets;
-    size_t max_changesets;
     struct changeset ** changesets;
+    struct changeset ** changesets_end;
+    struct changeset ** changesets_max;
 
     heap_t ready_versions;
     heap_t ready_changesets;
