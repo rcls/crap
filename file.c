@@ -16,8 +16,8 @@ version_t * file_new_version (file_t * f)
 
 file_tag_t * file_new_file_tag (file_t * f)
 {
-    ARRAY_EXTEND (f->file_tags, f->num_file_tags, f->max_file_tags);
-    return f->file_tags + f->num_file_tags - 1;
+    ARRAY_EXTENDX (f->file_tags, f->file_tags_end, f->file_tags_max);
+    return &f->file_tags_end[-1];
 }
 
 

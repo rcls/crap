@@ -95,9 +95,9 @@ file_t * database_new_file (database_t * db)
     result->versions = NULL;
     result->versions_end = NULL;
     result->versions_max = NULL;
-    result->num_file_tags = 0;
-    result->max_file_tags = 0;
     result->file_tags = NULL;
+    result->file_tags_end = NULL;
+    result->file_tags_max = NULL;
     result->branches = NULL;
     result->branches_end = NULL;
     result->branches_max = NULL;
