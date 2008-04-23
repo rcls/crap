@@ -311,25 +311,18 @@ static void fill_in_versions_and_parents (file_t * file)
     file->num_file_tags -= offset;
 
     /* Sort the branches by tag.  */
-    qsort (file->branches, file->num_branches, sizeof (file_tag_t *),
-           branch_compare);
+    qsort (file->branches, file->branches_end - file->branches,
+           sizeof (file_tag_t *), branch_compare);
 
     /* Check for duplicate branches.  */
-    offset = 0;
-    for (size_t i = 1; i < file->num_branches; ++i) {
-        assert (strcmp (file->branches[i - offset - 1]->vers,
-                        file->branches[i]->vers) < 0);
-        if (file->branches[i - offset - 1] != file->branches[i]) {
-            file->branches[i - offset] = file->branches[i];
-            continue;
-        }
-
-        fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
-                 file->rcs_path,
-                 file->branches[i]->tag->tag,
-                 file->branches[i-1]->tag->tag,
-                 file->branches[i]->version->version);
-        ++offset;
+    file_tag_t ** bb = file->branches;
+    for (file_tag_t ** i = file->branches; i != file->branches_end; ++i) {
+        if (i == file->branches || bb[-1] != *i)
+            *bb++ = *i;
+        else
+            fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
+                     file->rcs_path, i[0]->tag->tag, i[-1]->tag->tag,
+                     i[0]->version->version);
     }
 
     /* Fill in the branch pointers on the versions.  FIXME - we should

@@ -17,4 +17,11 @@ void * xcalloc (size_t size)
             P = xrealloc (P, M * sizeof (*P));  \
         } } while (0);
 
+#define ARRAY_EXTENDX(P,E,M) do { if (E != M) { ++E; break; }   \
+        size_t ITEMS = E - P + 1;                               \
+        P = xrealloc (P, 2 * ITEMS * sizeof (*P));              \
+        E = P + ITEMS;                                          \
+        M = E + ITEMS;                                          \
+    } while (0);
+
 #endif

@@ -98,8 +98,8 @@ file_t * database_new_file (database_t * db)
     result->num_file_tags = 0;
     result->max_file_tags = 0;
     result->file_tags = NULL;
-    result->num_branches = 0;
-    result->max_branches = 0;
+    result->branches_end = 0;
+    result->branches_max = 0;
     result->branches = NULL;
     return result;
 }

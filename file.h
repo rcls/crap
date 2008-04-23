@@ -21,9 +21,9 @@ struct file {
     size_t max_file_tags;
     file_tag_t * file_tags;
 
-    size_t num_branches;
-    size_t max_branches;
     file_tag_t ** branches;
+    file_tag_t ** branches_end;
+    file_tag_t ** branches_max;
 };
 
 version_t * file_new_version (file_t * f);
