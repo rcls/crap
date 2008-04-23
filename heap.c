@@ -11,8 +11,8 @@ void heap_init (heap_t * heap, size_t offset,
                 int (*compare) (const void *, const void *))
 {
     heap->entries = NULL;
-    heap->num_entries = 0;
-    heap->max_entries = 0;
+    heap->entries_end = NULL;
+    heap->entries_max = NULL;
     heap->index_offset = offset;
     heap->compare = compare;
 }
@@ -23,12 +23,13 @@ void heap_init (heap_t * heap, size_t offset,
  * appropriate point, and place @c item in it.  */
 static void shuffle_down (heap_t * heap, size_t position, void * item)
 {
+    size_t num_entries = heap->entries_end - heap->entries;
     while (1) {
         size_t child = position * 2 + 1;
-        if (child + 1 > heap->num_entries)
+        if (child + 1 > num_entries)
             break;
 
-        if (child + 1 < heap->num_entries
+        if (child + 1 < num_entries
             && LESS (heap->entries[child + 1], heap->entries[child]))
             ++child;
         
@@ -69,9 +70,9 @@ void heap_insert (heap_t * heap, void * item)
     assert (INDEX (item) == SIZE_MAX);
 
     /* Create a bubble at the end.  */
-    ARRAY_EXTEND (heap->entries, heap->num_entries, heap->max_entries);
+    ARRAY_EXTEND (heap->entries, heap->entries_end, heap->entries_max);
 
-    shuffle_up (heap, heap->num_entries - 1, item);
+    shuffle_up (heap, heap->entries_end - heap->entries - 1, item);
 }
 
 
@@ -90,10 +91,10 @@ void heap_remove (heap_t * heap, void * item)
 {
     assert (INDEX (item) != SIZE_MAX);
 
-    --heap->num_entries;
-    if (INDEX (item) != heap->num_entries)
+    --heap->entries_end;
+    if (item != *heap->entries_end)
         /* Shuffle the item from the end into the bubble.  */
-        shuffle_up (heap, INDEX (item), heap->entries[heap->num_entries]);
+        shuffle_up (heap, INDEX (item), *heap->entries_end);
 
     INDEX (item) = SIZE_MAX;
 }
@@ -101,16 +102,16 @@ void heap_remove (heap_t * heap, void * item)
 
 void * heap_front (heap_t * heap)
 {
-    assert (heap->num_entries != 0);
+    assert (heap->entries != heap->entries_end);
     return heap->entries[0];
 }
 
 
 void * heap_pop (heap_t * heap)
 {
-    assert (heap->num_entries != 0);
+    assert (heap->entries != heap->entries_end);
     void * result = heap->entries[0];
-    if (--heap->num_entries != 0)
-        shuffle_down (heap, 0, heap->entries[heap->num_entries]);
+    if (--heap->entries_end != heap->entries)
+        shuffle_down (heap, 0, *heap->entries_end);
     return result;
 }

@@ -94,16 +94,14 @@ int main()
     create_changesets (&db);
 
     /* Mark the initial versions as ready to emit.  */
-    for (size_t i = 0; i != db.num_files; ++i) {
-        file_t * f = &db.files[i];
-        for (size_t j = 0; j != f->num_versions; ++j)
-            if (f->versions[j].parent == NULL)
-                version_release (&db, &f->versions[j]);
-    }
+    for (file_t * f = db.files; f != db.files_end; ++f)
+        for (version_t * j = f->versions; j != f->versions_end; ++j)
+            if (j->parent == NULL)
+                version_release (&db, j);
 
     size_t emitted_changesets = 0;
-    while (db.ready_versions.num_entries) {
-        if (db.ready_changesets.num_entries == 0)
+    while (db.ready_versions.entries != db.ready_versions.entries_end) {
+        if (db.ready_changesets.entries == db.ready_changesets.entries_end)
             cycle_split (
                 &db, cycle_find (heap_front (&db.ready_versions))->changeset);
 
@@ -136,7 +134,7 @@ int main()
 
     fflush (NULL);
     fprintf (stderr, "Emitted %u of %u changesets.\n",
-             emitted_changesets, db.num_changesets);
+             emitted_changesets, db.changesets_end - db.changesets);
 
     string_cache_stats (stderr);
 

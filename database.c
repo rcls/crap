@@ -51,13 +51,14 @@ static int compare_changset (const void * AA, const void * BB)
 
 void database_init (database_t * db)
 {
-    db->num_files = 0;
     db->files = NULL;
-    db->num_tags = 0;
+    db->files_end = NULL;
+    db->files_max = NULL;
     db->tags = NULL;
-    db->num_changesets = 0;
-    db->max_changesets = 0;
+    db->tags_end = NULL;
     db->changesets = NULL;
+    db->changesets_end = NULL;
+    db->changesets_max = NULL;
 
     heap_init (&db->ready_versions,
                offsetof (version_t, ready_index), compare_version);
@@ -68,17 +69,17 @@ void database_init (database_t * db)
 
 void database_destroy (database_t * db)
 {
-    for (size_t i = 0; i != db->num_files; ++i) {
-        free (db->files[i].versions);
-        free (db->files[i].file_tags);
-        free (db->files[i].branches);
+    for (file_t * i = db->files; i != db->files_end; ++i) {
+        free (i->versions);
+        free (i->file_tags);
+        free (i->branches);
     }
 
-    for (size_t i = 0; i != db->num_tags; ++i)
-        free (db->tags[i].tag_files);
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+        free (i->tag_files);
 
-    for (size_t i = 0; i != db->num_changesets; ++i)
-        free (db->changesets[i]);
+    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
+        free (*i);
 
     free (db->files);
     free (db->tags);
@@ -90,17 +91,17 @@ void database_destroy (database_t * db)
 
 file_t * database_new_file (database_t * db)
 {
-    db->files = xrealloc (db->files, ++db->num_files * sizeof (file_t));
-    file_t * result = &db->files[db->num_files - 1];
-    result->num_versions = 0;
-    result->max_versions = 0;
+    ARRAY_EXTEND (db->files, db->files_end, db->files_max);
+    file_t * result = &db->files_end[-1];
     result->versions = NULL;
-    result->num_file_tags = 0;
-    result->max_file_tags = 0;
+    result->versions_end = NULL;
+    result->versions_max = NULL;
     result->file_tags = NULL;
-    result->num_branches = 0;
-    result->max_branches = 0;
+    result->file_tags_end = NULL;
+    result->file_tags_max = NULL;
     result->branches = NULL;
+    result->branches_end = NULL;
+    result->branches_max = NULL;
     return result;
 }
 
@@ -110,9 +111,9 @@ changeset_t * database_new_changeset (database_t * db)
     changeset_t * result = xmalloc (sizeof (changeset_t));
     result->ready_index = SIZE_MAX;
 
-    ARRAY_EXTEND (db->changesets, db->num_changesets, db->max_changesets);
+    ARRAY_EXTEND (db->changesets, db->changesets_end, db->changesets_max);
 
-    db->changesets[db->num_changesets - 1] = result;
+    db->changesets_end[-1] = result;
     return result;
 }
 
