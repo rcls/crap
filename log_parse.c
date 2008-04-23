@@ -206,7 +206,7 @@ bool predecessor (char * s)
 
     assert (isdigit (*p));
     assert (p != s);
-    if (--*p == '0') {
+    if (--*p == '0' && p[-1] == '.') {
         /* Rewrite 09999 to 9999 etc.  */
         *p = '9';
         end[-1] = 0;
