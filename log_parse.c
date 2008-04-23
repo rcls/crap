@@ -580,25 +580,16 @@ void read_files_versions (database_t * db,
 
     /* Update the pointers from file_tags to tags, and compute the version
      * hashes.  */
-    for (tag_t * t = db->tags; t != db->tags_end; ++t) {
-        for (file_tag_t ** j = t->tag_files; j != t->tag_files_end; ++j)
-            (*j)->tag = t;
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+            (*j)->tag = i;
 
         SHA_CTX sha;
         SHA_Init (&sha);
-        void * buffer[32];
-        int bi = 0;
-        for (file_tag_t ** j = t->tag_files; j != t->tag_files_end; ++j) {
-            if ((*j)->version == NULL || (*j)->version->dead)
-                continue;
-            buffer[bi++] = (*j)->version;
-            if (bi == 32) {
-                SHA_Update (&sha, buffer, sizeof (buffer));
-                bi = 0;
-            }
-        }
-        if (bi)
-            SHA_Update (&sha, buffer, bi * sizeof (void *));
-        SHA1_Final (t->hash, &sha);
+        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+            if ((*j)->version != NULL && !(*j)->version->dead)
+                SHA_Update (&sha, &(*j)->version, sizeof (version_t *));
+
+        SHA1_Final (i->hash, &sha);
     }
 }
