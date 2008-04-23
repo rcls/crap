@@ -40,6 +40,7 @@ const version_t * cycle_find (const version_t * v)
 
 void cycle_split (database_t * db, changeset_t * cs)
 {
+    fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");
     /* We split the changeset into to.  We leave all the blocked versions
      * in cs, and put the ready-to-emit into nw.  */
