@@ -8,30 +8,30 @@
 
 version_t * file_new_version (file_t * f)
 {
-    ARRAY_EXTEND (f->versions, f->num_versions, f->max_versions);
-    f->versions[f->num_versions - 1].ready_index = SIZE_MAX;
-    return &f->versions[f->num_versions - 1];
+    ARRAY_EXTENDX (f->versions, f->versions_end, f->versions_max);
+    f->versions_end[-1].ready_index = SIZE_MAX;
+    return &f->versions_end[-1];
 }
 
 
 file_tag_t * file_new_file_tag (file_t * f)
 {
-    ARRAY_EXTEND (f->file_tags, f->num_file_tags, f->max_file_tags);
-    return f->file_tags + f->num_file_tags - 1;
+    ARRAY_EXTENDX (f->file_tags, f->file_tags_end, f->file_tags_max);
+    return &f->file_tags_end[-1];
 }
 
 
 void file_new_branch (file_t * f, file_tag_t * tag)
 {
-    ARRAY_EXTEND (f->branches, f->num_branches, f->max_branches);
-    f->branches[f->num_branches - 1] = tag;
+    ARRAY_EXTENDX (f->branches, f->branches_end, f->branches_max);
+    f->branches_end[-1] = tag;
 }
 
 
 version_t * file_find_version (const file_t * f, const char * s)
 {
     version_t * base = f->versions;
-    ssize_t count = f->num_versions;
+    ssize_t count = f->versions_end - f->versions;
 
     while (count > 0) {
         size_t mid = count >> 1;
@@ -69,7 +69,7 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
 
     /* Now bsearch for the branch.  */
     file_tag_t ** base = f->branches;
-    ssize_t count = f->num_branches;
+    ssize_t count = f->branches_end - f->branches;
 
     while (count > 0) {
         size_t mid = count >> 1;

@@ -249,14 +249,14 @@ static int branch_compare (const void * AA, const void * BB)
 
 static void fill_in_versions_and_parents (file_t * file)
 {
-    qsort (file->versions, file->num_versions,
+    qsort (file->versions, file->versions_end - file->versions,
            sizeof (version_t), version_compare);
-    qsort (file->file_tags, file->num_file_tags,
+    qsort (file->file_tags, file->file_tags_end - file->file_tags,
            sizeof (file_tag_t), file_tag_compare);
 
     /* Fill in the parent, sibling and children links.  */
-    for (size_t i = file->num_versions; i != 0;) {
-        version_t * v = file->versions + --i;
+    for (version_t * v = file->versions_end; v != file->versions;) {
+        --v;
         char vers[1 + strlen (v->version)];
         strcpy (vers, v->version);
         v->parent = NULL;
@@ -271,24 +271,21 @@ static void fill_in_versions_and_parents (file_t * file)
     }
 
     /* Fill in the tag version links, and remove tags to dead versions.  */
-    size_t offset = 0;
-    for (size_t i = 0; i != file->num_file_tags; ++i) {
-        file_tag_t * ft = file->file_tags + i;
-        if (offset) {
-            memcpy (ft - offset, ft, sizeof (file_tag_t));
-            ft -= offset;
-        }
+    file_tag_t * ft = file->file_tags;
+    for (file_tag_t * i = file->file_tags; i != file->file_tags_end; ++i) {
+        if (i != ft)
+            memcpy (ft, i, sizeof (file_tag_t));
 
         if (!tag_is_branch (ft)) {
             ft->version = file_find_version (file, ft->vers);
             if (ft->version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
                          file->rcs_path, ft->tag->tag, ft->vers);
-            else if (ft->version->dead) {
+            else if (ft->version->dead)
                 fprintf (stderr, "File %s tag %s has dead version %s\n",
                          file->rcs_path, ft->tag->tag, ft->version->version);
-                ++offset;
-            }
+            else
+                ++ft;
             continue;
         }
 
@@ -307,36 +304,29 @@ static void fill_in_versions_and_parents (file_t * file)
             ft->version = NULL;
 
         file_new_branch (file, ft);
+        ++ft;
     }
-    file->num_file_tags -= offset;
+    file->file_tags_end = ft;
 
     /* Sort the branches by tag.  */
-    qsort (file->branches, file->num_branches, sizeof (file_tag_t *),
-           branch_compare);
+    qsort (file->branches, file->branches_end - file->branches,
+           sizeof (file_tag_t *), branch_compare);
 
     /* Check for duplicate branches.  */
-    offset = 0;
-    for (size_t i = 1; i < file->num_branches; ++i) {
-        assert (strcmp (file->branches[i - offset - 1]->vers,
-                        file->branches[i]->vers) < 0);
-        if (file->branches[i - offset - 1] != file->branches[i]) {
-            file->branches[i - offset] = file->branches[i];
-            continue;
-        }
-
-        fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
-                 file->rcs_path,
-                 file->branches[i]->tag->tag,
-                 file->branches[i-1]->tag->tag,
-                 file->branches[i]->version->version);
-        ++offset;
+    file_tag_t ** bb = file->branches;
+    for (file_tag_t ** i = file->branches; i != file->branches_end; ++i) {
+        if (i == file->branches || bb[-1] != *i)
+            *bb++ = *i;
+        else
+            fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
+                     file->rcs_path, i[0]->tag->tag, i[-1]->tag->tag,
+                     i[0]->version->version);
     }
 
     /* Fill in the branch pointers on the versions.  FIXME - we should
      * distinguish between trunk versions and missing branches.  */
-    for (size_t i = 0; i != file->num_versions; ++i)
-        file->versions[i].branch
-            = file_find_branch (file, file->versions[i].version);
+    for (version_t * i = file->versions; i != file->versions_end; ++i)
+        i->branch = file_find_branch (file, i->version);
 }
 
 
@@ -558,20 +548,18 @@ void read_files_versions (database_t * db,
     }
 
     /* Sort the list of files.  */
-    qsort (db->files, db->num_files, sizeof (file_t), file_compare);
+    qsort (db->files, db->files_end - db->files, sizeof (file_t), file_compare);
 
     /* Set the pointers from versions to files and file_tags to files.  Add the
      * file_tags to the tags.  The latter will be sorted as we have already
      * sorted the files.  */
-    for (size_t i = 0; i != db->num_files; ++i) {
-        file_t * f = db->files + i;
-        for (size_t j = 0; j != f->num_versions; ++j)
-            f->versions[j].file = f;
+    for (file_t * f = db->files; f != db->files_end; ++f) {
+        for (version_t * j = f->versions; j != f->versions_end; ++j)
+            j->file = f;
 
-        for (size_t j = 0; j != f->num_file_tags; ++j) {
-            file_tag_t * ft = f->file_tags + j;
-            ft->file = f;
-            tag_new_tag_file (ft->tag, ft);
+        for (file_tag_t * j = f->file_tags; j != f->file_tags_end; ++j) {
+            j->file = f;
+            tag_new_tag_file (j->tag, j);
         }
     }
 
