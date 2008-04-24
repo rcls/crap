@@ -1,5 +1,6 @@
 #include "changeset.h"
 #include "database.h"
+#include "emission.h"
 #include "file.h"
 #include "log_parse.h"
 #include "string_cache.h"
@@ -156,6 +157,9 @@ int main()
         printf ("%s %s %s %s\n%s\n",
                 date, change->branch ? change->branch->tag->tag : "",
                 change->author, change->commitid, change->log);
+
+        if (changeset_update_branch (&db, changeset) == 0)
+            printf ("[There were no real changes in this changeset]\n");
 
         for (version_t * v = change; v; v = v->cs_sibling)
             printf ("\t%s %s\n", v->file->rcs_path, v->version);

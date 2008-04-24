@@ -13,6 +13,7 @@ void * xcalloc (size_t size)
     __attribute__ ((__malloc__, __warn_unused_result__));
 
 #define ARRAY_ALLOC(T,N) ((T *) xmalloc (sizeof (T) * (N)))
+#define ARRAY_CALLOC(T,N) ((T *) xcalloc (sizeof (T) * (N)))
 #define ARRAY_REALLOC(P,N) ((__typeof__ (P)) xrealloc (P, sizeof (*P) * (N)))
 
 #define ARRAY_EXTEND(P,E,M) do { if (E != M) { ++E; break; }    \

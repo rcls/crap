@@ -628,4 +628,13 @@ void read_files_versions (database_t * db,
 
         SHA1_Final (i->hash, &sha);
     }
+
+    /* Fill in all branches with their initial tags.  */
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+        if (i->branch_versions)
+            for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+                i->branch_versions[(*j)->file - db->files] = (*j)->version;
+
+    /* Create the trunk branch array.  */
+    db->trunk_versions = ARRAY_CALLOC (version_t *, db->files_end - db->files);
 }

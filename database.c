@@ -88,6 +88,7 @@ void database_destroy (database_t * db)
     free (db->changesets);
     free (db->ready_versions.entries);
     free (db->ready_changesets.entries);
+    free (db->trunk_versions);
 }
 
 
@@ -117,26 +118,4 @@ changeset_t * database_new_changeset (database_t * db)
 
     db->changesets_end[-1] = result;
     return result;
-}
-
-
-void version_release (database_t * db, version_t * version)
-{
-    heap_insert (&db->ready_versions, version);
-
-    assert (version->changeset->unready_versions != 0);
-
-    if (--version->changeset->unready_versions == 0)
-        heap_insert (&db->ready_changesets, version->changeset);
-}
-
-
-void changeset_emitted (database_t * db, changeset_t * changeset)
-{
-    for (version_t * cs_v = changeset->versions;
-         cs_v; cs_v = cs_v->cs_sibling) {
-        heap_remove (&db->ready_versions, cs_v);
-        for (version_t * v = cs_v->children; v; v = v->sibling)
-            version_release (db, v);
-    }
 }

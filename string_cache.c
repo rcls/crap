@@ -21,7 +21,7 @@ static void cache_resize()
 {
     if (cache_num_buckets == 0) {
         cache_num_buckets = 1024;        /* Start with a reasonable size.  */
-        cache_table = xcalloc (cache_num_buckets * sizeof (string_entry_t *));
+        cache_table = ARRAY_CALLOC (string_entry_t *, cache_num_buckets);
         return;
     }
 
@@ -139,7 +139,7 @@ void string_hash_init (string_hash_t * hash)
 {
     hash->num_entries = 0;
     hash->num_buckets = 16;
-    hash->buckets = xcalloc (16 * sizeof (string_hash_head_t *));
+    hash->buckets = ARRAY_CALLOC (string_hash_head_t *, 16);
 }
 
 
