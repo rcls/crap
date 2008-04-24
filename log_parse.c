@@ -496,6 +496,7 @@ static void read_file_versions (database_t * db,
             tag->tag.tag_files = NULL;
             tag->tag.tag_files_end = NULL;
             tag->tag.tag_files_max = NULL;
+            tag->tag.branch_versions = NULL;
         }
 
         ++colon;
