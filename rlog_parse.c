@@ -5,16 +5,19 @@
 #include "string_cache.h"
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include <stdint.h>
-const version_t * preceed (const version_t * v)
+
+static const version_t * preceed (const version_t * v)
 {
-    // If cs is not ready to emit, then some version in cs is blocked.  The
-    // earliest un-emitted ancestor of that version will be ready to emit.
-    // Search for it.
+    /* If cs is not ready to emit, then some version in cs is blocked.  The
+     * earliest un-emitted ancestor of that version will be ready to emit.
+     * Search for it.  We could be a bit smarter by seraching harder for the
+     * oldest possible version.  But most cycles are trivial (length 1) so it's
+     * probably not worth the effort.  */
     for (version_t * csv = v->changeset->versions; csv; csv = csv->cs_sibling) {
         if (csv->ready_index != SIZE_MAX)
             continue;                   /* Not blocked.  */
@@ -25,7 +28,8 @@ const version_t * preceed (const version_t * v)
     abort();
 }
 
-const version_t * cycle_find (const version_t * v)
+
+static const version_t * cycle_find (const version_t * v)
 {
     const version_t * slow = v;
     const version_t * fast = v;
@@ -38,8 +42,9 @@ const version_t * cycle_find (const version_t * v)
 }
 
 
-void cycle_split (database_t * db, changeset_t * cs)
+static void cycle_split (database_t * db, changeset_t * cs)
 {
+    fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");
     /* We split the changeset into to.  We leave all the blocked versions
      * in cs, and put the ready-to-emit into nw.  */
@@ -56,6 +61,7 @@ void cycle_split (database_t * db, changeset_t * cs)
         }
         else {
             /* Ready-to-emit; goes into new.  */
+            v->changeset = new;
             *new_v = v;
             new_v = &v->cs_sibling;
         }
@@ -99,7 +105,35 @@ int main()
             if (j->parent == NULL)
                 version_release (&db, j);
 
+    /* Do a dummy run of the changeset emission; this breaks any cycles before
+     * we commit ourselves to the real change-set order.  */
     size_t emitted_changesets = 0;
+    while (db.ready_versions.entries != db.ready_versions.entries_end) {
+        if (db.ready_changesets.entries == db.ready_changesets.entries_end)
+            cycle_split (
+                &db, cycle_find (heap_front (&db.ready_versions))->changeset);
+
+        changeset_t * changeset = heap_pop (&db.ready_changesets);
+        changeset_emitted (&db, changeset);
+        ++emitted_changesets;
+    }
+
+    assert (db.ready_changesets.entries_end == db.ready_changesets.entries_end);
+    assert (emitted_changesets == db.changesets_end - db.changesets);
+
+    /* Re-do the changeset unready counts.  */
+    for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i)
+        for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
+            ++(*i)->unready_versions;
+
+    /* Mark the initial versions as ready to emit once again.  */
+    for (file_t * f = db.files; f != db.files_end; ++f)
+        for (version_t * j = f->versions; j != f->versions_end; ++j)
+            if (j->parent == NULL)
+                version_release (&db, j);
+
+    /* Emit the changesets for real.  */
+    emitted_changesets = 0;
     while (db.ready_versions.entries != db.ready_versions.entries_end) {
         if (db.ready_changesets.entries == db.ready_changesets.entries_end)
             cycle_split (

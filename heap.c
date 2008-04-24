@@ -26,7 +26,7 @@ static void shuffle_down (heap_t * heap, size_t position, void * item)
     size_t num_entries = heap->entries_end - heap->entries;
     while (1) {
         size_t child = position * 2 + 1;
-        if (child + 1 > num_entries)
+        if (child >= num_entries)
             break;
 
         if (child + 1 < num_entries
@@ -102,5 +102,7 @@ void * heap_pop (heap_t * heap)
     void * result = heap->entries[0];
     if (--heap->entries_end != heap->entries)
         shuffle_down (heap, 0, *heap->entries_end);
+
+    INDEX (result) = SIZE_MAX;
     return result;
 }

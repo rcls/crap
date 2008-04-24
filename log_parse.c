@@ -143,53 +143,46 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 
 /* Is a version string value?  I.e., non-empty even-length '.' separated
  * numbers.  */
-bool valid_version (const char * s)
+static bool valid_version (const char * s)
 {
-    size_t position = 0;
-    size_t zero_position = 0;
-
     do {
-        if (s[0] == '0') {
-            // Forbid extraneous leading zeros.
-            if (s[1] != '.')
-                return false;
-            if (zero_position != 0)
-                return false;           /* Only one component can be zero.  */
-            if ((position & 1) == 0)
-                return false;           /* Must be in even position.  */
-            zero_position = position;
-        }
+        if (*s < '1' || *s > '9')
+            return false;               /* Bogus.  */
 
-        if (!isdigit (*s))
-            return false;               /* Must be at least one digit.  */
+        for ( ; *s >= '0' && *s <= '9'; ++s);
 
-        while (isdigit (*++s));
-        ++position;
+        if (*s != '.')
+            return false;               /* Bogus.  */
+
+        ++s;
+
+        if (*s < '1' || *s > '9')
+            return false;               /* Bogus.  */
+
+        for ( ; *s >= '0' && *s <= '9'; ++s);
+
+        if (*s == 0)
+            return true;                /* Done.  */
     }
-    while (*s++ == '.');
+    while (*s++ == '.');                /* Loop if OK.  */
 
-    if (s[-1] != 0)
-        return false;                   /* Illegal character.  */
-
-    if (position & 1)
-        return false;                  /* Must be even number of components.  */
-
-    if (zero_position != 0 && zero_position + 2 != position)
-        return false;                   /* A zero must be second-to-last.  */
-
-    return true;
+    return false;                       /* Bogus.  */
 }
 
 
-bool predecessor (char * s)
+static bool predecessor (char * s, bool is_branch)
 {
-    /* Check to see if we should just remove the last two components.  This is
-     * the case if we are a branch tag (.0.x) or the first rev on a branch
-     * (.x.1).  */
     char * l = strrchr (s, '.');
     assert (l);
-    if ((l - s > 2 && l[-1] == '0' && l[-2] == '.')
-        || (l[1] == '1' && l[2] == 0)) {
+
+    if (is_branch) {
+        /* Branch; just truncate the last component.  */
+        *l = 0;
+        return true;
+    }
+
+    if (l[1] == '1' && l[2] == 0) {
+        /* .1 version; just remove the last two components.  */
         *l = 0;
         l = strrchr (s, '.');
         if (l == NULL)
@@ -206,7 +199,7 @@ bool predecessor (char * s)
 
     assert (isdigit (*p));
     assert (p != s);
-    if (--*p == '0') {
+    if (--*p == '0' && p[-1] == '.') {
         /* Rewrite 09999 to 9999 etc.  */
         *p = '9';
         end[-1] = 0;
@@ -215,11 +208,47 @@ bool predecessor (char * s)
 }
 
 
-static bool tag_is_branch (const file_tag_t * t)
+/* Normalise a version string for a tag in place.  Rewrite the 'x.y.0.z' style
+ * branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1 on
+ * a branch tag.  */
+static int normalise_tag_version (char * s)
 {
-    char * l = strrchr (t->vers, '.');
-    assert (l);
-    return l - t->vers > 2 && l[-1] == '0' && l[-2] == '.';
+    do {
+        if (*s < '1' || *s > '9')
+            return -1;                  /* Bogus.  */
+
+        for ( ; *s >= '0' && *s <= '9'; ++s);
+
+        if (*s == 0)
+            return 1;                   /* x.y.z style branch.  */
+
+        if (*s++ != '.' || *s < '1' || *s > '9')
+            return -1;                  /* Bogus.  */
+
+        for ( ; *s >= '0' && *s <= '9'; ++s);
+
+        if (*s == 0)
+            return 0;                   /* Done.  */
+
+        if (*s++ != '.')
+            return -1;                  /* Bogus.  */
+    }
+    while (*s != '0');
+
+    /* We hit what should be the '0' of a new-style branch tag.  */
+    char * last = s;
+
+    if (*++s != '.' || *++s < '1' || *s > '9')
+        return -1;
+
+    for ( ; *s >= '0' && *s <= '9'; ++s);
+
+    if (*s != 0)
+        return -1;                      /* Bogus.  */
+
+    memmove (last, last + 2, s - last - 1);
+
+    return 1;
 }
 
 
@@ -260,7 +289,7 @@ static void fill_in_versions_and_parents (file_t * file)
         char vers[1 + strlen (v->version)];
         strcpy (vers, v->version);
         v->parent = NULL;
-        while (predecessor (vers)) {
+        while (predecessor (vers, false)) {
             v->parent = file_find_version (file, vers);
             if (v->parent) {
                 v->sibling = v->parent->children;
@@ -276,7 +305,7 @@ static void fill_in_versions_and_parents (file_t * file)
         if (i != ft)
             memcpy (ft, i, sizeof (file_tag_t));
 
-        if (!tag_is_branch (ft)) {
+        if (!ft->is_branch) {
             ft->version = file_find_version (file, ft->vers);
             if (ft->version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
@@ -293,7 +322,7 @@ static void fill_in_versions_and_parents (file_t * file)
          * If none exists, that's fine, it makes sense as a branch addition.  */
         char vers[1 + strlen (ft->vers)];
         strcpy (vers, ft->vers);
-        if (predecessor (vers))
+        if (predecessor (vers, true))
             ft->version = file_find_version (file, vers);
         else
             ft->version = NULL;
@@ -454,7 +483,7 @@ static void read_file_versions (database_t * db,
 
     len = next_line (l, buffer_len, f);
     while (starts_with (*l, "M \t")) {
-        const char * colon = strrchr (*l, ':');
+        char * colon = strrchr (*l, ':');
         if (colon == NULL)
             bugger ("Tag on (%s) did not have version: %s\n",
                     file->rcs_path, *l);
@@ -476,9 +505,14 @@ static void read_file_versions (database_t * db,
         if (*colon == ' ')
             ++colon;
 
-        /* FIXME - check that version string is a valid version.  */
+        int type = normalise_tag_version (colon);
+        if (type < 0)
+            bugger ("Tag %s on (%s) has bogus version '%s'\n",
+                    tag_name, file->rcs_path, colon);
+
         file_tag->vers = cache_string (colon);
         file_tag->tag = &tag->tag;
+        file_tag->is_branch = type;
 
         len = next_line (l, buffer_len, f);
     };
