@@ -626,7 +626,8 @@ void read_files_versions (database_t * db,
             if ((*j)->version != NULL && !(*j)->version->dead)
                 SHA_Update (&sha, &(*j)->version, sizeof (version_t *));
 
-        SHA1_Final (i->hash, &sha);
+        SHA1_Final ((unsigned char *) i->hash, &sha);
+        database_tag_hash_insert (db, i);
     }
 
     /* Fill in all branches with their initial tags.  */

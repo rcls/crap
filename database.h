@@ -3,6 +3,8 @@
 
 #include "heap.h"
 
+#include <stdint.h>
+
 struct version;
 
 typedef struct database {
@@ -22,6 +24,10 @@ typedef struct database {
 
     struct version ** trunk_versions;
 
+    struct tag ** tag_hash;
+    size_t tag_hash_num_entries;
+    size_t tag_hash_num_buckets;
+
 } database_t;
 
 /** Initialise a database_t object.  */
@@ -35,5 +41,14 @@ struct file * database_new_file (database_t * db);
 
 /** Create a new changeset object for the database.  */
 struct changeset * database_new_changeset (database_t * db);
+
+/** Insert a tag into the tag hash.  */
+void database_tag_hash_insert (database_t * db, struct tag * tag);
+
+/** Find the first tag matching a hash.  */
+struct tag * database_tag_hash_find (database_t * db, const uint32_t hash[40]);
+
+/** Find the next tag matching a hash.  */
+struct tag * database_tag_hash_next (database_t * db, struct tag * tag);
 
 #endif

@@ -59,6 +59,9 @@ void database_init (database_t * db)
     db->changesets = NULL;
     db->changesets_end = NULL;
     db->changesets_max = NULL;
+    db->tag_hash = NULL;
+    db->tag_hash_num_entries = 0;
+    db->tag_hash_num_buckets = 0;
 
     heap_init (&db->ready_versions,
                offsetof (version_t, ready_index), compare_version);
@@ -89,6 +92,7 @@ void database_destroy (database_t * db)
     free (db->ready_versions.entries);
     free (db->ready_changesets.entries);
     free (db->trunk_versions);
+    free (db->tag_hash);
 }
 
 
@@ -119,3 +123,60 @@ changeset_t * database_new_changeset (database_t * db)
     db->changesets_end[-1] = result;
     return result;
 }
+
+
+void database_tag_hash_insert (database_t * db, struct tag * tag)
+{
+    if (db->tag_hash_num_buckets == 0) {
+        db->tag_hash_num_buckets = 8;
+        db->tag_hash = ARRAY_CALLOC (tag_t *, 8);
+    }
+    else if (db->tag_hash_num_entries >= db->tag_hash_num_buckets) {
+        db->tag_hash = ARRAY_REALLOC (db->tag_hash,
+                                      2 * db->tag_hash_num_buckets);
+
+        for (size_t i = 0; i != db->tag_hash_num_buckets; ++i) {
+            tag_t ** old = db->tag_hash + i;
+            tag_t ** new = old + db->tag_hash_num_buckets;
+            for (tag_t * v = db->tag_hash[i]; v != 0; v = v->hash_next)
+                if (v->hash[0] & db->tag_hash_num_buckets) {
+                    *new = v;
+                    new = &v->hash_next;
+                }
+                else {
+                    *old = v;
+                    old = &v->hash_next;
+                }
+            *old = NULL;
+            *new = NULL;
+        }
+        db->tag_hash_num_buckets *= 2;
+    }
+
+    tag_t ** bucket = &db->tag_hash[tag->hash[0]
+                                    & (db->tag_hash_num_buckets - 1)];
+    tag->hash_next = *bucket;
+    *bucket = tag;
+
+    ++db->tag_hash_num_entries;
+}
+
+
+struct tag * database_tag_hash_find (database_t * db, const uint32_t hash[40])
+{
+    for (tag_t * i = db->tag_hash[hash[0] & (db->tag_hash_num_buckets - 1)];
+         i; i = i->hash_next)
+        if (memcmp (hash, i->hash, sizeof (i->hash)) == 0)
+            return i;
+    return NULL;
+}
+
+
+struct tag * database_tag_hash_next (database_t * db, struct tag * tag)
+{
+    for (tag_t * i = tag->hash_next; i; i = i->hash_next)
+        if (memcmp (tag->hash, i->hash, sizeof (i->hash)) == 0)
+            return i;
+    return NULL;
+}
+

@@ -2,6 +2,7 @@
 #define FILE_H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <time.h>
 
 typedef struct file file_t;
@@ -88,7 +89,8 @@ struct tag {
      * A sha-1 hash of the version information; this is used to identify when
      * a set of versions exactly matching this tag has been emitted.
      */
-    unsigned char hash[20];
+    uint32_t hash[5];
+    tag_t * hash_next;
 };
 
 void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);
