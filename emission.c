@@ -4,6 +4,8 @@
 #include "file.h"
 
 #include <assert.h>
+#include <openssl/sha.h>
+#include <stdio.h>
 
 void version_release (database_t * db, version_t * version)
 {
@@ -44,6 +46,22 @@ size_t changeset_update_branch (struct database * db,
             ++changes;
         }
     }
+
+    /* Compute the SHA1 hash of the current branch state.  */
+    SHA_CTX sha;
+    SHA_Init (&sha);
+    version_t ** branch_end = branch + (db->files_end - db->files);
+    for (version_t ** i = branch; i != branch_end; ++i)
+        if (*i != NULL && !(*i)->dead)
+            SHA_Update (&sha, i, sizeof (version_t *));
+
+    uint32_t hash[5];
+    SHA1_Final ((unsigned char *) hash, &sha);
+
+    /* Iterate over all the tags that match.  */
+    for (tag_t * i = database_tag_hash_find (db, hash); i; i = i->hash_next)
+        printf ("*** HIT TAG %s ***\n", i->tag);
+
     return changes;
 }
 

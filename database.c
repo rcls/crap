@@ -179,4 +179,3 @@ struct tag * database_tag_hash_next (database_t * db, struct tag * tag)
             return i;
     return NULL;
 }
-

@@ -616,8 +616,8 @@ void read_files_versions (database_t * db,
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
             (*j)->tag = i;
             if (i->branch_versions == NULL && (*j)->is_branch)
-                i->branch_versions = ARRAY_ALLOC (version_t *,
-                                                  db->files_end - db->files);
+                i->branch_versions = ARRAY_CALLOC (version_t *,
+                                                   db->files_end - db->files);
         }
 
         SHA_CTX sha;
