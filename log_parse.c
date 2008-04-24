@@ -310,10 +310,7 @@ static void fill_in_versions_and_parents (file_t * file)
             if (ft->version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
                          file->rcs_path, ft->tag->tag, ft->vers);
-            else if (ft->version->dead)
-                fprintf (stderr, "File %s tag %s has dead version %s\n",
-                         file->rcs_path, ft->tag->tag, ft->version->version);
-            else
+            else if (!ft->version->dead)
                 ++ft;
             continue;
         }
@@ -598,7 +595,7 @@ void read_files_versions (database_t * db,
     }
 
     /* Flatten the hash of tags to an array.  */
-    db->tags = xmalloc (tags.num_entries * sizeof (tag_t));
+    db->tags = ARRAY_ALLOC (tag_t, tags.num_entries);
     db->tags_end = db->tags;
 
     for (tag_hash_item_t * i = string_hash_begin (&tags);
@@ -618,8 +615,8 @@ void read_files_versions (database_t * db,
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
             (*j)->tag = i;
             if (i->branch_versions == NULL && (*j)->is_branch)
-                i->branch_versions = xmalloc (
-                    sizeof (version_t *) * (db->files_end - db->files));
+                i->branch_versions = ARRAY_ALLOC (version_t *,
+                                                  db->files_end - db->files);
         }
 
         SHA_CTX sha;

@@ -98,7 +98,7 @@ void create_changesets (database_t * db)
     if (total_versions == 0)
         return;
 
-    version_t ** version_list = xmalloc (total_versions * sizeof (version_t *));
+    version_t ** version_list = ARRAY_ALLOC (version_t *, total_versions);
     version_t ** vp = version_list;
 
     for (file_t * i = db->files; i != db->files_end; ++i)
