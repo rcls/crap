@@ -55,17 +55,14 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
 {
     char vers[strlen (s) + 1];
     strcpy (vers, s);
-    char * dot2 = strrchr (vers, '.');
-    if (dot2 == NULL)
+    char * dot = strrchr (vers, '.');
+    if (dot == NULL)
         return NULL;
-    char * dot1 = memrchr (vers, '.', dot2 - vers);
-    if (dot1 == NULL || dot2 == dot1 + 1)
+    if (memchr (vers, '.', dot - vers) == NULL)
         return NULL;
 
-    /* Shuffle the second to last component up 2, and put a '.0.' before it. */
-    memmove (dot1 + 2, dot1, dot2 - dot1);
-    dot1[1] = '0';
-    dot2[2] = 0;
+    /* Truncate the last component.  */
+    *dot = 0;
 
     /* Now bsearch for the branch.  */
     file_tag_t ** base = f->branches;

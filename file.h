@@ -66,6 +66,7 @@ struct file_tag {
      * the version to use as the branch point.  Version may be null.  */
     const char * vers;
     version_t * version;
+    bool is_branch;
 };
 
 

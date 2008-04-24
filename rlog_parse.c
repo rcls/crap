@@ -5,16 +5,19 @@
 #include "string_cache.h"
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
 
-#include <stdint.h>
-const version_t * preceed (const version_t * v)
+
+static const version_t * preceed (const version_t * v)
 {
-    // If cs is not ready to emit, then some version in cs is blocked.  The
-    // earliest un-emitted ancestor of that version will be ready to emit.
-    // Search for it.
+    /* If cs is not ready to emit, then some version in cs is blocked.  The
+     * earliest un-emitted ancestor of that version will be ready to emit.
+     * Search for it.  We could be a bit smarter by seraching harder for the
+     * oldest possible version.  But most cycles are trivial (length 1) so it's
+     * probably not worth the effort.  */
     for (version_t * csv = v->changeset->versions; csv; csv = csv->cs_sibling) {
         if (csv->ready_index != SIZE_MAX)
             continue;                   /* Not blocked.  */
@@ -25,7 +28,8 @@ const version_t * preceed (const version_t * v)
     abort();
 }
 
-const version_t * cycle_find (const version_t * v)
+
+static const version_t * cycle_find (const version_t * v)
 {
     const version_t * slow = v;
     const version_t * fast = v;
@@ -38,7 +42,7 @@ const version_t * cycle_find (const version_t * v)
 }
 
 
-void cycle_split (database_t * db, changeset_t * cs)
+static void cycle_split (database_t * db, changeset_t * cs)
 {
     fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");

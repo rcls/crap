@@ -3,8 +3,6 @@
 
 #include "heap.h"
 
-#include <sys/types.h>
-
 struct version;
 
 typedef struct database {
