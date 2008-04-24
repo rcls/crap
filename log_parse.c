@@ -310,10 +310,7 @@ static void fill_in_versions_and_parents (file_t * file)
             if (ft->version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
                          file->rcs_path, ft->tag->tag, ft->vers);
-            else if (ft->version->dead)
-                fprintf (stderr, "File %s tag %s has dead version %s\n",
-                         file->rcs_path, ft->tag->tag, ft->version->version);
-            else
+            else if (!ft->version->dead)
                 ++ft;
             continue;
         }
