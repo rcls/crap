@@ -75,8 +75,10 @@ void database_destroy (database_t * db)
         free (i->branches);
     }
 
-    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         free (i->tag_files);
+        free (i->branch_versions);
+    }
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
         free (*i);
