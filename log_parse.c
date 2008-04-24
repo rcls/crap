@@ -615,8 +615,12 @@ void read_files_versions (database_t * db,
     /* Update the pointers from file_tags to tags, and compute the version
      * hashes.  */
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
             (*j)->tag = i;
+            if (i->branch_versions == NULL && (*j)->is_branch)
+                i->branch_versions = xmalloc (
+                    sizeof (version_t *) * (db->files_end - db->files));
+        }
 
         SHA_CTX sha;
         SHA_Init (&sha);

@@ -77,14 +77,12 @@ struct tag {
     file_tag_t ** tag_files_end;
     file_tag_t ** tag_files_max;
 
-#if 0
     /**
      * This is non-NULL for branches, where a tag is considered a branch if the
      * tag is a branch tag on any file.  It points to an array of versions, the
      * same size as the database file array.  Each item in the slot is current
      * version, in the emission of the branch, of the corresponding file.  */
     version_t ** branch_versions;
-#endif
 
     /**
      * A sha-1 hash of the version information; this is used to identify when
