@@ -211,57 +211,42 @@ static bool predecessor (char * s, bool is_branch)
 /* Normalise a version string for a tag in place.  Rewrite the 'x.y.0.z' style
  * branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1 on
  * a branch tag.  */
-static int normalise_tag_version (char * dest, const char * src)
+static int normalise_tag_version (char * s)
 {
-    while (*src != '0') {
-        if (!isdigit (*src))
+    do {
+        if (*s < '1' || *s > '9')
             return -1;                  /* Bogus.  */
 
-        while (isdigit (*src))
-            *dest++ = *src++;
+        for ( ; *s >= '0' && *s <= '9'; ++s);
 
-        if (*src == 0) {
-            *dest = 0;
+        if (*s == 0)
             return 1;                   /* x.y.z style branch.  */
-        }
 
-        if (*src++ != '.')
-            return false;               /* Bogus.  */
-
-        *dest++ = '.';
-
-        if (!isdigit (*src) || *src == '0')
-            return false;               /* Bogus.  */
-
-        while (isdigit (*src))
-            *dest++ = *src++;
-
-        if (*src == 0) {
-            *dest = 0;
-            return 0;                   /* Done.  */
-        }
-
-        if (*src++ != '.')
+        if (*s++ != '.' || *s < '1' || *s > '9')
             return -1;                  /* Bogus.  */
 
-        *dest++ = '.';
+        for ( ; *s >= '0' && *s <= '9'; ++s);
+
+        if (*s == 0)
+            return 0;                   /* Done.  */
+
+        if (*s++ != '.')
+            return -1;                  /* Bogus.  */
     }
+    while (*s != '0');
 
     /* We hit what should be the '0' of a new-style branch tag.  */
-    ++src;
-    if (*src++ != '.')
+    char * last = s;
+
+    if (*++s != '.' || *++s < '1' || *s > '9')
         return -1;
 
-    if (*src < '1' || *src > '9')
-        return -1;
+    for ( ; *s >= '0' && *s <= '9'; ++s);
 
-    while (*src >= '0' && *src <= '9')
-        *dest++ = *src++;
-
-    if (*src != 0)
+    if (*s != 0)
         return -1;                      /* Bogus.  */
 
-    *dest = 0;
+    memmove (last, last + 2, s - last - 1);
 
     return 1;
 }
@@ -498,7 +483,7 @@ static void read_file_versions (database_t * db,
 
     len = next_line (l, buffer_len, f);
     while (starts_with (*l, "M \t")) {
-        const char * colon = strrchr (*l, ':');
+        char * colon = strrchr (*l, ':');
         if (colon == NULL)
             bugger ("Tag on (%s) did not have version: %s\n",
                     file->rcs_path, *l);
@@ -520,13 +505,12 @@ static void read_file_versions (database_t * db,
         if (*colon == ' ')
             ++colon;
 
-        char normal[strlen (colon) + 1];
-        int type = normalise_tag_version (normal, colon);
+        int type = normalise_tag_version (colon);
         if (type < 0)
             bugger ("Tag %s on (%s) has bogus version '%s'\n",
                     tag_name, file->rcs_path, colon);
 
-        file_tag->vers = cache_string (normal);
+        file_tag->vers = cache_string (colon);
         file_tag->tag = &tag->tag;
         file_tag->is_branch = type;
 
