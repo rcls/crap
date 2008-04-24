@@ -158,7 +158,7 @@ void string_hash_destroy (string_hash_t * hash)
 
 static void string_hash_resize (string_hash_t * hash)
 {
-    hash->buckets = xrealloc (hash->buckets, 2 * hash->num_buckets);
+    hash->buckets = ARRAY_REALLOC (hash->buckets, 2 * hash->num_buckets);
 
     for (size_t i = 0; i != hash->num_buckets; ++i) {
         string_hash_head_t ** me = hash->buckets + i;
