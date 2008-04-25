@@ -60,10 +60,11 @@ size_t changeset_update_branch (struct database * db,
 
     /* Iterate over all the tags that match.  */
     for (tag_t * i = database_tag_hash_find (db, hash); i; i = i->hash_next) {
+        printf ("*** HIT %s %s%s ***\n",
+                i->branch_versions ? "BRANCH" : "TAG", i->tag,
+                i->is_emitted ? " (DUPLICATE)" : "");
         i->is_emitted = true;
-        printf ("*** HIT TAG %s ***\n", i->tag);
     }
 
     return changes;
 }
-

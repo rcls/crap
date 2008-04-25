@@ -177,12 +177,23 @@ int main()
              emitted_changesets, db.changesets_end - db.changesets);
 
     size_t emitted_tags = 0;
+    size_t emitted_branches = 0;
+    size_t tags = 0;
+    size_t branches = 0;
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
-        if (i->is_emitted)
-            ++emitted_tags;
+        if (i->branch_versions) {
+            ++branches;
+            emitted_branches += i->is_emitted;
+        }
+        else {
+            ++tags;
+            emitted_tags += i->is_emitted;
+        }
 
-    fprintf (stderr, "Emitted %u of %u tags.\n",
-             emitted_tags, db.tags_end - db.tags);
+    fprintf (stderr,
+             "Emitted %u + %u = %u of %u + %u = %u branches + tags = total.\n",
+             emitted_branches, emitted_tags, emitted_branches + emitted_tags,
+             branches, tags, branches + tags);
 
     string_cache_stats (stderr);
 
