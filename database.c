@@ -125,7 +125,7 @@ changeset_t * database_new_changeset (database_t * db)
 }
 
 
-void database_tag_hash_insert (database_t * db, struct tag * tag)
+void database_tag_hash_insert (database_t * db, tag_t * tag)
 {
     if (db->tag_hash_num_buckets == 0) {
         db->tag_hash_num_buckets = 8;
@@ -162,7 +162,7 @@ void database_tag_hash_insert (database_t * db, struct tag * tag)
 }
 
 
-struct tag * database_tag_hash_find (database_t * db, const uint32_t hash[40])
+tag_t * database_tag_hash_find (database_t * db, const uint32_t hash[5])
 {
     for (tag_t * i = db->tag_hash[hash[0] & (db->tag_hash_num_buckets - 1)];
          i; i = i->hash_next)
@@ -172,7 +172,7 @@ struct tag * database_tag_hash_find (database_t * db, const uint32_t hash[40])
 }
 
 
-struct tag * database_tag_hash_next (database_t * db, struct tag * tag)
+tag_t * database_tag_hash_next (tag_t * tag)
 {
     for (tag_t * i = tag->hash_next; i; i = i->hash_next)
         if (memcmp (tag->hash, i->hash, sizeof (i->hash)) == 0)

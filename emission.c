@@ -47,19 +47,23 @@ size_t changeset_update_branch (struct database * db,
         }
     }
 
+    if (changes == 0)
+        return 0;
+
     /* Compute the SHA1 hash of the current branch state.  */
     SHA_CTX sha;
-    SHA_Init (&sha);
+    SHA1_Init (&sha);
     version_t ** branch_end = branch + (db->files_end - db->files);
     for (version_t ** i = branch; i != branch_end; ++i)
         if (*i != NULL && !(*i)->dead)
-            SHA_Update (&sha, i, sizeof (version_t *));
+            SHA1_Update (&sha, i, sizeof (version_t *));
 
     uint32_t hash[5];
     SHA1_Final ((unsigned char *) hash, &sha);
 
     /* Iterate over all the tags that match.  */
-    for (tag_t * i = database_tag_hash_find (db, hash); i; i = i->hash_next) {
+    for (tag_t * i = database_tag_hash_find (db, hash); i;
+         i = database_tag_hash_next (i)) {
         printf ("*** HIT %s %s%s ***\n",
                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
                 i->is_emitted ? " (DUPLICATE)" : "");

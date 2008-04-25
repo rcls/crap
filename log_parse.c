@@ -621,10 +621,10 @@ void read_files_versions (database_t * db,
         }
 
         SHA_CTX sha;
-        SHA_Init (&sha);
+        SHA1_Init (&sha);
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
             if ((*j)->version != NULL && !(*j)->version->dead)
-                SHA_Update (&sha, &(*j)->version, sizeof (version_t *));
+                SHA1_Update (&sha, &(*j)->version, sizeof (version_t *));
 
         SHA1_Final ((unsigned char *) i->hash, &sha);
         database_tag_hash_insert (db, i);
