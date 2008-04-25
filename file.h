@@ -91,6 +91,7 @@ struct tag {
      */
     uint32_t hash[5];
     tag_t * hash_next;
+    bool is_emitted;
 };
 
 void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);

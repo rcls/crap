@@ -133,6 +133,8 @@ int main()
             if (j->parent == NULL)
                 version_release (&db, j);
 
+    /* FIXME - we will have to mark tags as unemitted at some point also.  */
+
     /* Emit the changesets for real.  */
     emitted_changesets = 0;
     while (db.ready_versions.entries != db.ready_versions.entries_end) {
@@ -173,6 +175,14 @@ int main()
     fflush (NULL);
     fprintf (stderr, "Emitted %u of %u changesets.\n",
              emitted_changesets, db.changesets_end - db.changesets);
+
+    size_t emitted_tags = 0;
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+        if (i->is_emitted)
+            ++emitted_tags;
+
+    fprintf (stderr, "Emitted %u of %u tags.\n",
+             emitted_tags, db.tags_end - db.tags);
 
     string_cache_stats (stderr);
 

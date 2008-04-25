@@ -628,6 +628,8 @@ void read_files_versions (database_t * db,
 
         SHA1_Final ((unsigned char *) i->hash, &sha);
         database_tag_hash_insert (db, i);
+
+        i->is_emitted = false;
     }
 
     /* Fill in all branches with their initial tags.  */

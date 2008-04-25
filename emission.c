@@ -59,8 +59,10 @@ size_t changeset_update_branch (struct database * db,
     SHA1_Final ((unsigned char *) hash, &sha);
 
     /* Iterate over all the tags that match.  */
-    for (tag_t * i = database_tag_hash_find (db, hash); i; i = i->hash_next)
+    for (tag_t * i = database_tag_hash_find (db, hash); i; i = i->hash_next) {
+        i->is_emitted = true;
         printf ("*** HIT TAG %s ***\n", i->tag);
+    }
 
     return changes;
 }
