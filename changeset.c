@@ -113,19 +113,19 @@ void create_changesets (database_t * db)
     version_t * tail = version_list[0];
     tail->changeset = current;
     current->versions = tail;
-    current->unready_versions = 1;
+    current->unready_count = 1;
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (strings_match (tail, next)
             && next->time - current->versions->time < FUZZ_TIME) {
             tail->cs_sibling = next;
-            ++current->unready_versions;
+            ++current->unready_count;
         }
         else {
             tail->cs_sibling = NULL;
             current = database_new_changeset (db);
             current->versions = next;
-            current->unready_versions = 1;
+            current->unready_count = 1;
         }
         next->changeset = current;
         tail = next;

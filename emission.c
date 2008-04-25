@@ -11,9 +11,9 @@ void version_release (database_t * db, version_t * version)
 {
     heap_insert (&db->ready_versions, version);
 
-    assert (version->changeset->unready_versions != 0);
+    assert (version->changeset->unready_count != 0);
 
-    if (--version->changeset->unready_versions == 0)
+    if (--version->changeset->unready_count == 0)
         heap_insert (&db->ready_changesets, version->changeset);
 }
 

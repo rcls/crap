@@ -51,7 +51,7 @@ static void cycle_split (database_t * db, changeset_t * cs)
      * in cs, and put the ready-to-emit into nw.  */
 
     changeset_t * new = database_new_changeset (db);
-    new->unready_versions = 0;
+    new->unready_count = 0;
     version_t ** cs_v = &cs->versions;
     version_t ** new_v = &new->versions;
     for (version_t * v = cs->versions; v; v = v->cs_sibling) {
@@ -125,7 +125,7 @@ int main()
     /* Re-do the changeset unready counts.  */
     for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i)
         for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
-            ++(*i)->unready_versions;
+            ++(*i)->unready_count;
 
     /* Mark the initial versions as ready to emit once again.  */
     for (file_t * f = db.files; f != db.files_end; ++f)
