@@ -22,8 +22,6 @@ typedef struct database {
     heap_t ready_versions;
     heap_t ready_changesets;
 
-    struct version ** trunk_versions;
-
     struct tag ** tag_hash;
     size_t tag_hash_num_entries;
     size_t tag_hash_num_buckets;

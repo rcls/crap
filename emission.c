@@ -32,11 +32,14 @@ void changeset_emitted (database_t * db, changeset_t * changeset)
 size_t changeset_update_branch (struct database * db,
                                 struct changeset * changeset)
 {
-    version_t ** branch;
-    if (changeset->versions->branch)
-        branch = changeset->versions->branch->tag->branch_versions;
-    else
-        branch = db->trunk_versions;
+    /* FIXME - what should we do about changesets on anonymous branches?
+     * Stringing them together into branches is probably more bother than it's
+     * worth, so we should probably really just never actually create those
+     * changesets.  */
+    if (changeset->versions->branch == NULL)
+        return 0;                       /* Changeset on unknown branch.  */
+
+    version_t ** branch = changeset->versions->branch->tag->branch_versions;
 
     size_t changes = 0;
     for (version_t * i = changeset->versions; i; i = i->cs_sibling) {

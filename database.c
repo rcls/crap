@@ -91,7 +91,6 @@ void database_destroy (database_t * db)
     free (db->changesets);
     free (db->ready_versions.entries);
     free (db->ready_changesets.entries);
-    free (db->trunk_versions);
     free (db->tag_hash);
 }
 

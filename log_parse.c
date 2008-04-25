@@ -25,6 +25,27 @@ typedef struct tag_hash_item {
 } tag_hash_item_t;
 
 
+static file_tag_t * file_add_tag (string_hash_t * tags,
+                                  file_t * f,
+                                  const char * tag_name)
+{
+    ARRAY_EXTEND (f->file_tags, f->file_tags_end, f->file_tags_max);
+    file_tag_t * file_tag = &f->file_tags_end[-1];
+    bool n;
+    tag_hash_item_t * tag = string_hash_insert (
+        tags, tag_name, sizeof (tag_hash_item_t), &n);
+    if (n) {
+        tag->tag.tag = tag_name;
+        tag->tag.tag_files = NULL;
+        tag->tag.tag_files_end = NULL;
+        tag->tag.tag_files_max = NULL;
+        tag->tag.branch_versions = NULL;
+    }
+    file_tag->tag = &tag->tag;
+    return file_tag;
+}
+
+
 static size_t next_line (char ** line, size_t * len, FILE * stream)
 {
     ssize_t s = getline (line, len, stream);
@@ -319,7 +340,7 @@ static void fill_in_versions_and_parents (file_t * file)
          * If none exists, that's fine, it makes sense as a branch addition.  */
         char vers[1 + strlen (ft->vers)];
         strcpy (vers, ft->vers);
-        if (predecessor (vers, true))
+        if (vers[0] != 0 && predecessor (vers, true))
             ft->version = file_find_version (file, vers);
         else
             ft->version = NULL;
@@ -466,6 +487,12 @@ static void read_file_versions (database_t * db,
     file_t * file = database_new_file (db);
     file->rcs_path = cache_string_n (*l + 12, len - 14);
 
+    /* Add a fake branch for the trunk.  */
+    const char * empty_string = cache_string ("");
+    file_tag_t * dummy_tag = file_add_tag (tags, file, empty_string);
+    dummy_tag->vers = empty_string;
+    dummy_tag->is_branch = 1;
+
     do {
         len = next_line (l, buffer_len, f);
     }
@@ -485,19 +512,8 @@ static void read_file_versions (database_t * db,
             bugger ("Tag on (%s) did not have version: %s\n",
                     file->rcs_path, *l);
 
-        file_tag_t * file_tag = file_new_file_tag (file);
-
         const char * tag_name = cache_string_n (*l + 3, colon - *l - 3);
-        bool n;
-        tag_hash_item_t * tag = string_hash_insert (
-            tags, tag_name, sizeof (tag_hash_item_t), &n);
-        if (n) {
-            tag->tag.tag = tag_name;
-            tag->tag.tag_files = NULL;
-            tag->tag.tag_files_end = NULL;
-            tag->tag.tag_files_max = NULL;
-            tag->tag.branch_versions = NULL;
-        }
+        file_tag_t * file_tag = file_add_tag (tags, file, tag_name);
 
         ++colon;
         if (*colon == ' ')
@@ -509,7 +525,6 @@ static void read_file_versions (database_t * db,
                     tag_name, file->rcs_path, colon);
 
         file_tag->vers = cache_string (colon);
-        file_tag->tag = &tag->tag;
         file_tag->is_branch = type;
 
         len = next_line (l, buffer_len, f);
@@ -637,7 +652,4 @@ void read_files_versions (database_t * db,
         if (i->branch_versions)
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
                 i->branch_versions[(*j)->file - db->files] = (*j)->version;
-
-    /* Create the trunk branch array.  */
-    db->trunk_versions = ARRAY_CALLOC (version_t *, db->files_end - db->files);
 }

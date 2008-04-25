@@ -184,10 +184,14 @@ int main()
         if (i->branch_versions) {
             ++branches;
             emitted_branches += i->is_emitted;
+            if (!i->is_emitted)
+                fprintf (stderr, "Missed branch %s\n", i->tag);
         }
         else {
             ++tags;
             emitted_tags += i->is_emitted;
+            if (!i->is_emitted)
+                fprintf (stderr, "Missed tag %s\n", i->tag);
         }
 
     fprintf (stderr,

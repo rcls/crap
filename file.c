@@ -1,6 +1,7 @@
 #include "file.h"
 #include "utils.h"
 
+#include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -11,13 +12,6 @@ version_t * file_new_version (file_t * f)
     ARRAY_EXTEND (f->versions, f->versions_end, f->versions_max);
     f->versions_end[-1].ready_index = SIZE_MAX;
     return &f->versions_end[-1];
-}
-
-
-file_tag_t * file_new_file_tag (file_t * f)
-{
-    ARRAY_EXTEND (f->file_tags, f->file_tags_end, f->file_tags_max);
-    return &f->file_tags_end[-1];
 }
 
 
@@ -56,10 +50,9 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
     char vers[strlen (s) + 1];
     strcpy (vers, s);
     char * dot = strrchr (vers, '.');
-    if (dot == NULL)
-        return NULL;
+    assert (dot != NULL);
     if (memchr (vers, '.', dot - vers) == NULL)
-        return NULL;
+        dot = vers;                     /* On trunk.  */
 
     /* Truncate the last component.  */
     *dot = 0;

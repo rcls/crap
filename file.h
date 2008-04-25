@@ -29,7 +29,6 @@ struct file {
 
 version_t * file_new_version (file_t * f);
 
-file_tag_t * file_new_file_tag (file_t * f);
 void file_new_branch (file_t *f, file_tag_t * tag);
 
 version_t * file_find_version (const file_t * f, const char * s);
