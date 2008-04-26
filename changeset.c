@@ -15,19 +15,12 @@
 
 static bool strings_match (const version_t * A, const version_t * B)
 {
-    if (cache_strcmp (A->author, B->author) != 0)
-        return 0;
-
-    if (cache_strcmp (A->commitid, B->commitid) != 0)
-        return 0;
-
-    if (string_hash_get (A->log) != string_hash_get (B->log))
-        return 0;
-
-    if (cache_strcmp (A->log, B->log) != 0)
-        return 0;
-
-    return 1;
+    tag_t * Abranch = A->branch ? A->branch->tag : NULL;
+    tag_t * Bbranch = B->branch ? B->branch->tag : NULL;
+    return A->author   == B->author
+        && A->commitid == B->commitid
+        && Abranch     == Bbranch
+        && A->log      == B->log;
 }
 
 
