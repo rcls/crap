@@ -386,9 +386,6 @@ static void fill_in_versions_and_parents (file_t * file)
         if (v1_1->dead || strcmp (v1_1->log, "Initial revision\n") != 0)
             return;
 
-    /* Mark 1.1 as dead; the implicit merge will create it instead.  */
-    v1_1->dead = true;
-
     version_t * v1_2 = file_find_version (file, "1.2");
     for (version_t * i = file->versions; i != file->versions_end; ++i) {
         if (strncmp (i->version, "1.1.1.", 6) != 0
@@ -397,6 +394,9 @@ static void fill_in_versions_and_parents (file_t * file)
         if (v1_2 && i->time >= v1_2->time)
             continue;
         i->implicit_merge = true;
+
+        /* Mark 1.1 as dead; the implicit merge will create it instead.  */
+        v1_1->dead = true;
     }
 }
 
