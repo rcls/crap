@@ -36,7 +36,6 @@ void changeset_emitted (database_t * db, changeset_t * changeset)
     }
 }
 
-#include <string.h>
 size_t changeset_update_branch (struct database * db,
                                 struct changeset * changeset)
 {
@@ -76,13 +75,9 @@ size_t changeset_update_branch (struct database * db,
     SHA_CTX sha;
     SHA1_Init (&sha);
     version_t ** branch_end = branch + (db->files_end - db->files);
-    printf ("Versions:\n");
     for (version_t ** i = branch; i != branch_end; ++i)
-        if (*i != NULL && !(*i)->dead) {
-            printf (" %s %s", (*i)->file->rcs_path + 17, (*i)->version);
+        if (*i != NULL && !(*i)->dead)
             SHA1_Update (&sha, i, sizeof (version_t *));
-        }
-    printf ("\n");
 
     uint32_t hash[5];
     SHA1_Final ((unsigned char *) hash, &sha);

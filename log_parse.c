@@ -382,15 +382,12 @@ static void fill_in_versions_and_parents (file_t * file)
      * somehow else.  If it was created by an import, then it will be not dead,
      * and identical to 1.1.1.1 (FIXME - first on 1.1 branch.).  */
     version_t * v1_1 = file_find_version (file, "1.1");
-    if (v1_1 != NULL) {
-        if (v1_1->dead)
+    if (v1_1 != NULL)
+        if (v1_1->dead || strcmp (v1_1->log, "Initial revision\n") != 0)
             return;
-        fprintf (stderr, "1.1 log: '%s'\n", v1_1->log);
-        if (strcmp (v1_1->log, "Initial revision\n") != 0) {
-            fprintf (stderr, "  dont merge\n");
-            return;
-        }
-    }
+
+    /* Mark 1.1 as dead; the implicit merge will create it instead.  */
+    v1_1->dead = true;
 
     version_t * v1_2 = file_find_version (file, "1.2");
     for (version_t * i = file->versions; i != file->versions_end; ++i) {
@@ -399,8 +396,6 @@ static void fill_in_versions_and_parents (file_t * file)
             continue;
         if (v1_2 && i->time >= v1_2->time)
             continue;
-/*         fprintf (stderr, "Implicit merge %s; %s  %lu %lu\n", */
-/*                  file->rcs_path, i->version, i->time, v1_2 ? v1_2->time : 0); */
         i->implicit_merge = true;
     }
 }
@@ -666,14 +661,10 @@ void read_files_versions (database_t * db,
 
         SHA_CTX sha;
         SHA1_Init (&sha);
-        printf ("Tag %s\n", i->tag);
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-            if ((*j)->version != NULL && !(*j)->version->dead) {
-                printf (" %s %s", (*j)->file->rcs_path + 17, (*j)->version->version);
+            if ((*j)->version != NULL && !(*j)->version->dead)
                 SHA1_Update (&sha, &(*j)->version, sizeof (version_t *));
-            }
-        printf ("\n");
-        fflush (stdout);
+
         SHA1_Final ((unsigned char *) i->hash, &sha);
         database_tag_hash_insert (db, i);
 
