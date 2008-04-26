@@ -22,28 +22,28 @@ static int compare_version (const void * AA, const void * BB)
 }
 
 
-static int compare_changset (const void * AA, const void * BB)
+static int compare_changeset (const void * AA, const void * BB)
 {
-    const version_t * A = ((const changeset_t *) AA)->versions;
-    const version_t * B = ((const changeset_t *) BB)->versions;
+    const commit_t * A = as_commit (AA);
+    const commit_t * B = as_commit (BB);
 
-    if (A->time != B->time)
-        return A->time > B->time;
+    if (A->changeset.time != B->changeset.time)
+        return A->changeset.time > B->changeset.time;
 
-    if (A->author != B->author)
-        return strcmp (A->author, B->author);
+    if (A->versions->author != B->versions->author)
+        return strcmp (A->versions->author, B->versions->author);
 
-    if (A->commitid != B->commitid)
-        return strcmp (A->commitid, B->commitid);
+    if (A->versions->commitid != B->versions->commitid)
+        return strcmp (A->versions->commitid, B->versions->commitid);
 
-    if (A->log != B->log)
-        return strcmp (A->log, B->log);
+    if (A->versions->log != B->versions->log)
+        return strcmp (A->versions->log, B->versions->log);
 
     // FIXME - should have branch names in here.
 
     // Last resort.
-    if (A->file != B->file)
-        return A->file > B->file;
+    if (A->versions->file != B->versions->file)
+        return A->versions->file > B->versions->file;
 
     return A > B;
 }
@@ -67,7 +67,7 @@ void database_init (database_t * db)
     heap_init (&db->ready_versions,
                offsetof (version_t, ready_index), compare_version);
     heap_init (&db->ready_changesets,
-               offsetof (changeset_t, ready_index), compare_changset);
+               offsetof (changeset_t, ready_index), compare_changeset);
 }
 
 
@@ -113,11 +113,10 @@ file_t * database_new_file (database_t * db)
 }
 
 
-changeset_t * database_new_changeset (database_t * db)
+void * database_new_changeset (database_t * db, size_t size)
 {
-    changeset_t * result = xmalloc (sizeof (changeset_t));
+    changeset_t * result = xmalloc (size);
     result->ready_index = SIZE_MAX;
-    result->implicit_merge = NULL;
 
     ARRAY_EXTEND (db->changesets, db->changesets_end, db->changesets_max);
 

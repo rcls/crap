@@ -12,53 +12,62 @@ void version_release (database_t * db, version_t * version)
 {
     heap_insert (&db->ready_versions, version);
 
-    assert (version->changeset->unready_count != 0);
+    assert (version->commit->changeset.unready_count != 0);
 
-    if (--version->changeset->unready_count == 0)
-        heap_insert (&db->ready_changesets, version->changeset);
+    if (--version->commit->changeset.unready_count == 0)
+        heap_insert (&db->ready_changesets, &version->commit->changeset);
 }
 
 
 void changeset_emitted (database_t * db, changeset_t * changeset)
 {
-    if (changeset->type == ct_commit && changeset->implicit_merge != NULL) {
-        assert (db->pending_implicit_merge == NULL);
-        db->pending_implicit_merge = changeset->implicit_merge;
-    }
     if (changeset->type == ct_implicit_merge)
         return;
 
-    for (version_t * cs_v = changeset->versions;
-         cs_v; cs_v = cs_v->cs_sibling) {
+    commit_t * commit = as_commit (changeset);
+
+    if (commit->implicit_merge != NULL) {
+        assert (db->pending_implicit_merge == NULL);
+        db->pending_implicit_merge = commit->implicit_merge;
+    }
+
+    for (version_t * cs_v = commit->versions; cs_v; cs_v = cs_v->cs_sibling) {
         heap_remove (&db->ready_versions, cs_v);
         for (version_t * v = cs_v->children; v; v = v->sibling)
             version_release (db, v);
     }
 }
 
+
 size_t changeset_update_branch (struct database * db,
                                 struct changeset * changeset)
 {
     version_t ** branch;
     bool implicit_merge = false;
+    commit_t * commit;
     if (changeset->type == ct_implicit_merge) {
         assert (db->tags[0].tag[0] == 0);
         branch = db->tags[0].branch_versions;
         assert (branch);
-        changeset = changeset->implicit_merge;
+        changeset = &as_imerge (changeset)->commit->changeset;
         implicit_merge = true;
+        commit = as_commit (changeset);
     }
-    else if (changeset->versions->branch == NULL)
-        /* FIXME - what should we do about changesets on anonymous branches?
-         * Stringing them together into branches is probably more bother than
-         * it's worth, so we should probably really just never actually create
-         * those changesets.  */
-        return 0;                       /* Changeset on unknown branch.  */
-    else
-        branch = changeset->versions->branch->tag->branch_versions;
+    else {
+        commit = as_commit (changeset);
+
+        if (commit->versions->branch == NULL)
+            /* FIXME - what should we do about changesets on anonymous branches?
+             * Stringing them together into branches is probably more bother
+             * than it's worth, so we should probably really just never actually
+             * create those changesets.  */
+            return 0;                   /* Changeset on unknown branch.  */
+
+        branch = commit->versions->branch->tag->branch_versions;
+    }
 
     size_t changes = 0;
-    for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
+    for (version_t * i = commit->versions; i; i = i->cs_sibling) {
         if (implicit_merge && !i->implicit_merge)
             continue;
         version_t * v = i->dead ? NULL : i;
@@ -102,7 +111,7 @@ static const version_t * preceed (const version_t * v)
      * Search for it.  We could be a bit smarter by seraching harder for the
      * oldest possible version.  But most cycles are trivial (length 1) so it's
      * probably not worth the effort.  */
-    for (version_t * csv = v->changeset->versions; csv; csv = csv->cs_sibling) {
+    for (version_t * csv = v->commit->versions; csv; csv = csv->cs_sibling) {
         if (csv->ready_index != SIZE_MAX)
             continue;                   /* Not blocked.  */
         for (version_t * v = csv->parent; v; v = v->parent)
@@ -113,7 +122,7 @@ static const version_t * preceed (const version_t * v)
 }
 
 
-static void cycle_split (database_t * db, changeset_t * cs)
+static void cycle_split (database_t * db, commit_t * cs)
 {
     /* FIXME - the changeset may have an implicit merge; we should then split
      * the implicit merge also.  */
@@ -124,10 +133,11 @@ static void cycle_split (database_t * db, changeset_t * cs)
 
     /* FIXME - we should split implicit merges also.  */
     assert (cs->implicit_merge == NULL);
-    changeset_t * new = database_new_changeset (db);
-    new->type = ct_commit;
-    new->time = cs->time;
-    new->unready_count = 0;
+    commit_t * new = database_new_changeset (db, sizeof (commit_t));
+    new->changeset.type = ct_commit;
+    new->changeset.time = cs->changeset.time;
+    new->changeset.unready_count = 0;
+    new->implicit_merge = NULL;
     version_t ** cs_v = &cs->versions;
     version_t ** new_v = &new->versions;
     for (version_t * v = cs->versions; v; v = v->cs_sibling) {
@@ -138,7 +148,7 @@ static void cycle_split (database_t * db, changeset_t * cs)
         }
         else {
             /* Ready-to-emit; goes into new.  */
-            v->changeset = new;
+            v->commit = new;
             *new_v = v;
             new_v = &v->cs_sibling;
         }
@@ -149,7 +159,7 @@ static void cycle_split (database_t * db, changeset_t * cs)
     assert (cs->versions);
     assert (new->versions);
 
-    heap_insert (&db->ready_changesets, new);
+    heap_insert (&db->ready_changesets, &new->changeset);
 
     fprintf (stderr, "Changeset %s %s\n%s\n",
              cs->versions->branch ? cs->versions->branch->tag->tag : "",
@@ -181,9 +191,9 @@ changeset_t * next_changeset (database_t * db)
 {
     /* A pending implicit merge is always done before anything else.  */
     if (db->pending_implicit_merge) {
-        changeset_t * result = db->pending_implicit_merge;
+        implicit_merge_t * result = db->pending_implicit_merge;
         db->pending_implicit_merge = NULL;
-        return result;
+        return &result->changeset;
     }
 
     if (db->ready_versions.entries == db->ready_versions.entries_end)
@@ -200,8 +210,7 @@ changeset_t * next_changeset (database_t * db)
         while (slow != fast);
 
         /* And split it.  */
-        cycle_split (db,
-                     cycle_find (heap_front (&db->ready_versions))->changeset);
+        cycle_split (db, cycle_find (heap_front (&db->ready_versions))->commit);
 
         assert (db->ready_changesets.entries
                 != db->ready_changesets.entries_end);

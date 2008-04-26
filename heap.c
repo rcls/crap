@@ -79,6 +79,7 @@ void heap_insert (heap_t * heap, void * item)
 void heap_remove (heap_t * heap, void * item)
 {
     assert (INDEX (item) != SIZE_MAX);
+    assert (heap->entries[INDEX (item)] == item);
 
     --heap->entries_end;
     if (item != *heap->entries_end)
@@ -100,6 +101,7 @@ void * heap_pop (heap_t * heap)
 {
     assert (heap->entries != heap->entries_end);
     void * result = heap->entries[0];
+    assert (INDEX (result) == 0);
     if (--heap->entries_end != heap->entries)
         shuffle_down (heap, 0, *heap->entries_end);
 

@@ -1,5 +1,4 @@
 
-
 LD=gcc
 
 all: rlog_parse

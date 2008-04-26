@@ -26,7 +26,7 @@ typedef struct database {
     size_t tag_hash_num_entries;
     size_t tag_hash_num_buckets;
 
-    struct changeset * pending_implicit_merge;
+    struct implicit_merge * pending_implicit_merge;
 } database_t;
 
 /** Initialise a database_t object.  */
@@ -39,7 +39,7 @@ void database_destroy (database_t * db);
 struct file * database_new_file (database_t * db);
 
 /** Create a new changeset object for the database.  */
-struct changeset * database_new_changeset (database_t * db);
+void * database_new_changeset (database_t * db, size_t size);
 
 /** Insert a tag into the tag hash.  */
 void database_tag_hash_insert (database_t * db, struct tag * tag);

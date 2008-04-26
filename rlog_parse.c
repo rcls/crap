@@ -12,7 +12,6 @@
 #include <time.h>
 
 
-
 int main()
 {
     char * line = NULL;
@@ -45,8 +44,9 @@ int main()
 
     /* Re-do the changeset unready counts.  */
     for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i)
-        for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
-            ++(*i)->unready_count;
+        if ((*i)->type == ct_commit)
+            for (version_t * j = as_commit (*i)->versions; j; j = j->cs_sibling)
+                ++(*i)->unready_count;
 
     /* Mark the initial versions as ready to emit once again.  */
     for (file_t * f = db.files; f != db.files_end; ++f)
@@ -76,13 +76,13 @@ int main()
         const char * log;
         bool implicit_merge = false;
         if (changeset->type == ct_implicit_merge) {
-            change = changeset->implicit_merge->versions;
+            change = as_imerge (changeset)->commit->versions;
             branch = "";
             log = "Implicit merge of vendor branch to trunk.\n";
             implicit_merge = true;
         }
         else {
-            change = changeset->versions;
+            change = as_commit (changeset)->versions;
             if (change->branch)
                 branch = change->branch->tag->tag;
             else
