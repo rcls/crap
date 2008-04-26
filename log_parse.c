@@ -370,10 +370,39 @@ static void fill_in_versions_and_parents (file_t * file)
                      i[0]->version->version);
     }
 
-    /* Fill in the branch pointers on the versions.  FIXME - we should
-     * distinguish between trunk versions and missing branches.  */
+    /* Fill in the branch pointers on the versions.  */
     for (version_t * i = file->versions; i != file->versions_end; ++i)
         i->branch = file_find_branch (file, i->version);
+
+    /* Now check for vendor branch imports that should be merged to head.  We
+     * look for 1.1.1.x versions that have a date prior to any 1.2 version.
+     * FIXME - 1.2 might have been outdated.  */
+
+    /* We need to check if the initial revision was created by an import or
+     * somehow else.  If it was created by an import, then it will be not dead,
+     * and identical to 1.1.1.1 (FIXME - first on 1.1 branch.).  */
+    version_t * v1_1 = file_find_version (file, "1.1");
+    if (v1_1 != NULL) {
+        if (v1_1->dead)
+            return;
+        fprintf (stderr, "1.1 log: '%s'\n", v1_1->log);
+        if (strcmp (v1_1->log, "Initial revision\n") != 0) {
+            fprintf (stderr, "  dont merge\n");
+            return;
+        }
+    }
+
+    version_t * v1_2 = file_find_version (file, "1.2");
+    for (version_t * i = file->versions; i != file->versions_end; ++i) {
+        if (strncmp (i->version, "1.1.1.", 6) != 0
+            || strchr (i->version + 6, '.') != NULL)
+            continue;
+        if (v1_2 && i->time >= v1_2->time)
+            continue;
+/*         fprintf (stderr, "Implicit merge %s; %s  %lu %lu\n", */
+/*                  file->rcs_path, i->version, i->time, v1_2 ? v1_2->time : 0); */
+        i->implicit_merge = true;
+    }
 }
 
 
@@ -637,10 +666,14 @@ void read_files_versions (database_t * db,
 
         SHA_CTX sha;
         SHA1_Init (&sha);
+        printf ("Tag %s\n", i->tag);
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-            if ((*j)->version != NULL && !(*j)->version->dead)
+            if ((*j)->version != NULL && !(*j)->version->dead) {
+                printf (" %s %s", (*j)->file->rcs_path + 17, (*j)->version->version);
                 SHA1_Update (&sha, &(*j)->version, sizeof (version_t *));
-
+            }
+        printf ("\n");
+        fflush (stdout);
         SHA1_Final ((unsigned char *) i->hash, &sha);
         database_tag_hash_insert (db, i);
 

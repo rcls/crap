@@ -59,28 +59,46 @@ int main()
     /* Emit the changesets for real.  */
     emitted_changesets = 0;
     while ((changeset = next_changeset (&db))) {
-        version_t * change = changeset->versions;
 
         struct tm dtm;
         char date[32];
         size_t dl = strftime (date, sizeof (date), "%F %T %Z",
-                              localtime_r (&change->time, &dtm));
+                              localtime_r (&changeset->time, &dtm));
         if (dl == 0)
             /* Maybe someone gave us a crap timezone?  */
             dl = strftime (date, sizeof (date), "%F %T %Z",
-                           gmtime_r (&change->time, &dtm));
+                           gmtime_r (&changeset->time, &dtm));
 
         assert (dl != 0);
 
+        version_t * change;
+        const char * branch;
+        const char * log;
+        bool implicit_merge = false;
+        if (changeset->type == ct_implicit_merge) {
+            change = changeset->implicit_merge->versions;
+            branch = "";
+            log = "Implicit merge of vendor branch to trunk.\n";
+            implicit_merge = true;
+        }
+        else {
+            change = changeset->versions;
+            if (change->branch)
+                branch = change->branch->tag->tag;
+            else
+                branch = "";
+            log = change->log;
+        }
+
         printf ("%s %s %s %s\n%s\n",
-                date, change->branch ? change->branch->tag->tag : "",
-                change->author, change->commitid, change->log);
+                date, branch, change->author, change->commitid, log);
 
         if (changeset_update_branch (&db, changeset) == 0)
             printf ("[There were no real changes in this changeset]\n");
 
         for (version_t * v = change; v; v = v->cs_sibling)
-            printf ("\t%s %s\n", v->file->rcs_path, v->version);
+            if (!implicit_merge || v->implicit_merge)
+                printf ("\t%s %s\n", v->file->rcs_path, v->version);
 
         printf ("\n");
 

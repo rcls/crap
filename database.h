@@ -26,6 +26,7 @@ typedef struct database {
     size_t tag_hash_num_entries;
     size_t tag_hash_num_buckets;
 
+    struct changeset * pending_implicit_merge;
 } database_t;
 
 /** Initialise a database_t object.  */

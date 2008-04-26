@@ -62,6 +62,7 @@ void database_init (database_t * db)
     db->tag_hash = NULL;
     db->tag_hash_num_entries = 0;
     db->tag_hash_num_buckets = 0;
+    db->pending_implicit_merge = NULL;
 
     heap_init (&db->ready_versions,
                offsetof (version_t, ready_index), compare_version);
@@ -116,6 +117,7 @@ changeset_t * database_new_changeset (database_t * db)
 {
     changeset_t * result = xmalloc (sizeof (changeset_t));
     result->ready_index = SIZE_MAX;
+    result->implicit_merge = NULL;
 
     ARRAY_EXTEND (db->changesets, db->changesets_end, db->changesets_max);
 

@@ -31,6 +31,9 @@ version_t * file_new_version (file_t * f);
 
 void file_new_branch (file_t *f, file_tag_t * tag);
 
+/**
+ * Find a file version object by the version string.  The version string @c s
+ * need not be cached.  */
 version_t * file_find_version (const file_t * f, const char * s);
 
 /** Find a branch on which version @c s of file @c lies.  */
@@ -40,6 +43,12 @@ struct version {
     file_t * file;
     const char * version;
     bool dead;
+
+    /**
+     * Indicate that this revision is part of a vendor branch import that should
+     * be implicitly merged to the trunk.
+     */
+    bool implicit_merge;
 
     version_t * parent;
     version_t * children;               /* A child, or NULL.  */

@@ -10,7 +10,7 @@
 #include <string.h>
 
 /* FIXME - should be configurable.  */
-#define FUZZ_TIME 300
+#define FUZZ_TIME 3600
 
 
 static bool strings_match (const version_t * A, const version_t * B)
@@ -31,11 +31,8 @@ static bool strings_match (const version_t * A, const version_t * B)
 }
 
 
-static int version_compare (const void * AA, const void * BB)
+static int version_compare (const version_t * A, version_t * B)
 {
-    const version_t * A = * (version_t * const *) AA;
-    const version_t * B = * (version_t * const *) BB;
-
     int r = cache_strcmp (A->commitid, B->commitid);
     if (r != 0)
         return r;
@@ -70,21 +67,52 @@ static int version_compare (const void * AA, const void * BB)
 
     if (A->file != B->file)
         return A->file < B->file ? -1 : 1; /* Files are sorted by now.  */
+
     if (A == B)
         return 0;
+
     return A < B ? -1 : 1;              /* Versions are sorted by now.  */
+}
+
+
+static int version_compare_qsort (const void * AA, const void * BB)
+{
+    return version_compare (* (version_t * const *) AA,
+                            * (version_t * const *) BB);
 }
 
 
 static int cs_compare (const void * AA, const void * BB)
 {
-    const version_t * A = (* (changeset_t * const *) AA)->versions;
-    const version_t * B = (* (changeset_t * const *) BB)->versions;
+    const changeset_t * A = * (changeset_t * const *) AA;
+    const changeset_t * B = * (changeset_t * const *) BB;
 
     if (A->time != B->time)
         return A->time < B->time ? -1 : 1;
-    else
-        return version_compare (&A, &B);
+
+    if (A->type != B->type)
+        return A->type < B->type ? -1 : 1;
+
+    if (A->type == ct_commit)
+        return version_compare (A->versions, B->versions);
+
+    if (A->type == ct_implicit_merge)
+        return version_compare (A->implicit_merge->versions,
+                                B->implicit_merge->versions);
+
+    abort();
+}
+
+
+static void create_implicit_merge (database_t * db, changeset_t * cs)
+{
+    assert (cs->implicit_merge == NULL);
+    changeset_t * merge = database_new_changeset (db);
+    merge->time = cs->time;
+    merge->type = ct_implicit_merge;
+    cs->implicit_merge = merge;
+    merge->implicit_merge = cs;
+    merge->versions = NULL;
 }
 
 
@@ -107,24 +135,31 @@ void create_changesets (database_t * db)
 
     assert (vp == version_list + total_versions);
 
-    qsort (version_list, total_versions, sizeof (version_t *), version_compare);
+    qsort (version_list, total_versions, sizeof (version_t *),
+           version_compare_qsort);
 
     changeset_t * current = database_new_changeset (db);
     version_t * tail = version_list[0];
     tail->changeset = current;
+    current->time = tail->time;
+    current->type = ct_commit;
     current->versions = tail;
+    current->implicit_merge = NULL;
     current->unready_count = 1;
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (strings_match (tail, next)
-            && next->time - current->versions->time < FUZZ_TIME) {
+            && next->time - current->time < FUZZ_TIME) {
             tail->cs_sibling = next;
             ++current->unready_count;
         }
         else {
             tail->cs_sibling = NULL;
             current = database_new_changeset (db);
+            current->time = next->time;
+            current->type = ct_commit;
             current->versions = next;
+            current->implicit_merge = NULL;
             current->unready_count = 1;
         }
         next->changeset = current;
@@ -134,6 +169,16 @@ void create_changesets (database_t * db)
     tail->cs_sibling = NULL;
 
     free (version_list);
+
+    /* Now walk through the commit changesets and process the implicit_merges.
+     * We create an implicit_merge changeset for each one that needs it.  */
+    size_t num_commits = db->changesets_end - db->changesets;
+    for (size_t i = 0; i != num_commits; ++i)
+        for (version_t * v = db->changesets[i]->versions; v; v = v->cs_sibling)
+            if (v->implicit_merge) {
+                create_implicit_merge (db, db->changesets[i]);
+                break;
+            }
 
     qsort (db->changesets, db->changesets_end - db->changesets,
            sizeof (changeset_t *), cs_compare);
