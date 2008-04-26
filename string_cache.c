@@ -7,20 +7,20 @@
 #include <string.h>
 
 typedef struct string_entry {
-    struct string_entry * next;         /* Next in hash chain.  */
-    unsigned long hash;                 /* hash.  */
-    char data[1];                       /* Actual data.  */
+    struct string_entry * next;         // Next in hash chain.
+    unsigned long hash;                 // hash.
+    char data[1];                       // Actual data.
 } string_entry_t;
 
 static size_t cache_entries;
-static size_t cache_num_buckets;         /* Always a power of 2.  */
+static size_t cache_num_buckets;         // Always a power of 2.
 static string_entry_t ** cache_table;
 
 
 static void cache_resize()
 {
     if (cache_num_buckets == 0) {
-        cache_num_buckets = 1024;        /* Start with a reasonable size.  */
+        cache_num_buckets = 1024;        // Start with a reasonable size.
         cache_table = ARRAY_CALLOC (string_entry_t *, cache_num_buckets);
         return;
     }

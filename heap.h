@@ -3,36 +3,35 @@
 
 #include <stddef.h>
 
-/** Type used to store a heap.  */
+/// Type used to store a heap.
 typedef struct heap {
     void ** entries;
     void ** entries_end;
     void ** entries_max;
     size_t index_offset;
-    /**
-     * @c compare should return >0 if first arg is greater than second, and <=0
-     * otherwise.  Thus either a strcmp or a '>' like predicate can be used.  */
+    /// @c compare should return >0 if first arg is greater than second, and <=0
+    /// otherwise.  Thus either a strcmp or a '>' like predicate can be used.
     int (*compare) (const void *, const void *);
 } heap_t;
 
 
-/** Initialise a new heap.  */
+/// Initialise a new heap.
 void heap_init (heap_t * heap, size_t offset,
                 int (*compare) (const void *, const void *));
 
-/** Destroy a heap.  */
+/// Destroy a heap.
 void heap_destroy (heap_t * heap);
 
-/** Insert an item.  */
+/// Insert an item.
 void heap_insert (heap_t * heap, void * item);
 
-/** Remove an item.  */
+/// Remove an item.
 void heap_remove (heap_t * heap, void * item);
 
-/** Return least item from a heap.  */
+/// Return least item from a heap.
 void * heap_front (heap_t * heap);
 
-/** Return least item from a heap, after removing it.  */
+/// Return least item from a heap, after removing it.
 void * heap_pop (heap_t * heap);
 
 #endif

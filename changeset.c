@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* FIXME - should be configurable.  */
+// FIXME - should be configurable.
 #define FUZZ_TIME 3600
 
 
@@ -59,12 +59,12 @@ static int version_compare (const version_t * A, version_t * B)
         return A->time < B->time ? -1 : 1;
 
     if (A->file != B->file)
-        return A->file < B->file ? -1 : 1; /* Files are sorted by now.  */
+        return A->file < B->file ? -1 : 1; // Files are sorted by now.
 
     if (A == B)
         return 0;
 
-    return A < B ? -1 : 1;              /* Versions are sorted by now.  */
+    return A < B ? -1 : 1;              // Versions are sorted by now.
 }
 
 
@@ -164,8 +164,8 @@ void create_changesets (database_t * db)
 
     free (version_list);
 
-    /* Now walk through the commit changesets and process the implicit_merges.
-     * We create an implicit_merge changeset for each one that needs it.  */
+    // Now walk through the commit changesets and process the implicit_merges.
+    // We create an implicit_merge changeset for each one that needs it.
     size_t num_commits = db->changesets_end - db->changesets;
     for (size_t i = 0; i != num_commits; ++i) {
         commit_t * commit = as_commit (db->changesets[i]);

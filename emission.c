@@ -57,11 +57,11 @@ size_t changeset_update_branch (struct database * db,
         commit = as_commit (changeset);
 
         if (commit->versions->branch == NULL)
-            /* FIXME - what should we do about changesets on anonymous branches?
-             * Stringing them together into branches is probably more bother
-             * than it's worth, so we should probably really just never actually
-             * create those changesets.  */
-            return 0;                   /* Changeset on unknown branch.  */
+            // FIXME - what should we do about changesets on anonymous branches?
+            // Stringing them together into branches is probably more bother
+            // than it's worth, so we should probably really just never actually
+            // create those changesets.
+            return 0;                   // Changeset on unknown branch.
 
         branch = commit->versions->branch->tag->branch_versions;
     }
@@ -80,7 +80,7 @@ size_t changeset_update_branch (struct database * db,
     if (changes == 0)
         return 0;
 
-    /* Compute the SHA1 hash of the current branch state.  */
+    // Compute the SHA1 hash of the current branch state.
     SHA_CTX sha;
     SHA1_Init (&sha);
     version_t ** branch_end = branch + (db->files_end - db->files);
@@ -91,7 +91,7 @@ size_t changeset_update_branch (struct database * db,
     uint32_t hash[5];
     SHA1_Final ((unsigned char *) hash, &sha);
 
-    /* Iterate over all the tags that match.  */
+    // Iterate over all the tags that match.
     for (tag_t * i = database_tag_hash_find (db, hash); i;
          i = database_tag_hash_next (i)) {
         printf ("*** HIT %s %s%s ***\n",
@@ -106,14 +106,14 @@ size_t changeset_update_branch (struct database * db,
 
 static const version_t * preceed (const version_t * v)
 {
-    /* If cs is not ready to emit, then some version in cs is blocked.  The
-     * earliest un-emitted ancestor of that version will be ready to emit.
-     * Search for it.  We could be a bit smarter by seraching harder for the
-     * oldest possible version.  But most cycles are trivial (length 1) so it's
-     * probably not worth the effort.  */
+    // If cs is not ready to emit, then some version in cs is blocked.  The
+    // earliest un-emitted ancestor of that version will be ready to emit.
+    // Search for it.  We could be a bit smarter by seraching harder for the
+    // oldest possible version.  But most cycles are trivial (length 1) so it's
+    // probably not worth the effort.
     for (version_t * csv = v->commit->versions; csv; csv = csv->cs_sibling) {
         if (csv->ready_index != SIZE_MAX)
-            continue;                   /* Not blocked.  */
+            continue;                   // Not blocked.
         for (version_t * v = csv->parent; v; v = v->parent)
             if (v->ready_index != SIZE_MAX)
                 return v;
@@ -124,14 +124,14 @@ static const version_t * preceed (const version_t * v)
 
 static void cycle_split (database_t * db, commit_t * cs)
 {
-    /* FIXME - the changeset may have an implicit merge; we should then split
-     * the implicit merge also.  */
+    // FIXME - the changeset may have an implicit merge; we should then split
+    // the implicit merge also.
     fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");
-    /* We split the changeset into to.  We leave all the blocked versions
-     * in cs, and put the ready-to-emit into nw.  */
+    // We split the changeset into to.  We leave all the blocked versions
+    // in cs, and put the ready-to-emit into nw.
 
-    /* FIXME - we should split implicit merges also.  */
+    // FIXME - we should split implicit merges also.
     assert (cs->implicit_merge == NULL);
     commit_t * new = database_new_changeset (db, sizeof (commit_t));
     new->changeset.type = ct_commit;
@@ -142,12 +142,12 @@ static void cycle_split (database_t * db, commit_t * cs)
     version_t ** new_v = &new->versions;
     for (version_t * v = cs->versions; v; v = v->cs_sibling) {
         if (v->ready_index == SIZE_MAX) {
-            /* Blocked; stays in cs.  */
+            // Blocked; stays in cs.
             *cs_v = v;
             cs_v = &v->cs_sibling;
         }
         else {
-            /* Ready-to-emit; goes into new.  */
+            // Ready-to-emit; goes into new.
             v->commit = new;
             *new_v = v;
             new_v = &v->cs_sibling;
@@ -166,7 +166,7 @@ static void cycle_split (database_t * db, commit_t * cs)
              cs->versions->author, cs->versions->log);
     for (const version_t * v = new->versions; v; v = v->cs_sibling)
         fprintf (stderr, "    %s:%s\n", v->file->rcs_path, v->version);
-        
+
     fprintf (stderr, "Deferring:\n");
 
     for (const version_t * v = cs->versions; v; v = v->cs_sibling)
@@ -189,7 +189,7 @@ static const version_t * cycle_find (const version_t * v)
 
 changeset_t * next_changeset (database_t * db)
 {
-    /* A pending implicit merge is always done before anything else.  */
+    // A pending implicit merge is always done before anything else.
     if (db->pending_implicit_merge) {
         implicit_merge_t * result = db->pending_implicit_merge;
         db->pending_implicit_merge = NULL;
@@ -200,7 +200,7 @@ changeset_t * next_changeset (database_t * db)
         return NULL;
 
     if (db->ready_changesets.entries == db->ready_changesets.entries_end) {
-        /* Find a cycle.  */
+        // Find a cycle.
         const version_t * slow = heap_front (&db->ready_versions);
         const version_t * fast = slow;
         do {
@@ -209,7 +209,7 @@ changeset_t * next_changeset (database_t * db)
         }
         while (slow != fast);
 
-        /* And split it.  */
+        // And split it.
         cycle_split (db, cycle_find (heap_front (&db->ready_versions))->commit);
 
         assert (db->ready_changesets.entries

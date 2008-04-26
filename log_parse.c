@@ -79,12 +79,12 @@ static inline bool ends_with (const char * haystack, const char * needle)
 }
 
 
-/* Parse a date string into a time_t and an offset; the filled in time includes
- * the offset and hence is a real Unix time.  */
+/// Parse a date string into a time_t and an offset; the filled in time includes
+/// the offset and hence is a real Unix time.
 static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 {
-    /* We parse (YY|YYYY)-MM-DD HH:MM(:SS)?( (+|-)HH(MM?))?  This is just like
-     * cvsps.  We are a little looser about the digit sequences.  */
+    // We parse (YY|YYYY)-MM-DD HH:MM(:SS)?( (+|-)HH(MM?))?  This is just like
+    // cvsps.  We are a little looser about the digit sequences.
     if (!isdigit (date[0]) || !isdigit (date[1]))
         return false;
 
@@ -162,32 +162,32 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 }
 
 
-/* Is a version string value?  I.e., non-empty even-length '.' separated
- * numbers.  */
+/// Is a version string value?  I.e., non-empty even-length '.' separated
+/// numbers.
 static bool valid_version (const char * s)
 {
     do {
         if (*s < '1' || *s > '9')
-            return false;               /* Bogus.  */
+            return false;               // Bogus.
 
         for ( ; *s >= '0' && *s <= '9'; ++s);
 
         if (*s != '.')
-            return false;               /* Bogus.  */
+            return false;               // Bogus.
 
         ++s;
 
         if (*s < '1' || *s > '9')
-            return false;               /* Bogus.  */
+            return false;               // Bogus.
 
         for ( ; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
-            return true;                /* Done.  */
+            return true;                // Done.
     }
-    while (*s++ == '.');                /* Loop if OK.  */
+    while (*s++ == '.');                // Loop if OK.
 
-    return false;                       /* Bogus.  */
+    return false;                       // Bogus.
 }
 
 
@@ -197,13 +197,13 @@ static bool predecessor (char * s, bool is_branch)
     assert (l);
 
     if (is_branch) {
-        /* Branch; just truncate the last component.  */
+        // Branch; just truncate the last component.
         *l = 0;
         return true;
     }
 
     if (l[1] == '1' && l[2] == 0) {
-        /* .1 version; just remove the last two components.  */
+        // .1 version; just remove the last two components.
         *l = 0;
         l = strrchr (s, '.');
         if (l == NULL)
@@ -212,7 +212,7 @@ static bool predecessor (char * s, bool is_branch)
         return true;
     }
 
-    /* Decrement the last component.  */
+    // Decrement the last component.
     char * end = s + strlen (s);
     char * p = end;
     while (*--p == '0')
@@ -221,7 +221,7 @@ static bool predecessor (char * s, bool is_branch)
     assert (isdigit (*p));
     assert (p != s);
     if (--*p == '0' && p[-1] == '.') {
-        /* Rewrite 09999 to 9999 etc.  */
+        // Rewrite 09999 to 9999 etc.
         *p = '9';
         end[-1] = 0;
     }
@@ -229,34 +229,34 @@ static bool predecessor (char * s, bool is_branch)
 }
 
 
-/* Normalise a version string for a tag in place.  Rewrite the 'x.y.0.z' style
- * branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1 on
- * a branch tag.  */
+/// Normalise a version string for a tag in place.  Rewrite the 'x.y.0.z' style
+/// branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1 on
+/// a branch tag.
 static int normalise_tag_version (char * s)
 {
     do {
         if (*s < '1' || *s > '9')
-            return -1;                  /* Bogus.  */
+            return -1;                  // Bogus.
 
         for ( ; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
-            return 1;                   /* x.y.z style branch.  */
+            return 1;                   // x.y.z style branch.
 
         if (*s++ != '.' || *s < '1' || *s > '9')
-            return -1;                  /* Bogus.  */
+            return -1;                  // Bogus.
 
         for ( ; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
-            return 0;                   /* Done.  */
+            return 0;                   // Done.
 
         if (*s++ != '.')
-            return -1;                  /* Bogus.  */
+            return -1;                  // Bogus.
     }
     while (*s != '0');
 
-    /* We hit what should be the '0' of a new-style branch tag.  */
+    // We hit what should be the '0' of a new-style branch tag.
     char * last = s;
 
     if (*++s != '.' || *++s < '1' || *s > '9')
@@ -265,7 +265,7 @@ static int normalise_tag_version (char * s)
     for ( ; *s >= '0' && *s <= '9'; ++s);
 
     if (*s != 0)
-        return -1;                      /* Bogus.  */
+        return -1;                      // Bogus.
 
     memmove (last, last + 2, s - last - 1);
 
@@ -304,7 +304,7 @@ static void fill_in_versions_and_parents (file_t * file)
     qsort (file->file_tags, file->file_tags_end - file->file_tags,
            sizeof (file_tag_t), file_tag_compare);
 
-    /* Fill in the parent, sibling and children links.  */
+    // Fill in the parent, sibling and children links.
     for (version_t * v = file->versions_end; v != file->versions;) {
         --v;
         char vers[1 + strlen (v->version)];
@@ -320,7 +320,7 @@ static void fill_in_versions_and_parents (file_t * file)
         }
     }
 
-    /* Fill in the tag version links, and remove tags to dead versions.  */
+    // Fill in the tag version links, and remove tags to dead versions.
     file_tag_t * ft = file->file_tags;
     for (file_tag_t * i = file->file_tags; i != file->file_tags_end; ++i) {
         if (i != ft)
@@ -336,8 +336,8 @@ static void fill_in_versions_and_parents (file_t * file)
             continue;
         }
 
-        /* We try and find a predecessor version, to use as the branch point.
-         * If none exists, that's fine, it makes sense as a branch addition.  */
+        // We try and find a predecessor version, to use as the branch point.
+        // If none exists, that's fine, it makes sense as a branch addition.
         char vers[1 + strlen (ft->vers)];
         strcpy (vers, ft->vers);
         if (vers[0] != 0 && predecessor (vers, true))
@@ -346,8 +346,8 @@ static void fill_in_versions_and_parents (file_t * file)
             ft->version = NULL;
 
         if (ft->version && ft->version->dead)
-            /* This hits for branch additions.  We don't log, and unlike tags
-             * on dead versions, we keep the file_tag.  */
+            // This hits for branch additions.  We don't log, and unlike tags
+            // on dead versions, we keep the file_tag.
             ft->version = NULL;
 
         file_new_branch (file, ft);
@@ -355,11 +355,11 @@ static void fill_in_versions_and_parents (file_t * file)
     }
     file->file_tags_end = ft;
 
-    /* Sort the branches by tag.  */
+    // Sort the branches by tag.
     qsort (file->branches, file->branches_end - file->branches,
            sizeof (file_tag_t *), branch_compare);
 
-    /* Check for duplicate branches.  */
+    // Check for duplicate branches.
     file_tag_t ** bb = file->branches;
     for (file_tag_t ** i = file->branches; i != file->branches_end; ++i) {
         if (i == file->branches || bb[-1] != *i)
@@ -370,17 +370,17 @@ static void fill_in_versions_and_parents (file_t * file)
                      i[0]->version->version);
     }
 
-    /* Fill in the branch pointers on the versions.  */
+    // Fill in the branch pointers on the versions.
     for (version_t * i = file->versions; i != file->versions_end; ++i)
         i->branch = file_find_branch (file, i->version);
 
-    /* Now check for vendor branch imports that should be merged to head.  We
-     * look for 1.1.1.x versions that have a date prior to any 1.2 version.
-     * FIXME - 1.2 might have been outdated.  */
+    // Now check for vendor branch imports that should be merged to head.  We
+    // look for 1.1.1.x versions that have a date prior to any 1.2 version.
+    // FIXME - 1.2 might have been outdated.
 
-    /* We need to check if the initial revision was created by an import or
-     * somehow else.  If it was created by an import, then it will be not dead,
-     * and identical to 1.1.1.1 (FIXME - first on 1.1 branch.).  */
+    // We need to check if the initial revision was created by an import or
+    // somehow else.  If it was created by an import, then it will be not dead,
+    // and identical to 1.1.1.1 (FIXME - first on 1.1 branch.).
     version_t * v1_1 = file_find_version (file, "1.1");
     if (v1_1 != NULL)
         if (v1_1->dead || strcmp (v1_1->log, "Initial revision\n") != 0)
@@ -395,7 +395,7 @@ static void fill_in_versions_and_parents (file_t * file)
             continue;
         i->implicit_merge = true;
 
-        /* Mark 1.1 as dead; the implicit merge will create it instead.  */
+        // Mark 1.1 as dead; the implicit merge will create it instead.
         v1_1->dead = true;
     }
 }
@@ -418,8 +418,8 @@ static void read_file_version (file_t * result,
 
     version->author = NULL;
     version->commitid = cache_string ("");
-/*     version->time = 0; */
-/*     version->offset = 0; */
+//     version->time = 0;
+//     version->offset = 0;
     bool have_date = false;
     version->dead = false;
     version->children = NULL;
@@ -468,8 +468,8 @@ static void read_file_version (file_t * result,
         len = next_line (l, buffer_len, f);
     }
 
-    /* We don't care about the 'branches:' annotation; we reconstruct the branch
-     * information ourselves.  */
+    // We don't care about the 'branches:' annotation; we reconstruct the branch
+    // information ourselves.
     if (starts_with (*l, "M branches: "))
         len = next_line (l, buffer_len, f);
 
@@ -479,7 +479,7 @@ static void read_file_version (file_t * result,
     if (version->author == NULL)
         bugger ("Log (%s) does not have author.\n", result->rcs_path);
 
-    /* Snarf the log entry.  */
+    // Snarf the log entry.
     char * log = NULL;
     size_t log_len = 0;
     while (strcmp (*l, REV_BOUNDARY) != 0 && strcmp (*l, FILE_BOUNDARY) != 0) {
@@ -511,7 +511,7 @@ static void read_file_versions (database_t * db,
     file_t * file = database_new_file (db);
     file->rcs_path = cache_string_n (*l + 12, len - 14);
 
-    /* Add a fake branch for the trunk.  */
+    // Add a fake branch for the trunk.
     const char * empty_string = cache_string ("");
     file_tag_t * dummy_tag = file_add_tag (tags, file, empty_string);
     dummy_tag->vers = empty_string;
@@ -562,8 +562,8 @@ static void read_file_versions (database_t * db,
         bugger ("Log (%s) did not have expected 'description' item: %s\n",
                 file->rcs_path, *l);
 
-    /* Just skip until a boundary.  Too bad if a log entry contains one of
-     * the boundary strings.  */
+    // Just skip until a boundary.  Too bad if a log entry contains one of
+    // the boundary strings.
     while (strcmp (*l, REV_BOUNDARY) != 0 &&
            strcmp (*l, FILE_BOUNDARY) != 0) {
         if (!starts_with (*l, "M "))
@@ -618,12 +618,12 @@ void read_files_versions (database_t * db,
         read_file_versions (db, &tags, l, buffer_len, f);
     }
 
-    /* Sort the list of files.  */
+    // Sort the list of files.
     qsort (db->files, db->files_end - db->files, sizeof (file_t), file_compare);
 
-    /* Set the pointers from versions to files and file_tags to files.  Add the
-     * file_tags to the tags.  The latter will be sorted as we have already
-     * sorted the files.  */
+    // Set the pointers from versions to files and file_tags to files.  Add the
+    // file_tags to the tags.  The latter will be sorted as we have already
+    // sorted the files.
     for (file_t * f = db->files; f != db->files_end; ++f) {
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             j->file = f;
@@ -634,7 +634,7 @@ void read_files_versions (database_t * db,
         }
     }
 
-    /* Flatten the hash of tags to an array.  */
+    // Flatten the hash of tags to an array.
     db->tags = ARRAY_ALLOC (tag_t, tags.num_entries);
     db->tags_end = db->tags;
 
@@ -646,11 +646,11 @@ void read_files_versions (database_t * db,
 
     string_hash_destroy (&tags);
 
-    /* Sort the list of tags.  */
+    // Sort the list of tags.
     qsort (db->tags, db->tags_end - db->tags, sizeof (tag_t), tag_compare);
 
-    /* Update the pointers from file_tags to tags, and compute the version
-     * hashes.  */
+    // Update the pointers from file_tags to tags, and compute the version
+    // hashes.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
             (*j)->tag = i;
@@ -671,7 +671,7 @@ void read_files_versions (database_t * db,
         i->is_emitted = false;
     }
 
-    /* Fill in all branches with their initial tags.  */
+    // Fill in all branches with their initial tags.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         if (i->branch_versions)
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)

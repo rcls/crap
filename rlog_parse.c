@@ -24,14 +24,14 @@ int main()
 
     create_changesets (&db);
 
-    /* Mark the initial versions as ready to emit.  */
+    // Mark the initial versions as ready to emit.
     for (file_t * f = db.files; f != db.files_end; ++f)
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             if (j->parent == NULL)
                 version_release (&db, j);
 
-    /* Do a dummy run of the changeset emission; this breaks any cycles before
-     * we commit ourselves to the real change-set order.  */
+    // Do a dummy run of the changeset emission; this breaks any cycles before
+    // we commit ourselves to the real change-set order.
     size_t emitted_changesets = 0;
     changeset_t * changeset;
     while ((changeset = next_changeset (&db))) {
@@ -42,21 +42,21 @@ int main()
     assert (db.ready_changesets.entries_end == db.ready_changesets.entries_end);
     assert (emitted_changesets == db.changesets_end - db.changesets);
 
-    /* Re-do the changeset unready counts.  */
+    // Re-do the changeset unready counts.
     for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i)
         if ((*i)->type == ct_commit)
             for (version_t * j = as_commit (*i)->versions; j; j = j->cs_sibling)
                 ++(*i)->unready_count;
 
-    /* Mark the initial versions as ready to emit once again.  */
+    // Mark the initial versions as ready to emit once again.
     for (file_t * f = db.files; f != db.files_end; ++f)
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             if (j->parent == NULL)
                 version_release (&db, j);
 
-    /* FIXME - we will have to mark tags as unemitted at some point also.  */
+    // FIXME - we will have to mark tags as unemitted at some point also.
 
-    /* Emit the changesets for real.  */
+    // Emit the changesets for real.
     emitted_changesets = 0;
     while ((changeset = next_changeset (&db))) {
 
@@ -65,7 +65,7 @@ int main()
         size_t dl = strftime (date, sizeof (date), "%F %T %Z",
                               localtime_r (&changeset->time, &dtm));
         if (dl == 0)
-            /* Maybe someone gave us a crap timezone?  */
+            // Maybe someone gave us a crap timezone?
             dl = strftime (date, sizeof (date), "%F %T %Z",
                            gmtime_r (&changeset->time, &dtm));
 

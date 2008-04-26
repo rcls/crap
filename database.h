@@ -29,25 +29,25 @@ typedef struct database {
     struct implicit_merge * pending_implicit_merge;
 } database_t;
 
-/** Initialise a database_t object.  */
+/// Initialise a database_t object.
 void database_init (database_t * db);
 
-/** Free memory owned by a database_t object.  */
+/// Free memory owned by a database_t object.
 void database_destroy (database_t * db);
 
-/** Create a new file object for the database.  */
+/// Create a new file object for the database.
 struct file * database_new_file (database_t * db);
 
-/** Create a new changeset object for the database.  */
+/// Create a new changeset object for the database.
 void * database_new_changeset (database_t * db, size_t size);
 
-/** Insert a tag into the tag hash.  */
+/// Insert a tag into the tag hash.
 void database_tag_hash_insert (database_t * db, struct tag * tag);
 
-/** Find the first tag matching a hash.  */
+/// Find the first tag matching a hash.
 struct tag * database_tag_hash_find (database_t * db, const uint32_t hash[5]);
 
-/** Find the next tag matching a hash.  */
+/// Find the next tag matching a hash.
 struct tag * database_tag_hash_next (struct tag * tag);
 
 #endif

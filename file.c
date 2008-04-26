@@ -53,12 +53,12 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
     char * dot = strrchr (vers, '.');
     assert (dot != NULL);
     if (memchr (vers, '.', dot - vers) == NULL)
-        dot = vers;                     /* On trunk.  */
+        dot = vers;                     // On trunk.
 
-    /* Truncate the last component.  */
+    // Truncate the last component.
     *dot = 0;
 
-    /* Now bsearch for the branch.  */
+    // Now bsearch for the branch.
     file_tag_t ** base = f->branches;
     ssize_t count = f->branches_end - f->branches;
 

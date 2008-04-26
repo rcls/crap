@@ -18,9 +18,8 @@ void heap_init (heap_t * heap, size_t offset,
 }
 
 
-/**
- * The heap has a bubble at @c position; shuffle the bubble downwards to an
- * appropriate point, and place @c item in it.  */
+/// The heap has a bubble at @c position; shuffle the bubble downwards to an
+/// appropriate point, and place @c item in it.
 static void shuffle_down (heap_t * heap, size_t position, void * item)
 {
     size_t num_entries = heap->entries_end - heap->entries;
@@ -32,7 +31,7 @@ static void shuffle_down (heap_t * heap, size_t position, void * item)
         if (child + 1 < num_entries
             && LESS (heap->entries[child + 1], heap->entries[child]))
             ++child;
-        
+
         if (LESS (item, heap->entries[child]))
             break;
 
@@ -46,9 +45,8 @@ static void shuffle_down (heap_t * heap, size_t position, void * item)
 }
 
 
-/**
- * The heap has a bubble at @c position; shuffle the bubble upwards as far as
- * might be needed to insert @c item, and then call @c shuffle_down.  */
+/// The heap has a bubble at @c position; shuffle the bubble upwards as far as
+/// might be needed to insert @c item, and then call @c shuffle_down.
 static void shuffle_up (heap_t * heap, size_t position, void * item)
 {
     while (position > 0) {
@@ -69,7 +67,7 @@ void heap_insert (heap_t * heap, void * item)
 {
     assert (INDEX (item) == SIZE_MAX);
 
-    /* Create a bubble at the end.  */
+    // Create a bubble at the end.
     ARRAY_EXTEND (heap->entries, heap->entries_end, heap->entries_max);
 
     shuffle_up (heap, heap->entries_end - heap->entries - 1, item);
@@ -83,7 +81,7 @@ void heap_remove (heap_t * heap, void * item)
 
     --heap->entries_end;
     if (item != *heap->entries_end)
-        /* Shuffle the item from the end into the bubble.  */
+        // Shuffle the item from the end into the bubble.
         shuffle_up (heap, INDEX (item), *heap->entries_end);
 
     INDEX (item) = SIZE_MAX;
