@@ -21,7 +21,7 @@ void version_release (database_t * db, version_t * version)
 {
     heap_insert (&db->ready_versions, version);
 
-    changeset_release (db, &version->commit->changeset);
+    changeset_release (db, version->commit);
 }
 
 
@@ -30,15 +30,13 @@ void changeset_emitted (database_t * db, changeset_t * changeset)
     if (changeset->type == ct_implicit_merge)
         return;
 
-    commit_t * commit = as_commit (changeset);
-
-    for (version_t * i = commit->versions; i; i = i->cs_sibling) {
+    for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
         heap_remove (&db->ready_versions, i);
         for (version_t * v = i->children; v; v = v->sibling)
             version_release (db, v);
     }
 
-    for (changeset_t * i = commit->changeset.children; i; i = i->sibling)
+    for (changeset_t * i = changeset->children; i; i = i->sibling)
         changeset_release (db, i);
 }
 
@@ -48,30 +46,25 @@ size_t changeset_update_branch (struct database * db,
 {
     version_t ** branch;
     bool implicit_merge = false;
-    commit_t * commit;
+    version_t * versions = changeset->versions;
     if (changeset->type == ct_implicit_merge) {
         assert (db->tags[0].tag[0] == 0);
         branch = db->tags[0].branch_versions;
         assert (branch);
-        changeset = &as_imerge (changeset)->commit->changeset;
         implicit_merge = true;
-        commit = as_commit (changeset);
+        versions = changeset->parent->versions;
     }
-    else {
-        commit = as_commit (changeset);
-
-        if (commit->versions->branch == NULL)
-            // FIXME - what should we do about changesets on anonymous branches?
-            // Stringing them together into branches is probably more bother
-            // than it's worth, so we should probably really just never actually
-            // create those changesets.
-            return 0;                   // Changeset on unknown branch.
-
-        branch = commit->versions->branch->tag->branch_versions;
-    }
+    else if (changeset->versions->branch == NULL)
+        // FIXME - what should we do about changesets on anonymous branches?
+        // Stringing them together into branches is probably more bother
+        // than it's worth, so we should probably really just never actually
+        // create those changesets.
+        return 0;                   // Changeset on unknown branch.
+    else
+        branch = changeset->versions->branch->tag->branch_versions;
 
     size_t changes = 0;
-    for (version_t * i = commit->versions; i; i = i->cs_sibling) {
+    for (version_t * i = versions; i; i = i->cs_sibling) {
         if (implicit_merge && !i->implicit_merge)
             continue;
         version_t * v = i->dead ? NULL : i;
@@ -126,7 +119,7 @@ static const version_t * preceed (const version_t * v)
 }
 
 
-static void cycle_split (database_t * db, commit_t * cs)
+static void cycle_split (database_t * db, changeset_t * cs)
 {
     // FIXME - the changeset may have an implicit merge; we should then split
     // the implicit merge also.
@@ -136,9 +129,9 @@ static void cycle_split (database_t * db, commit_t * cs)
     // in cs, and put the ready-to-emit into nw.
 
     // FIXME - we should split implicit merges also.
-    commit_t * new = database_new_changeset (db, sizeof (commit_t));
-    new->changeset.type = ct_commit;
-    new->changeset.time = cs->changeset.time;
+    changeset_t * new = database_new_changeset (db, sizeof (changeset_t));
+    new->type = ct_commit;
+    new->time = cs->time;
     version_t ** cs_v = &cs->versions;
     version_t ** new_v = &new->versions;
     for (version_t * v = cs->versions; v; v = v->cs_sibling) {
@@ -161,7 +154,7 @@ static void cycle_split (database_t * db, commit_t * cs)
     assert (cs->versions);
     assert (new->versions);
 
-    heap_insert (&db->ready_changesets, &new->changeset);
+    heap_insert (&db->ready_changesets, new);
 
     fprintf (stderr, "Changeset %s %s\n%s\n",
              cs->versions->branch ? cs->versions->branch->tag->tag : "",
@@ -220,7 +213,7 @@ void prepare_for_emission (database_t * db)
     // Re-do the changeset unready counts.
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
         if ((*i)->type == ct_commit)
-            for (version_t * j = as_commit (*i)->versions; j; j = j->cs_sibling)
+            for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
                 ++(*i)->unready_count;
 
         for (changeset_t * j = (*i)->children; j; j = j->sibling)

@@ -58,7 +58,7 @@ struct version {
     const char * log;
     file_tag_t * branch;
 
-    struct commit * commit;
+    struct changeset * commit;
     version_t * cs_sibling;             ///< Sibling in changeset.
 
     size_t ready_index;               ///< Heap index for emitting versions.

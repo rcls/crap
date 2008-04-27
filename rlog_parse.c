@@ -60,13 +60,13 @@ int main()
         const char * log;
         bool implicit_merge = false;
         if (changeset->type == ct_implicit_merge) {
-            change = as_imerge (changeset)->commit->versions;
+            change = changeset->parent->versions;
             branch = "";
             log = "Implicit merge of vendor branch to trunk.\n";
             implicit_merge = true;
         }
         else {
-            change = as_commit (changeset)->versions;
+            change = changeset->versions;
             if (change->branch)
                 branch = change->branch->tag->tag;
             else

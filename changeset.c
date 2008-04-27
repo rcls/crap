@@ -87,31 +87,28 @@ static int cs_compare (const void * AA, const void * BB)
         return A->type < B->type ? -1 : 1;
 
     if (A->type == ct_commit)
-        return version_compare (as_commit (A)->versions,
-                                as_commit (B)->versions);
+        return version_compare (A->versions, B->versions);
 
     if (A->type == ct_implicit_merge)
-        return version_compare (as_imerge (A)->commit->versions,
-                                as_imerge (B)->commit->versions);
+        return version_compare (A->parent->versions, B->parent->versions);
 
     abort();
 }
 
 
-static void create_implicit_merge (database_t * db, commit_t * cs)
+static void create_implicit_merge (database_t * db, changeset_t * cs)
 {
-    implicit_merge_t * merge
-        = database_new_changeset (db, sizeof (implicit_merge_t));
-    merge->changeset.type = ct_implicit_merge;
-    merge->changeset.time = cs->changeset.time;
-    merge->commit = cs;
-    changeset_add_child (&cs->changeset, &merge->changeset);
+    changeset_t * merge = database_new_changeset (db, sizeof (changeset_t));
+    merge->type = ct_implicit_merge;
+    merge->time = cs->time;
+    changeset_add_child (cs, merge);
 }
 
 
 void changeset_add_child (changeset_t * parent, changeset_t * child)
 {
-    assert (child->sibling == NULL);
+    assert (child->parent == NULL);
+    child->parent = parent;
     child->sibling = parent->children;
     parent->children = child;
 }
@@ -139,23 +136,23 @@ void create_changesets (database_t * db)
     qsort (version_list, total_versions, sizeof (version_t *),
            version_compare_qsort);
 
-    commit_t * current = database_new_changeset (db, sizeof (commit_t));
+    changeset_t * current = database_new_changeset (db, sizeof (changeset_t));
     version_t * tail = version_list[0];
     tail->commit = current;
-    current->changeset.time = tail->time;
-    current->changeset.type = ct_commit;
+    current->time = tail->time;
+    current->type = ct_commit;
     current->versions = tail;
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (strings_match (tail, next)
-            && next->time - current->changeset.time < FUZZ_TIME) {
+            && next->time - current->time < FUZZ_TIME) {
             tail->cs_sibling = next;
         }
         else {
             tail->cs_sibling = NULL;
-            current = database_new_changeset (db, sizeof (commit_t));
-            current->changeset.time = next->time;
-            current->changeset.type = ct_commit;
+            current = database_new_changeset (db, sizeof (changeset_t));
+            current->time = next->time;
+            current->type = ct_commit;
             current->versions = next;
         }
         next->commit = current;
@@ -169,14 +166,12 @@ void create_changesets (database_t * db)
     // Now walk through the commit changesets and process the implicit merges.
     // We create an implicit_merge changeset for each one that needs it.
     size_t num_commits = db->changesets_end - db->changesets;
-    for (size_t i = 0; i != num_commits; ++i) {
-        commit_t * commit = as_commit (db->changesets[i]);
-        for (version_t * v = commit->versions; v; v = v->cs_sibling)
+    for (size_t i = 0; i != num_commits; ++i)
+        for (version_t * v = db->changesets[i]->versions; v; v = v->cs_sibling)
             if (v->implicit_merge) {
-                create_implicit_merge (db, commit);
+                create_implicit_merge (db, db->changesets[i]);
                 break;
             }
-    }
 
     qsort (db->changesets, db->changesets_end - db->changesets,
            sizeof (changeset_t *), cs_compare);

@@ -6,9 +6,7 @@
 
 struct database;
 
-typedef struct implicit_merge implicit_merge_t;
 typedef struct changeset changeset_t;
-typedef struct commit commit_t;
 
 /// The possible types of changeset.
 typedef enum changeset_type {
@@ -28,6 +26,8 @@ struct changeset {
     /// branch start point has not been detected.
     size_t ready_index;                 ///< Index into emission heap.
 
+    struct version * versions;          ///< List of versions for a commit.
+
     /// Child changeset list.  Children cannot be emitted until the parent is.
     /// Possible reasons for being a child:
     ///  - implicit merge of a vendor branch import.
@@ -35,44 +35,8 @@ struct changeset {
     ///  - branch off a branch.  (NYI).
     changeset_t * children;
     changeset_t * sibling;              ///< Sibling in parent/child relation.
+    changeset_t * parent;               ///< Parent in parent/child relation.
 };
-
-
-/// A changeset representing a commit.
-struct commit {
-    changeset_t changeset;
-
-    struct version * versions;          ///< List of versions.
-};
-
-
-/// A changeset representing an implicit merge.  Note that we don't maintain
-/// strict dependency information on implicit merges; a changeset may depend
-/// on the implict merge despite not having the dependency explicitly
-/// maintained.  Instead, we simply prioritise the emission of the implicit
-/// merge.
-struct implicit_merge {
-    changeset_t changeset;
-    commit_t * commit;
-};
-
-void create_changesets (struct database * db);
-
-
-/// Type safe conversion from changeset to commit.
-static inline commit_t * as_commit (const changeset_t * cs)
-{
-    assert (cs->type == ct_commit);
-    return (commit_t *) cs;
-}
-
-
-/// Type safe conversion from changeset to implicit merge.
-static inline implicit_merge_t * as_imerge (const changeset_t * cs)
-{
-    assert (cs->type == ct_implicit_merge);
-    return (implicit_merge_t *) cs;
-}
 
 
 /// Give @c parent a @c child.

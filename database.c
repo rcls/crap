@@ -44,35 +44,32 @@ static int compare_changeset (const void * AA, const void * BB)
         return A->type > B->type ? 1 : -1;
 
     if (A->type == ct_implicit_merge) {
-        A = &as_imerge (A)->commit->changeset;
-        B = &as_imerge (B)->commit->changeset;
+        A = A->parent;
+        B = B->parent;
     }
 
-    const version_t * Av = as_commit (A)->versions;
-    const version_t * Bv = as_commit (B)->versions;
+    if (A->versions->author != B->versions->author)
+        return strcmp (A->versions->author, B->versions->author);
 
-    if (Av->author != Bv->author)
-        return strcmp (Av->author, Bv->author);
+    if (A->versions->commitid != B->versions->commitid)
+        return strcmp (A->versions->commitid, B->versions->commitid);
 
-    if (Av->commitid != Bv->commitid)
-        return strcmp (Av->commitid, Bv->commitid);
+    if (A->versions->log != B->versions->log)
+        return strcmp (A->versions->log, B->versions->log);
 
-    if (Av->log != Bv->log)
-        return strcmp (Av->log, Bv->log);
-
-    if (Av->branch == NULL && Bv->branch != NULL)
+    if (A->versions->branch == NULL && B->versions->branch != NULL)
         return -1;
 
-    if (Av->branch != NULL && Bv->branch == NULL)
+    if (A->versions->branch != NULL && B->versions->branch == NULL)
         return 1;
 
-    if (Av->branch->tag != Bv->branch->tag)
-        return Av->branch->tag < Bv->branch->tag ? -1 : 1;
+    if (A->versions->branch->tag != B->versions->branch->tag)
+        return A->versions->branch->tag < B->versions->branch->tag ? -1 : 1;
 
-    if (Av->file != Bv->file)
-        return Av->file > Bv->file;
+    if (A->versions->file != B->versions->file)
+        return A->versions->file > B->versions->file;
 
-    return Av > Bv;
+    return A->versions > B->versions;
 }
 
 
@@ -144,6 +141,7 @@ void * database_new_changeset (database_t * db, size_t size)
     changeset_t * result = xmalloc (size);
     result->ready_index = SIZE_MAX;
     result->unready_count = 0;
+    result->parent = NULL;
     result->children = NULL;
     result->sibling = NULL;
 
