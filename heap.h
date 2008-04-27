@@ -18,9 +18,6 @@ typedef struct heap {
 void heap_init (heap_t * heap, size_t offset,
                 int (*compare) (const void *, const void *));
 
-/// Destroy a heap.
-void heap_destroy (heap_t * heap);
-
 /// Insert an item.
 void heap_insert (heap_t * heap, void * item);
 

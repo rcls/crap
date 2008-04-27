@@ -116,23 +116,29 @@ static bool emit_tag (heap_t * heap)
     tag_t * tag = heap_pop (heap);
     tag->is_emitted = true;
 
-    fprintf (stderr, "Branch '%s' with %u parents\n",
+    fprintf (stderr, "Tag '%s' with %u parents\n",
              tag->tag, tag->parents_end - tag->parents);
 
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i)
         fprintf (stderr, "\t%s\n", i->branch->tag);
 
+    for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
+        assert (i->tag->changeset.unready_count != 0);
+        if (--i->tag->changeset.unready_count == 0)
+            heap_insert (heap, i->tag);
+    }
+
     return true;
 }
 
 
-void create_weights (database_t * db)
+void branch_analyse (database_t * db)
 {
     // First, go through each tag, and put it on all the branches.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         i->changeset.unready_count = 0;
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
-            if ((*j)->version->branch == NULL)
+            if ((*j)->version == NULL || (*j)->version->branch == NULL)
                 continue;
             tag_t * b = (*j)->version->branch->tag;
             if (b->tags_end != b->tags && b->tags_end[-1].tag == i) {
@@ -174,4 +180,6 @@ void create_weights (database_t * db)
             split_cycle (&heap, i);
             while (emit_tag (&heap));
         }
+
+    free (heap.entries);
 }

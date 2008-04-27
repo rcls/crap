@@ -1,3 +1,4 @@
+#include "branch.h"
 #include "changeset.h"
 #include "database.h"
 #include "emission.h"
@@ -21,6 +22,8 @@ int main()
 
     read_files_versions (&db, &line, &len, stdin);
     free (line);
+
+    branch_analyse (&db);
 
     create_changesets (&db);
 

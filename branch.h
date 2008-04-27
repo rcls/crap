@@ -3,6 +3,9 @@
 
 #include <sys/types.h>
 
+struct database;
+
+
 typedef struct branch_tag {
     struct tag * tag;
     size_t weight;
@@ -13,5 +16,7 @@ typedef struct parent_branch {
     struct tag * branch;
     size_t weight;
 } parent_branch_t;
+
+void branch_analyse (struct database * db);
 
 #endif

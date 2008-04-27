@@ -103,6 +103,8 @@ void database_destroy (database_t * db)
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         free (i->tag_files);
         free (i->branch_versions);
+        free (i->tags);
+        free (i->parents);
     }
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
