@@ -136,14 +136,10 @@ file_t * database_new_file (database_t * db)
 }
 
 
-void * database_new_changeset (database_t * db, size_t size)
+changeset_t * database_new_changeset (database_t * db)
 {
-    changeset_t * result = xmalloc (size);
-    result->ready_index = SIZE_MAX;
-    result->unready_count = 0;
-    result->parent = NULL;
-    result->children = NULL;
-    result->sibling = NULL;
+    changeset_t * result = xmalloc (sizeof (changeset_t));
+    changeset_init (result);
 
     ARRAY_EXTEND (db->changesets, db->changesets_end, db->changesets_max);
 

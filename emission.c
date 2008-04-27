@@ -129,7 +129,7 @@ static void cycle_split (database_t * db, changeset_t * cs)
     // in cs, and put the ready-to-emit into nw.
 
     // FIXME - we should split implicit merges also.
-    changeset_t * new = database_new_changeset (db, sizeof (changeset_t));
+    changeset_t * new = database_new_changeset (db);
     new->type = ct_commit;
     new->time = cs->time;
     version_t ** cs_v = &cs->versions;
@@ -216,8 +216,8 @@ void prepare_for_emission (database_t * db)
             for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
                 ++(*i)->unready_count;
 
-        for (changeset_t * j = (*i)->children; j; j = j->sibling)
-            ++j->unready_count;
+        if ((*i)->parent)
+            ++(*i)->unready_count;
     }
 
     // Mark the initial versions as ready to emit.

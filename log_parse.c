@@ -34,13 +34,9 @@ static file_tag_t * file_add_tag (string_hash_t * tags,
     bool n;
     tag_hash_item_t * tag = string_hash_insert (
         tags, tag_name, sizeof (tag_hash_item_t), &n);
-    if (n) {
-        tag->tag.tag = tag_name;
-        tag->tag.tag_files = NULL;
-        tag->tag.tag_files_end = NULL;
-        tag->tag.tag_files_max = NULL;
-        tag->tag.branch_versions = NULL;
-    }
+    if (n)
+        tag_init (&tag->tag, tag_name);
+
     file_tag->tag = &tag->tag;
     return file_tag;
 }

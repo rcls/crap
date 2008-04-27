@@ -1,7 +1,11 @@
 #ifndef FILE_H
 #define FILE_H
 
+#include "changeset.h"
+
+#include <assert.h>
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <time.h>
 
@@ -61,7 +65,7 @@ struct version {
     struct changeset * commit;
     version_t * cs_sibling;             ///< Sibling in changeset.
 
-    size_t ready_index;               ///< Heap index for emitting versions.
+    size_t ready_index;                 ///< Heap index for emitting versions.
 };
 
 
@@ -89,14 +93,37 @@ struct tag {
     /// version, in the emission of the branch, of the corresponding file.
     version_t ** branch_versions;
 
+    /// The array of parent branches to this tag.  The emission process will
+    /// choose one of these as the branch to put the tag on.
+    struct parent_branch * parents;
+    struct parent_branch * parents_end;
+    struct parent_branch * parents_max;
+
+    // Tags on this branch (if it's a branch).
+    struct branch_tag * tags;
+    struct branch_tag * tags_end;
+    struct branch_tag * tags_max;
+
+    bool is_emitted;                    ///< Have we been emitted?
+
+    changeset_t changeset;              ///< Tag emission changeset.
+
+    tag_t * hash_next;                  ///< Next in tag hash table.
+
     /// A sha-1 hash of the version information; this is used to identify when
     /// a set of versions exactly matching this tag has been emitted.
-
     uint32_t hash[5];
-    tag_t * hash_next;
-    bool is_emitted;
 };
 
+
+void tag_init (tag_t * tag, const char * name);
+
 void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);
+
+static inline tag_t * as_tag (changeset_t * cs)
+{
+    assert (cs->type == ct_tag);
+    return (tag_t *) (((char *) cs) - offsetof (tag_t, changeset));
+}
 
 #endif

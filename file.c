@@ -83,6 +83,26 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
 }
 
 
+void tag_init (tag_t * tag, const char * name)
+{
+    changeset_init (&tag->changeset);
+
+    tag->tag = name;
+    tag->tag_files = NULL;
+    tag->tag_files_end = NULL;
+    tag->tag_files_max = NULL;
+    tag->branch_versions = NULL;
+
+    tag->parents = NULL;
+    tag->parents_end = NULL;
+    tag->parents_max = NULL;
+
+    tag->tags = NULL;
+    tag->tags_end = NULL;
+    tag->tags_max = NULL;
+}
+
+
 void tag_new_tag_file (tag_t * t, file_tag_t * ft)
 {
     ARRAY_EXTEND (t->tag_files, t->tag_files_end, t->tag_files_max);

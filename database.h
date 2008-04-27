@@ -37,7 +37,7 @@ void database_destroy (database_t * db);
 struct file * database_new_file (database_t * db);
 
 /// Create a new changeset object for the database.
-void * database_new_changeset (database_t * db, size_t size);
+struct changeset * database_new_changeset (database_t * db);
 
 /// Insert a tag into the tag hash.
 void database_tag_hash_insert (database_t * db, struct tag * tag);

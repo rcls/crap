@@ -13,6 +13,16 @@
 #define FUZZ_TIME 3600
 
 
+void changeset_init (changeset_t * cs)
+{
+    cs->ready_index = SIZE_MAX;
+    cs->unready_count = 0;
+    cs->parent = NULL;
+    cs->children = NULL;
+    cs->sibling = NULL;
+}
+
+
 static bool strings_match (const version_t * A, const version_t * B)
 {
     tag_t * Abranch = A->branch ? A->branch->tag : NULL;
@@ -98,7 +108,7 @@ static int cs_compare (const void * AA, const void * BB)
 
 static void create_implicit_merge (database_t * db, changeset_t * cs)
 {
-    changeset_t * merge = database_new_changeset (db, sizeof (changeset_t));
+    changeset_t * merge = database_new_changeset (db);
     merge->type = ct_implicit_merge;
     merge->time = cs->time;
     changeset_add_child (cs, merge);
@@ -136,7 +146,7 @@ void create_changesets (database_t * db)
     qsort (version_list, total_versions, sizeof (version_t *),
            version_compare_qsort);
 
-    changeset_t * current = database_new_changeset (db, sizeof (changeset_t));
+    changeset_t * current = database_new_changeset (db);
     version_t * tail = version_list[0];
     tail->commit = current;
     current->time = tail->time;
@@ -150,7 +160,7 @@ void create_changesets (database_t * db)
         }
         else {
             tail->cs_sibling = NULL;
-            current = database_new_changeset (db, sizeof (changeset_t));
+            current = database_new_changeset (db);
             current->time = next->time;
             current->type = ct_commit;
             current->versions = next;
