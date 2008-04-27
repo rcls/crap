@@ -40,7 +40,8 @@ int main()
     assert (db.ready_changesets.entries_end == db.ready_changesets.entries_end);
     assert (emitted_changesets == db.changesets_end - db.changesets);
 
-    // FIXME - we will have to mark tags as unemitted at some point also.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+        i->is_emitted = false;
 
     // Emit the changesets for real.
     prepare_for_emission (&db);
