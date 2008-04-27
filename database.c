@@ -24,28 +24,55 @@ static int compare_version (const void * AA, const void * BB)
 
 static int compare_changeset (const void * AA, const void * BB)
 {
-    const commit_t * A = as_commit (AA);
-    const commit_t * B = as_commit (BB);
+    const changeset_t * A = AA;
+    const changeset_t * B = BB;
 
-    if (A->changeset.time != B->changeset.time)
-        return A->changeset.time > B->changeset.time;
+    // Implicit merges go before anything else, no matter what the timestamps.
+    if (A->type == ct_implicit_merge && B->type != ct_implicit_merge)
+        return -1;
 
-    if (A->versions->author != B->versions->author)
-        return strcmp (A->versions->author, B->versions->author);
+    if (A->type != ct_implicit_merge && B->type == ct_implicit_merge)
+        return 1;
 
-    if (A->versions->commitid != B->versions->commitid)
-        return strcmp (A->versions->commitid, B->versions->commitid);
+    if (A->time != B->time)
+        return A->time > B->time;
 
-    if (A->versions->log != B->versions->log)
-        return strcmp (A->versions->log, B->versions->log);
+    // That's all the ordering we really *need* to do, but we try and make
+    // things as deterministic as possible.
 
-    // FIXME - should have branch names in here.
+    if (A->type != B->type)
+        return A->type > B->type ? 1 : -1;
 
-    // Last resort.
-    if (A->versions->file != B->versions->file)
-        return A->versions->file > B->versions->file;
+    if (A->type == ct_implicit_merge) {
+        A = &as_imerge (A)->commit->changeset;
+        B = &as_imerge (B)->commit->changeset;
+    }
 
-    return A > B;
+    const version_t * Av = as_commit (A)->versions;
+    const version_t * Bv = as_commit (B)->versions;
+
+    if (Av->author != Bv->author)
+        return strcmp (Av->author, Bv->author);
+
+    if (Av->commitid != Bv->commitid)
+        return strcmp (Av->commitid, Bv->commitid);
+
+    if (Av->log != Bv->log)
+        return strcmp (Av->log, Bv->log);
+
+    if (Av->branch == NULL && Bv->branch != NULL)
+        return -1;
+
+    if (Av->branch != NULL && Bv->branch == NULL)
+        return 1;
+
+    if (Av->branch->tag != Bv->branch->tag)
+        return Av->branch->tag < Bv->branch->tag ? -1 : 1;
+
+    if (Av->file != Bv->file)
+        return Av->file > Bv->file;
+
+    return Av > Bv;
 }
 
 
@@ -62,7 +89,6 @@ void database_init (database_t * db)
     db->tag_hash = NULL;
     db->tag_hash_num_entries = 0;
     db->tag_hash_num_buckets = 0;
-    db->pending_implicit_merge = NULL;
 
     heap_init (&db->ready_versions,
                offsetof (version_t, ready_index), compare_version);
@@ -117,6 +143,9 @@ void * database_new_changeset (database_t * db, size_t size)
 {
     changeset_t * result = xmalloc (size);
     result->ready_index = SIZE_MAX;
+    result->unready_count = 0;
+    result->children = NULL;
+    result->sibling = NULL;
 
     ARRAY_EXTEND (db->changesets, db->changesets_end, db->changesets_max);
 

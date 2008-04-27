@@ -381,6 +381,8 @@ static void fill_in_versions_and_parents (file_t * file)
     // We need to check if the initial revision was created by an import or
     // somehow else.  If it was created by an import, then it will be not dead,
     // and identical to 1.1.1.1 (FIXME - first on 1.1 branch.).
+    // FIXME - a better way of detecting what imports should be merged would
+    // be to do it at the time of emission.
     version_t * v1_1 = file_find_version (file, "1.1");
     if (v1_1 != NULL)
         if (v1_1->dead || strcmp (v1_1->log, "Initial revision\n") != 0)
@@ -671,7 +673,7 @@ void read_files_versions (database_t * db,
         i->is_emitted = false;
     }
 
-    // Fill in all branches with their initial tags.
+    // Fill in all branches with their initial versions.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         if (i->branch_versions)
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)

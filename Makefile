@@ -10,7 +10,7 @@ libcrap.a: changeset.o database.o emission.o file.o heap.o log.o log_parse.o \
    string_cache.o utils.o
 	ar crv $@ $+
 
-CFLAGS=-O2 -Wall -Werror -std=gnu99 -D_GNU_SOURCE -g3 \
+CFLAGS=-O2 -Wall -Werror -std=gnu99 -D_GNU_SOURCE -g3 -Wno-inline \
 	-MMD -MP -MF.deps/$(subst /,:,$@).d
 CC=gcc
 

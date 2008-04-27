@@ -8,14 +8,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+
+static void changeset_release (database_t * db, changeset_t * cs)
+{
+    assert (cs->unready_count != 0);
+
+    if (--cs->unready_count == 0)
+        heap_insert (&db->ready_changesets, cs);
+}
+
 void version_release (database_t * db, version_t * version)
 {
     heap_insert (&db->ready_versions, version);
 
-    assert (version->commit->changeset.unready_count != 0);
-
-    if (--version->commit->changeset.unready_count == 0)
-        heap_insert (&db->ready_changesets, &version->commit->changeset);
+    changeset_release (db, &version->commit->changeset);
 }
 
 
@@ -26,16 +32,14 @@ void changeset_emitted (database_t * db, changeset_t * changeset)
 
     commit_t * commit = as_commit (changeset);
 
-    if (commit->implicit_merge != NULL) {
-        assert (db->pending_implicit_merge == NULL);
-        db->pending_implicit_merge = commit->implicit_merge;
-    }
-
-    for (version_t * cs_v = commit->versions; cs_v; cs_v = cs_v->cs_sibling) {
-        heap_remove (&db->ready_versions, cs_v);
-        for (version_t * v = cs_v->children; v; v = v->sibling)
+    for (version_t * i = commit->versions; i; i = i->cs_sibling) {
+        heap_remove (&db->ready_versions, i);
+        for (version_t * v = i->children; v; v = v->sibling)
             version_release (db, v);
     }
+
+    for (changeset_t * i = commit->changeset.children; i; i = i->sibling)
+        changeset_release (db, i);
 }
 
 
@@ -132,15 +136,13 @@ static void cycle_split (database_t * db, commit_t * cs)
     // in cs, and put the ready-to-emit into nw.
 
     // FIXME - we should split implicit merges also.
-    assert (cs->implicit_merge == NULL);
     commit_t * new = database_new_changeset (db, sizeof (commit_t));
     new->changeset.type = ct_commit;
     new->changeset.time = cs->changeset.time;
-    new->changeset.unready_count = 0;
-    new->implicit_merge = NULL;
     version_t ** cs_v = &cs->versions;
     version_t ** new_v = &new->versions;
     for (version_t * v = cs->versions; v; v = v->cs_sibling) {
+        assert (!v->implicit_merge);    // Not yet handled.
         if (v->ready_index == SIZE_MAX) {
             // Blocked; stays in cs.
             *cs_v = v;
@@ -189,13 +191,6 @@ static const version_t * cycle_find (const version_t * v)
 
 changeset_t * next_changeset (database_t * db)
 {
-    // A pending implicit merge is always done before anything else.
-    if (db->pending_implicit_merge) {
-        implicit_merge_t * result = db->pending_implicit_merge;
-        db->pending_implicit_merge = NULL;
-        return &result->changeset;
-    }
-
     if (db->ready_versions.entries == db->ready_versions.entries_end)
         return NULL;
 
@@ -217,4 +212,24 @@ changeset_t * next_changeset (database_t * db)
     }
 
     return heap_pop (&db->ready_changesets);
+}
+
+
+void prepare_for_emission (database_t * db)
+{
+    // Re-do the changeset unready counts.
+    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
+        if ((*i)->type == ct_commit)
+            for (version_t * j = as_commit (*i)->versions; j; j = j->cs_sibling)
+                ++(*i)->unready_count;
+
+        for (changeset_t * j = (*i)->children; j; j = j->sibling)
+            ++j->unready_count;
+    }
+
+    // Mark the initial versions as ready to emit.
+    for (file_t * f = db->files; f != db->files_end; ++f)
+        for (version_t * j = f->versions; j != f->versions_end; ++j)
+            if (j->parent == NULL)
+                version_release (db, j);
 }

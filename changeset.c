@@ -100,13 +100,20 @@ static int cs_compare (const void * AA, const void * BB)
 
 static void create_implicit_merge (database_t * db, commit_t * cs)
 {
-    assert (cs->implicit_merge == NULL);
     implicit_merge_t * merge
         = database_new_changeset (db, sizeof (implicit_merge_t));
     merge->changeset.type = ct_implicit_merge;
     merge->changeset.time = cs->changeset.time;
-    cs->implicit_merge = merge;
     merge->commit = cs;
+    changeset_add_child (&cs->changeset, &merge->changeset);
+}
+
+
+void changeset_add_child (changeset_t * parent, changeset_t * child)
+{
+    assert (child->sibling == NULL);
+    child->sibling = parent->children;
+    parent->children = child;
 }
 
 
@@ -137,24 +144,19 @@ void create_changesets (database_t * db)
     tail->commit = current;
     current->changeset.time = tail->time;
     current->changeset.type = ct_commit;
-    current->changeset.unready_count = 1;
     current->versions = tail;
-    current->implicit_merge = NULL;
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (strings_match (tail, next)
             && next->time - current->changeset.time < FUZZ_TIME) {
             tail->cs_sibling = next;
-            ++current->changeset.unready_count;
         }
         else {
             tail->cs_sibling = NULL;
             current = database_new_changeset (db, sizeof (commit_t));
             current->changeset.time = next->time;
             current->changeset.type = ct_commit;
-            current->changeset.unready_count = 1;
             current->versions = next;
-            current->implicit_merge = NULL;
         }
         next->commit = current;
         tail = next;
@@ -164,7 +166,7 @@ void create_changesets (database_t * db)
 
     free (version_list);
 
-    // Now walk through the commit changesets and process the implicit_merges.
+    // Now walk through the commit changesets and process the implicit merges.
     // We create an implicit_merge changeset for each one that needs it.
     size_t num_commits = db->changesets_end - db->changesets;
     for (size_t i = 0; i != num_commits; ++i) {
