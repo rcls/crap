@@ -77,12 +77,10 @@ void database_init (database_t * db)
 {
     db->files = NULL;
     db->files_end = NULL;
-    db->files_max = NULL;
     db->tags = NULL;
     db->tags_end = NULL;
     db->changesets = NULL;
     db->changesets_end = NULL;
-    db->changesets_max = NULL;
     db->tag_hash = NULL;
     db->tag_hash_num_entries = 0;
     db->tag_hash_num_buckets = 0;
@@ -121,17 +119,14 @@ void database_destroy (database_t * db)
 
 file_t * database_new_file (database_t * db)
 {
-    ARRAY_EXTEND (db->files, db->files_end, db->files_max);
+    ARRAY_EXTEND (db->files, db->files_end);
     file_t * result = &db->files_end[-1];
     result->versions = NULL;
     result->versions_end = NULL;
-    result->versions_max = NULL;
     result->file_tags = NULL;
     result->file_tags_end = NULL;
-    result->file_tags_max = NULL;
     result->branches = NULL;
     result->branches_end = NULL;
-    result->branches_max = NULL;
     return result;
 }
 
@@ -141,7 +136,7 @@ changeset_t * database_new_changeset (database_t * db)
     changeset_t * result = xmalloc (sizeof (changeset_t));
     changeset_init (result);
 
-    ARRAY_EXTEND (db->changesets, db->changesets_end, db->changesets_max);
+    ARRAY_EXTEND (db->changesets, db->changesets_end);
 
     db->changesets_end[-1] = result;
     return result;

@@ -12,7 +12,6 @@ void heap_init (heap_t * heap, size_t offset,
 {
     heap->entries = NULL;
     heap->entries_end = NULL;
-    heap->entries_max = NULL;
     heap->index_offset = offset;
     heap->compare = compare;
 }
@@ -68,7 +67,7 @@ void heap_insert (heap_t * heap, void * item)
     assert (INDEX (item) == SIZE_MAX);
 
     // Create a bubble at the end.
-    ARRAY_EXTEND (heap->entries, heap->entries_end, heap->entries_max);
+    ARRAY_EXTEND (heap->entries, heap->entries_end);
 
     shuffle_up (heap, heap->entries_end - heap->entries - 1, item);
 }

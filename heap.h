@@ -7,7 +7,6 @@
 typedef struct heap {
     void ** entries;
     void ** entries_end;
-    void ** entries_max;
     size_t index_offset;
     /// @c compare should return >0 if first arg is greater than second, and <=0
     /// otherwise.  Thus either a strcmp or a '>' like predicate can be used.

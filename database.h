@@ -10,14 +10,12 @@ struct version;
 typedef struct database {
     struct file * files;
     struct file * files_end;
-    struct file * files_max;
 
     struct tag * tags;
     struct tag * tags_end;
 
     struct changeset ** changesets;
     struct changeset ** changesets_end;
-    struct changeset ** changesets_max;
 
     heap_t ready_versions;
     heap_t ready_changesets;

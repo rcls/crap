@@ -29,7 +29,7 @@ static file_tag_t * file_add_tag (string_hash_t * tags,
                                   file_t * f,
                                   const char * tag_name)
 {
-    ARRAY_EXTEND (f->file_tags, f->file_tags_end, f->file_tags_max);
+    ARRAY_EXTEND (f->file_tags, f->file_tags_end);
     file_tag_t * file_tag = &f->file_tags_end[-1];
     bool n;
     tag_hash_item_t * tag = string_hash_insert (
@@ -226,8 +226,8 @@ static bool predecessor (char * s, bool is_branch)
 
 
 /// Normalise a version string for a tag in place.  Rewrite the 'x.y.0.z' style
-/// branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1 on
-/// a branch tag.
+/// branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1
+/// on a branch tag.
 static int normalise_tag_version (char * s)
 {
     do {

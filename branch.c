@@ -140,7 +140,7 @@ void create_weights (database_t * db)
                 continue;
             }
 
-            ARRAY_EXTEND (b->tags, b->tags_end, b->tags_max);
+            ARRAY_EXTEND (b->tags, b->tags_end);
             b->tags_end[-1].tag = i;
             b->tags_end[-1].weight = 1;
         }
@@ -149,8 +149,7 @@ void create_weights (database_t * db)
     // Now go through each branch and put it onto each tag.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         for (branch_tag_t * j = i->tags; j != i->tags_end; ++j) {
-            ARRAY_EXTEND (j->tag->parents,
-                          j->tag->parents_end, j->tag->parents_max);
+            ARRAY_EXTEND (j->tag->parents, j->tag->parents_end);
             j->tag->parents_end[-1].branch = i;
             j->tag->parents_end[-1].weight = j->weight;
             ++j->tag->changeset.unready_count;

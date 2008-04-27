@@ -20,15 +20,12 @@ struct file {
 
     version_t * versions;
     version_t * versions_end;
-    version_t * versions_max;
 
     file_tag_t * file_tags;
     file_tag_t * file_tags_end;
-    file_tag_t * file_tags_max;
 
     file_tag_t ** branches;
     file_tag_t ** branches_end;
-    file_tag_t ** branches_max;
 };
 
 version_t * file_new_version (file_t * f);
@@ -85,7 +82,6 @@ struct tag {
 
     file_tag_t ** tag_files;
     file_tag_t ** tag_files_end;
-    file_tag_t ** tag_files_max;
 
     /// This is non-NULL for branches, where a tag is considered a branch if the
     /// tag is a branch tag on any file.  It points to an array of versions, the
@@ -97,12 +93,10 @@ struct tag {
     /// choose one of these as the branch to put the tag on.
     struct parent_branch * parents;
     struct parent_branch * parents_end;
-    struct parent_branch * parents_max;
 
     // Tags on this branch (if it's a branch).
     struct branch_tag * tags;
     struct branch_tag * tags_end;
-    struct branch_tag * tags_max;
 
     bool is_emitted;                    ///< Have we been emitted?
 
