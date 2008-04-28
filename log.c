@@ -13,7 +13,7 @@ void warning (const char * f, ...)
     va_end (l);
 }
 
-void bugger (const char * f, ...)
+void fatal (const char * f, ...)
 {
     va_list l;
     va_start (l, f);

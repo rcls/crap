@@ -46,10 +46,10 @@ static size_t next_line (char ** line, size_t * len, FILE * stream)
 {
     ssize_t s = getline (line, len, stream);
     if (s < 0)
-        bugger ("Unexpected EOF from server.\n");
+        fatal ("Unexpected EOF from server.\n");
 
     if (strlen (*line) < s)
-        bugger ("Got line containing ASCII NUL from server.\n");
+        fatal ("Got line containing ASCII NUL from server.\n");
 
     if (s > 0 && (*line)[s - 1] == '\n') {
         --s;
@@ -404,15 +404,15 @@ static void read_file_version (file_t * result,
                                FILE * f)
 {
     if (!starts_with (*l, "M revision "))
-        bugger ("Log (%s) did not have expected 'revision' line: %s\n",
-                result->rcs_path, *l);
+        fatal ("Log (%s) did not have expected 'revision' line: %s\n",
+               result->rcs_path, *l);
 
     version_t * version = file_new_version (result);
 
     version->version = cache_string (*l + 11);
     if (!valid_version (version->version))
-        bugger ("Log (%s) has malformed version %s\n",
-                result->rcs_path, version->version);
+        fatal ("Log (%s) has malformed version %s\n",
+               result->rcs_path, version->version);
 
     version->author = NULL;
     version->commitid = cache_string ("");
@@ -431,28 +431,28 @@ static void read_file_version (file_t * result,
     while (starts_with (*l, "MT ")) {
         if (starts_with (*l, "MT date ")) {
             if (!parse_cvs_date (&version->time, &version->offset, *l + 8))
-                bugger ("Log (%s) date line has unknown format: %s\n",
-                        result->rcs_path, *l);
+                fatal ("Log (%s) date line has unknown format: %s\n",
+                       result->rcs_path, *l);
             have_date = true;
         }
         if (author_next) {
             if (!starts_with (*l, "MT text "))
-                bugger ("Log (%s) author line is not text: %s\n",
-                        result->rcs_path, *l);
+                fatal ("Log (%s) author line is not text: %s\n",
+                       result->rcs_path, *l);
             version->author = cache_string (*l + 8);
             author_next = false;
         }
         if (state_next) {
             if (!starts_with (*l, "MT text "))
-                bugger ("Log (%s) state line is not text: %s\n",
-                        result->rcs_path, *l);
+                fatal ("Log (%s) state line is not text: %s\n",
+                       result->rcs_path, *l);
             version->dead = starts_with (*l, "MT text dead");
             state_next = false;
         }
         if (commitid_next) {
             if (!starts_with (*l, "MT text "))
-                bugger ("Log (%s) commitid line is not text: %s\n",
-                        result->rcs_path, *l);
+                fatal ("Log (%s) commitid line is not text: %s\n",
+                       result->rcs_path, *l);
             version->commitid = cache_string (*l + 8);
             commitid_next = false;
         }
@@ -472,10 +472,10 @@ static void read_file_version (file_t * result,
         len = next_line (l, buffer_len, f);
 
     if (!have_date)
-        bugger ("Log (%s) does not have date.\n", result->rcs_path);
+        fatal ("Log (%s) does not have date.\n", result->rcs_path);
 
     if (version->author == NULL)
-        bugger ("Log (%s) does not have author.\n", result->rcs_path);
+        fatal ("Log (%s) does not have author.\n", result->rcs_path);
 
     // Snarf the log entry.
     char * log = NULL;
@@ -500,11 +500,11 @@ static void read_file_versions (database_t * db,
                                 FILE * f)
 {
     if (!starts_with (*l, "M RCS file: /"))
-        bugger ("Expected RCS file line, not %s\n", *l);
+        fatal ("Expected RCS file line, not %s\n", *l);
 
     size_t len = strlen (*l);
     if ((*l)[len - 1] != 'v' || (*l)[len - 2] != ',')
-        bugger ("RCS file name does not end with ',v': %s\n", *l);
+        fatal ("RCS file name does not end with ',v': %s\n", *l);
 
     file_t * file = database_new_file (db);
     file->rcs_path = cache_string_n (*l + 12, len - 14);
@@ -524,15 +524,15 @@ static void read_file_versions (database_t * db,
            starts_with (*l, "M access list:"));
 
     if (!starts_with (*l, "M symbolic names:"))
-        bugger ("Log (%s) did not have expected tag list: %s\n",
-                file->rcs_path, *l);
+        fatal ("Log (%s) did not have expected tag list: %s\n",
+               file->rcs_path, *l);
 
     len = next_line (l, buffer_len, f);
     while (starts_with (*l, "M \t")) {
         char * colon = strrchr (*l, ':');
         if (colon == NULL)
-            bugger ("Tag on (%s) did not have version: %s\n",
-                    file->rcs_path, *l);
+            fatal ("Tag on (%s) did not have version: %s\n",
+                   file->rcs_path, *l);
 
         const char * tag_name = cache_string_n (*l + 3, colon - *l - 3);
         file_tag_t * file_tag = file_add_tag (tags, file, tag_name);
@@ -543,8 +543,8 @@ static void read_file_versions (database_t * db,
 
         int type = normalise_tag_version (colon);
         if (type < 0)
-            bugger ("Tag %s on (%s) has bogus version '%s'\n",
-                    tag_name, file->rcs_path, colon);
+            fatal ("Tag %s on (%s) has bogus version '%s'\n",
+                   tag_name, file->rcs_path, colon);
 
         file_tag->vers = cache_string (colon);
         file_tag->is_branch = type;
@@ -557,16 +557,16 @@ static void read_file_versions (database_t * db,
         len = next_line (l, buffer_len, f);
 
     if (!starts_with (*l, "M description:"))
-        bugger ("Log (%s) did not have expected 'description' item: %s\n",
-                file->rcs_path, *l);
+        fatal ("Log (%s) did not have expected 'description' item: %s\n",
+               file->rcs_path, *l);
 
     // Just skip until a boundary.  Too bad if a log entry contains one of
     // the boundary strings.
     while (strcmp (*l, REV_BOUNDARY) != 0 &&
            strcmp (*l, FILE_BOUNDARY) != 0) {
         if (!starts_with (*l, "M "))
-            bugger ("Log (%s) description incorrectly terminated\n",
-                    file->rcs_path);
+            fatal ("Log (%s) description incorrectly terminated\n",
+                   file->rcs_path);
         len = next_line (l, buffer_len, f);
     }
 
