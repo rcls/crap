@@ -3,6 +3,8 @@
 
 #include <assert.h>
 #include <stdint.h>
+#include <stdlib.h>
+
 
 #define INDEX(P) *((size_t *) (heap->index_offset + (char *) (P)))
 #define LESS(P,Q) (heap->compare (Q, P) > 0)
@@ -14,6 +16,12 @@ void heap_init (heap_t * heap, size_t offset,
     heap->entries_end = NULL;
     heap->index_offset = offset;
     heap->compare = compare;
+}
+
+
+void heap_destroy (heap_t * heap)
+{
+    free (heap->entries);
 }
 
 

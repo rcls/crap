@@ -108,30 +108,6 @@ static void split_cycle (heap_t * heap, tag_t * t)
 }
 
 
-static bool emit_tag (heap_t * heap)
-{
-    if (heap->entries == heap->entries_end)
-        return false;
-
-    tag_t * tag = heap_pop (heap);
-    tag->is_emitted = true;
-
-    fprintf (stderr, "Tag '%s' with %u parents\n",
-             tag->tag, tag->parents_end - tag->parents);
-
-    for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i)
-        fprintf (stderr, "\t%s\n", i->branch->tag);
-
-    for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
-        assert (i->tag->changeset.unready_count != 0);
-        if (--i->tag->changeset.unready_count == 0)
-            heap_insert (heap, i->tag);
-    }
-
-    return true;
-}
-
-
 void branch_analyse (database_t * db)
 {
     // First, go through each tag, and put it on all the branches.
@@ -161,25 +137,53 @@ void branch_analyse (database_t * db)
             ++j->tag->changeset.unready_count;
         }
 
-    heap_t heap;
-    heap_init (&heap, offsetof (tag_t, changeset.ready_index), tag_compare);
-
-    // Put the tags that are ready right now on to the heap.  Also sort the
-    // parents.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        if (i->changeset.unready_count == 0)
-            heap_insert (&heap, i);
+    // Sort the parent lists.
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
         qsort (i->parents, i->parents_end - i->parents,
                sizeof (parent_branch_t), compare_pb);
-    }
 
-    while (emit_tag (&heap));
+    // Now do a cycle breaking pass of the branches.
+    heap_t heap;
+    branch_heap_init (db, &heap);
+    while (branch_heap_next (&heap));
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         while (!i->is_emitted) {
             split_cycle (&heap, i);
-            while (emit_tag (&heap));
+            while (branch_heap_next (&heap));
         }
 
-    free (heap.entries);
+    heap_destroy (&heap);
+}
+
+
+void branch_heap_init (database_t * db, heap_t * heap)
+{
+    heap_init (heap, offsetof (tag_t, changeset.ready_index), tag_compare);
+
+    // Put the tags that are ready right now on to the heap.  Also sort the
+    // parents.
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        i->changeset.unready_count = i->parents_end - i->parents;
+        if (i->changeset.unready_count == 0)
+            heap_insert (heap, i);
+    }
+}
+
+
+tag_t * branch_heap_next (heap_t * heap)
+{
+    if (heap->entries == heap->entries_end)
+        return NULL;
+
+    tag_t * tag = heap_pop (heap);
+    tag->is_emitted = true;
+
+    for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
+        assert (i->tag->changeset.unready_count != 0);
+        if (--i->tag->changeset.unready_count == 0)
+            heap_insert (heap, i->tag);
+    }
+
+    return tag;
 }

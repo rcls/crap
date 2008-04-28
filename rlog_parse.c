@@ -25,6 +25,18 @@ int main()
 
     branch_analyse (&db);
 
+    heap_t branch_heap;
+    branch_heap_init (&db, &branch_heap);
+    tag_t * tag;
+    while ((tag = branch_heap_next (&branch_heap))) {
+        fprintf (stderr, "Tag '%s' with %u parents\n",
+                 tag->tag, tag->parents_end - tag->parents);
+
+        for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i)
+            fprintf (stderr, "\t%s\n", i->branch->tag);
+    }
+    heap_destroy (&branch_heap);
+
     create_changesets (&db);
 
     // Do a dummy run of the changeset emission; this breaks any cycles before

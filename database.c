@@ -113,8 +113,8 @@ void database_destroy (database_t * db)
     free (db->files);
     free (db->tags);
     free (db->changesets);
-    free (db->ready_versions.entries);
-    free (db->ready_changesets.entries);
+    heap_destroy (&db->ready_versions);
+    heap_destroy (&db->ready_changesets);
     free (db->tag_hash);
 }
 
