@@ -98,7 +98,13 @@ struct tag {
     struct branch_tag * tags;
     struct branch_tag * tags_end;
 
-    bool is_emitted;                    ///< Have we been emitted?
+    /// Have we been released for emission?  A tag may be released for one
+    /// of two reasons; either all it's parents have been released, or we had
+    /// an exact match in the tag hash.
+    bool is_released;
+
+    /// Have we had an exact match from the tag hash?
+    bool exact_match;
 
     changeset_t changeset;              ///< Tag emission changeset.
 

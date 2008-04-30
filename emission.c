@@ -93,8 +93,8 @@ size_t changeset_update_branch (struct database * db,
          i = database_tag_hash_next (i)) {
         printf ("*** HIT %s %s%s ***\n",
                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
-                i->is_emitted ? " (DUPLICATE)" : "");
-        i->is_emitted = true;
+                i->is_released ? " (DUPLICATE)" : "");
+        i->is_released = true;
     }
 
     return changes;
@@ -182,12 +182,12 @@ static const version_t * cycle_find (const version_t * v)
 }
 
 
-changeset_t * next_changeset (database_t * db)
+changeset_t * next_changeset_split (database_t * db)
 {
-    if (db->ready_versions.entries == db->ready_versions.entries_end)
+    if (heap_empty (db->ready_versions))
         return NULL;
 
-    if (db->ready_changesets.entries == db->ready_changesets.entries_end) {
+    if (heap_empty (db->ready_changesets)) {
         // Find a cycle.
         const version_t * slow = heap_front (&db->ready_versions);
         const version_t * fast = slow;

@@ -56,7 +56,7 @@ static parent_branch_t * unemitted_parent (tag_t * t)
 {
     parent_branch_t * i = t->parents_end;
     while (i != t->parents)
-        if (!(--i)->branch->is_emitted)
+        if (!(--i)->branch->is_released)
             return i;
     abort();
 }
@@ -148,7 +148,7 @@ void branch_analyse (database_t * db)
     while (branch_heap_next (&heap));
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
-        while (!i->is_emitted) {
+        while (!i->is_released) {
             split_cycle (&heap, i);
             while (branch_heap_next (&heap));
         }
@@ -165,25 +165,109 @@ void branch_heap_init (database_t * db, heap_t * heap)
     // parents.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         i->changeset.unready_count = i->parents_end - i->parents;
-        if (i->changeset.unready_count == 0)
+        if (i->changeset.unready_count == 0) {
+            tag->is_released = true;
             heap_insert (heap, i);
+        }
     }
 }
 
 
 tag_t * branch_heap_next (heap_t * heap)
 {
-    if (heap->entries == heap->entries_end)
+    if (heap_empty (heap))
         return NULL;
 
     tag_t * tag = heap_pop (heap);
-    tag->is_emitted = true;
 
     for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
         assert (i->tag->changeset.unready_count != 0);
-        if (--i->tag->changeset.unready_count == 0)
+        if (--i->tag->changeset.unready_count == 0 && !i->tag->is_released) {
+            i->tag->is_released = true;
             heap_insert (heap, i->tag);
+        }
     }
 
     return tag;
 }
+
+
+void assign_tag_point (database_t * db, tag_t * tag)
+{
+    // Exact matches have already assigned tag points.
+    if (tag->exact_match)
+        return;
+
+    // We're going to do this the hard way.
+    size_t best_weight = SIZE_MAX;
+    tag_t * best_branch = NULL;
+
+    // First of all, check to see which parent branches contain the most
+    // versions from the tag.
+    // counts.
+    for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
+        size_t weight = 0;
+        version_t * j = tag->file_tags;
+        version_t ** jj = i->file_tags;
+        while (j != tag->file_tags_end && j != i->branch->file_tags_end) {
+            if ((*j)->file < (*jj)->file) {
+                ++j;
+                continue;
+            }
+            if ((*j)->file > (*jj)->file) {
+                ++jj;
+                continue;
+            }
+            // FIXME - misses vendor imports that get merged.
+            if ((*j)->version->branch == i->branch
+                || (*j)->version == (*i)->version)
+                ++weight;
+            ++j;
+            ++jj;
+        }
+        if (weight > best_weight ||
+            (weight == best_weight && better_than (i->branch, best_branch))) {
+            best_weight = weight;
+            best_branch = i->branch;
+        }
+    }
+
+    // We should now have a branch to use.  Now we need to find at what point
+    // on the branch to place the tag.  We walk through the branch changesets,
+    // keeping tabs on how many file versions match.  The one with the most
+    // matches wins.
+    assert (best_branch != NULL);
+
+    ssize_t current = 0;
+    ssize_t best = 0;
+    changeset_t * best_cs = &best_branch->changeset;
+
+    for (changeset_t ** i = best_branch->changesets;
+         i != best_branch->changesets_end; ++i) {
+        // Go through the changeset versions; if it matches the tag version,
+        // then increment current; if the previous version matches the tag
+        // version, then decrement current.  Just to make life fun, the
+        // changeset versions are not sorted by file, so we have to search for
+        // them.  FIXME - again, this misses vendor imports.
+        for (version_t * j = (*i)->versions; j; j = j->cs_sibling) {
+            file_tag_t * ft = tag_find_file (j->file);
+            // FIXME - we should process ft->version==NULL.
+            if (ft == NULL || ft->version == NULL)
+                continue;
+            if (ft->version == j)
+                ++current;
+            else if (ft->version->parent == j)
+                --curent;
+        }
+        if (current > best) {
+            best = current;
+            best_cs = *i;
+        }
+    }
+
+    // Set the tag as a child of the changeset.
+    tag->parent = best_branch;
+    tag->sibling = best_branch->children;
+    best_branch->children = tag;
+}
+

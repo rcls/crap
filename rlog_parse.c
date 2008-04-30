@@ -25,6 +25,7 @@ int main()
 
     branch_analyse (&db);
 
+    // Do a pass through the branch/tag structure; this breaks any cycles in it.
     heap_t branch_heap;
     branch_heap_init (&db, &branch_heap);
     tag_t * tag;
@@ -39,21 +40,40 @@ int main()
 
     create_changesets (&db);
 
-    // Do a dummy run of the changeset emission; this breaks any cycles before
-    // we commit ourselves to the real change-set order.
+    // Do a pass through the changesets; this breaks any cycles.
     prepare_for_emission (&db);
     size_t emitted_changesets = 0;
     changeset_t * changeset;
-    while ((changeset = next_changeset (&db))) {
+    while ((changeset = next_changeset_split (&db))) {
         changeset_emitted (&db, changeset);
         ++emitted_changesets;
     }
 
-    assert (db.ready_changesets.entries_end == db.ready_changesets.entries_end);
+    assert (heap_empty (db.ready_changesets));
     assert (emitted_changesets == db.changesets_end - db.changesets);
 
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
-        i->is_emitted = false;
+        i->is_released = false;
+
+    // Do a second pass through the changesets, this time assigning
+    // branch-points.
+    prepare_for_emission (&db);
+    prepare_for_tag_emission (&db);
+
+    while (!heap_empty (&db.ready_tags)) {
+        tag_t * tag = heap_pop (&db.ready_tags);
+        assign_tag_point (&db, tag);
+        tag_emitted (&db, tag);
+
+        while (!heap_empty (&db.ready_changesets)) {
+            changeset * changeset = heap_pop (&db.ready_changesets);
+            changeset_update_branch (&db, changeset);
+            changeset_emitted (changeset);
+        }
+    }
+
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+        i->is_released = false;
 
     // Emit the changesets for real.
     prepare_for_emission (&db);
@@ -117,14 +137,14 @@ int main()
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
         if (i->branch_versions) {
             ++branches;
-            emitted_branches += i->is_emitted;
-            if (!i->is_emitted)
+            emitted_branches += i->is_released;
+            if (!i->is_released)
                 fprintf (stderr, "Missed branch %s\n", i->tag);
         }
         else {
             ++tags;
-            emitted_tags += i->is_emitted;
-            if (!i->is_emitted)
+            emitted_tags += i->is_released;
+            if (!i->is_released)
                 fprintf (stderr, "Missed tag %s\n", i->tag);
         }
 

@@ -562,8 +562,7 @@ static void read_file_versions (database_t * db,
 
     // Just skip until a boundary.  Too bad if a log entry contains one of
     // the boundary strings.
-    while (strcmp (*l, REV_BOUNDARY) != 0 &&
-           strcmp (*l, FILE_BOUNDARY) != 0) {
+    while (strcmp (*l, REV_BOUNDARY) != 0 && strcmp (*l, FILE_BOUNDARY) != 0) {
         if (!starts_with (*l, "M "))
             fatal ("Log (%s) description incorrectly terminated\n",
                    file->rcs_path);
@@ -666,7 +665,7 @@ void read_files_versions (database_t * db,
         SHA1_Final ((unsigned char *) i->hash, &sha);
         database_tag_hash_insert (db, i);
 
-        i->is_emitted = false;
+        i->is_released = false;
     }
 
     // Fill in all branches with their initial versions.

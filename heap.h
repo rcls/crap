@@ -1,6 +1,7 @@
 #ifndef HEAP_H
 #define HEAP_H
 
+#include <stdbool.h>
 #include <stddef.h>
 
 /// Type used to store a heap.
@@ -32,5 +33,11 @@ void * heap_front (heap_t * heap);
 
 /// Return least item from a heap, after removing it.
 void * heap_pop (heap_t * heap);
+
+/// Is a heap empty?
+static inline bool heap_empty (heap_t * heap)
+{
+    return heap->entries == heap->entries_end;
+}
 
 #endif

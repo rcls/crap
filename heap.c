@@ -97,14 +97,14 @@ void heap_remove (heap_t * heap, void * item)
 
 void * heap_front (heap_t * heap)
 {
-    assert (heap->entries != heap->entries_end);
+    assert (!heap_empty (heap));
     return heap->entries[0];
 }
 
 
 void * heap_pop (heap_t * heap)
 {
-    assert (heap->entries != heap->entries_end);
+    assert (!heap_empty (heap));
     void * result = heap->entries[0];
     assert (INDEX (result) == 0);
     if (--heap->entries_end != heap->entries)

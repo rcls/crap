@@ -18,8 +18,8 @@ void changeset_emitted (struct database * db, struct changeset * changeset);
 size_t changeset_update_branch (struct database * db,
                                 struct changeset * changeset);
 
-/// Find the next changeset to emit.
-changeset_t * next_changeset (database_t * db);
+/// Find the next changeset to emit; split cycles if necessary.
+changeset_t * next_changeset_split (database_t * db);
 
 void create_changesets (struct database * db);
 
