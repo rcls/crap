@@ -166,7 +166,7 @@ void branch_heap_init (database_t * db, heap_t * heap)
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         i->changeset.unready_count = i->parents_end - i->parents;
         if (i->changeset.unready_count == 0) {
-            tag->is_released = true;
+            i->is_released = true;
             heap_insert (heap, i);
         }
     }
@@ -192,6 +192,14 @@ tag_t * branch_heap_next (heap_t * heap)
 }
 
 
+static bool better_than (tag_t * new, tag_t * old)
+{
+    // FIXME - the actual test should be something like lower-rank-branches win;
+    // for equal rank, deterministicly order tags.
+    return true;
+}
+
+
 void assign_tag_point (database_t * db, tag_t * tag)
 {
     // Exact matches have already assigned tag points.
@@ -207,9 +215,9 @@ void assign_tag_point (database_t * db, tag_t * tag)
     // counts.
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
         size_t weight = 0;
-        version_t * j = tag->file_tags;
-        version_t ** jj = i->file_tags;
-        while (j != tag->file_tags_end && j != i->branch->file_tags_end) {
+        file_tag_t ** j = tag->tag_files;
+        file_tag_t ** jj = i->branch->tag_files;
+        while (j != tag->tag_files_end && j != i->branch->tag_files_end) {
             if ((*j)->file < (*jj)->file) {
                 ++j;
                 continue;
@@ -219,8 +227,8 @@ void assign_tag_point (database_t * db, tag_t * tag)
                 continue;
             }
             // FIXME - misses vendor imports that get merged.
-            if ((*j)->version->branch == i->branch
-                || (*j)->version == (*i)->version)
+            if ((*j)->version->branch->tag == i->branch
+                || (*j)->version == (*jj)->version)
                 ++weight;
             ++j;
             ++jj;
@@ -250,14 +258,14 @@ void assign_tag_point (database_t * db, tag_t * tag)
         // changeset versions are not sorted by file, so we have to search for
         // them.  FIXME - again, this misses vendor imports.
         for (version_t * j = (*i)->versions; j; j = j->cs_sibling) {
-            file_tag_t * ft = tag_find_file (j->file);
+            file_tag_t * ft = find_file_tag (j->file, tag);
             // FIXME - we should process ft->version==NULL.
             if (ft == NULL || ft->version == NULL)
                 continue;
             if (ft->version == j)
                 ++current;
             else if (ft->version->parent == j)
-                --curent;
+                --current;
         }
         if (current > best) {
             best = current;
@@ -266,8 +274,13 @@ void assign_tag_point (database_t * db, tag_t * tag)
     }
 
     // Set the tag as a child of the changeset.
-    tag->parent = best_branch;
-    tag->sibling = best_branch->children;
-    best_branch->children = tag;
+    tag->changeset.parent = &best_branch->changeset;
+    tag->changeset.sibling = best_branch->changeset.children;
+    best_branch->changeset.children = &tag->changeset;
 }
 
+
+void prepare_for_tag_emission (struct database * db)
+{
+    abort();
+}

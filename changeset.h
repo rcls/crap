@@ -3,6 +3,8 @@
 
 #include <time.h>
 
+struct database;
+
 typedef struct changeset changeset_t;
 
 /// The possible types of changeset.
@@ -42,8 +44,10 @@ struct changeset {
 /// Give @c parent a @c child.
 void changeset_add_child (changeset_t * parent, changeset_t * child);
 
-
 /// Initialise changeset members.
 void changeset_init (changeset_t * changeset);
+
+/// Create the commit and vendor-merge changesets.
+void create_changesets (struct database * db);
 
 #endif

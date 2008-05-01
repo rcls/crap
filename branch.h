@@ -24,4 +24,10 @@ void branch_analyse (struct database * db);
 void branch_heap_init (struct database * db, struct heap * heap);
 struct tag * branch_heap_next (struct heap * heap);
 
+void assign_tag_point (struct database * db, struct tag * tag);
+
+void prepare_for_tag_emission (struct database * db);
+
+//void tag_emitted (struct database * db, struct tag * tag);
+
 #endif

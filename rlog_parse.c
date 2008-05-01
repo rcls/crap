@@ -49,7 +49,7 @@ int main()
         ++emitted_changesets;
     }
 
-    assert (heap_empty (db.ready_changesets));
+    assert (heap_empty (&db.ready_changesets));
     assert (emitted_changesets == db.changesets_end - db.changesets);
 
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
@@ -63,12 +63,11 @@ int main()
     while (!heap_empty (&db.ready_tags)) {
         tag_t * tag = heap_pop (&db.ready_tags);
         assign_tag_point (&db, tag);
-        tag_emitted (&db, tag);
+// FIXME        tag_emitted (&db, tag);
 
-        while (!heap_empty (&db.ready_changesets)) {
-            changeset * changeset = heap_pop (&db.ready_changesets);
-            changeset_update_branch (&db, changeset);
-            changeset_emitted (changeset);
+        while ((changeset = next_changeset (&db))) {
+            changeset_update_branch_hash (&db, changeset);
+            changeset_emitted (&db, changeset);
         }
     }
 
@@ -78,6 +77,7 @@ int main()
     // Emit the changesets for real.
     prepare_for_emission (&db);
     emitted_changesets = 0;
+    // FIXME - should not be splitting at this point.
     while ((changeset = next_changeset (&db))) {
 
         struct tm dtm;
@@ -113,7 +113,7 @@ int main()
         printf ("%s %s %s %s\n%s\n",
                 date, branch, change->author, change->commitid, log);
 
-        if (changeset_update_branch (&db, changeset) == 0)
+        if (changeset_update_branch_hash (&db, changeset) == 0)
             printf ("[There were no real changes in this changeset]\n");
 
         for (version_t * v = change; v; v = v->cs_sibling)

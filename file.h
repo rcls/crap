@@ -94,9 +94,13 @@ struct tag {
     struct parent_branch * parents;
     struct parent_branch * parents_end;
 
-    // Tags on this branch (if it's a branch).
+    /// Tags on this branch (if it's a branch).
     struct branch_tag * tags;
     struct branch_tag * tags_end;
+
+    /// Changesets on this branch.  FIXME - fill this in.
+    struct changeset ** changesets;
+    struct changeset ** changesets_end;
 
     /// Have we been released for emission?  A tag may be released for one
     /// of two reasons; either all it's parents have been released, or we had
@@ -116,9 +120,14 @@ struct tag {
 };
 
 
+/// Initialise a @c tag with @c name.
 void tag_init (tag_t * tag, const char * name);
 
+/// Add a new @c file_tag to a @c tag.
 void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);
+
+/// Find a @c file_tag for the given @c file and @c tag.
+file_tag_t * find_file_tag (file_t * file, tag_t * tag);
 
 static inline tag_t * as_tag (changeset_t * cs)
 {

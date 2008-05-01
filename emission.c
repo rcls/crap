@@ -41,8 +41,8 @@ void changeset_emitted (database_t * db, changeset_t * changeset)
 }
 
 
-size_t changeset_update_branch (struct database * db,
-                                struct changeset * changeset)
+size_t changeset_update_branch_hash (struct database * db,
+                                     struct changeset * changeset)
 {
     version_t ** branch;
     bool implicit_merge = false;
@@ -88,12 +88,14 @@ size_t changeset_update_branch (struct database * db,
     uint32_t hash[5];
     SHA1_Final ((unsigned char *) hash, &sha);
 
-    // Iterate over all the tags that match.
+    // Iterate over all the tags that match.  FIXME the duplicate flag is no
+    // long accurate.
     for (tag_t * i = database_tag_hash_find (db, hash); i;
          i = database_tag_hash_next (i)) {
         printf ("*** HIT %s %s%s ***\n",
                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
                 i->is_released ? " (DUPLICATE)" : "");
+        i->exact_match = true;
         i->is_released = true;
     }
 
@@ -184,10 +186,10 @@ static const version_t * cycle_find (const version_t * v)
 
 changeset_t * next_changeset_split (database_t * db)
 {
-    if (heap_empty (db->ready_versions))
+    if (heap_empty (&db->ready_versions))
         return NULL;
 
-    if (heap_empty (db->ready_changesets)) {
+    if (heap_empty (&db->ready_changesets)) {
         // Find a cycle.
         const version_t * slow = heap_front (&db->ready_versions);
         const version_t * fast = slow;
@@ -205,6 +207,15 @@ changeset_t * next_changeset_split (database_t * db)
     }
 
     return heap_pop (&db->ready_changesets);
+}
+
+
+changeset_t * next_changeset (database_t * db)
+{
+    if (heap_empty (&db->ready_changesets))
+        return NULL;
+    else
+        return heap_pop (&db->ready_changesets);
 }
 
 

@@ -26,7 +26,7 @@ void file_new_branch (file_t * f, file_tag_t * tag)
 version_t * file_find_version (const file_t * f, const char * s)
 {
     version_t * base = f->versions;
-    ssize_t count = f->versions_end - f->versions;
+    size_t count = f->versions_end - f->versions;
 
     while (count > 0) {
         size_t mid = count >> 1;
@@ -104,4 +104,28 @@ void tag_new_tag_file (tag_t * t, file_tag_t * ft)
 {
     ARRAY_EXTEND (t->tag_files, t->tag_files_end);
     t->tag_files_end[-1] = ft;
+}
+
+
+file_tag_t * find_file_tag (file_t * file, tag_t * tag)
+{
+    file_tag_t * base = file->file_tags;
+    size_t count = file->file_tags_end - file->file_tags;
+
+    // FIXME - this relies on file_tags and tags having the same sort order;
+    // is that correct?
+    while (count > 0) {
+        size_t mid = count >> 1;
+        file_tag_t * mid_tag = base + mid;
+        if (tag < mid_tag->tag)
+            count = mid;
+        else if (tag > mid_tag->tag) {
+            base += mid + 1;
+            count -= mid + 1;
+        }
+        else
+            return mid_tag;
+    }
+
+    return NULL;
 }

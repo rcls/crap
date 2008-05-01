@@ -19,6 +19,7 @@ typedef struct database {
 
     heap_t ready_versions;
     heap_t ready_changesets;
+    heap_t ready_tags;
 
     struct tag ** tag_hash;
     size_t tag_hash_num_entries;
