@@ -5,6 +5,7 @@
 #include "file.h"
 #include "log_parse.h"
 #include "string_cache.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -24,19 +25,6 @@ int main()
     free (line);
 
     branch_analyse (&db);
-
-    // Do a pass through the branch/tag structure; this breaks any cycles in it.
-    heap_t branch_heap;
-    branch_heap_init (&db, &branch_heap);
-    tag_t * tag;
-    while ((tag = branch_heap_next (&branch_heap))) {
-        fprintf (stderr, "Tag '%s' with %u parents\n",
-                 tag->tag, tag->parents_end - tag->parents);
-
-        for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i)
-            fprintf (stderr, "\t%s\n", i->branch->tag);
-    }
-    heap_destroy (&branch_heap);
 
     create_changesets (&db);
 
@@ -60,12 +48,16 @@ int main()
     prepare_for_emission (&db);
     prepare_for_tag_emission (&db);
 
-    while (!heap_empty (&db.ready_tags)) {
-        tag_t * tag = heap_pop (&db.ready_tags);
+    tag_t * tag;
+    while ((tag = branch_heap_next (&db.ready_tags))) {
         assign_tag_point (&db, tag);
-// FIXME        tag_emitted (&db, tag);
 
         while ((changeset = next_changeset (&db))) {
+            // Add the changeset to its branch.  FIXME handle vendor merges.
+            tag_t * branch = changeset->versions->branch->tag;
+            ARRAY_EXTEND (branch->changesets, branch->changesets_end);
+            branch->changesets_end[-1] = changeset;
+
             changeset_update_branch_hash (&db, changeset);
             changeset_emitted (&db, changeset);
         }

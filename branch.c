@@ -62,7 +62,7 @@ static parent_branch_t * unemitted_parent (tag_t * t)
 }
 
 
-static void split_cycle (heap_t * heap, tag_t * t)
+static void break_cycle (heap_t * heap, tag_t * t)
 {
     tag_t * slow = t;
     tag_t * fast = t;
@@ -108,6 +108,10 @@ static void split_cycle (heap_t * heap, tag_t * t)
 }
 
 
+// FIXME - we don't cope optimally with the situation where a branch is
+// created, files deleted, and then the branch tagged (without rtag).  We'll
+// never know that the tag was placed on the branch; instead we'll place the tag
+// on the trunk.
 void branch_analyse (database_t * db)
 {
     // First, go through each tag, and put it on all the branches.
@@ -149,7 +153,7 @@ void branch_analyse (database_t * db)
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         while (!i->is_released) {
-            split_cycle (&heap, i);
+            break_cycle (&heap, i);
             while (branch_heap_next (&heap));
         }
 
@@ -196,7 +200,7 @@ static bool better_than (tag_t * new, tag_t * old)
 {
     // FIXME - the actual test should be something like lower-rank-branches win;
     // for equal rank, deterministicly order tags.
-    return true;
+    return false;
 }
 
 
