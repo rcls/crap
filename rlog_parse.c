@@ -40,9 +40,6 @@ int main()
     assert (heap_empty (&db.ready_changesets));
     assert (emitted_changesets == db.changesets_end - db.changesets);
 
-    for (tag_t * i = db.tags; i != db.tags_end; ++i)
-        i->is_released = false;
-
     // Do a second pass through the changesets, this time assigning
     // branch-points.
     prepare_for_emission (&db);
@@ -50,26 +47,30 @@ int main()
 
     tag_t * tag;
     while ((tag = branch_heap_next (&db.ready_tags))) {
+        fprintf (stderr, "Process tag '%s'\n", tag->tag);
         assign_tag_point (&db, tag);
 
         while ((changeset = next_changeset (&db))) {
+            changeset_emitted (&db, changeset);
             // Add the changeset to its branch.  FIXME handle vendor merges.
             tag_t * branch = changeset->versions->branch->tag;
             ARRAY_EXTEND (branch->changesets, branch->changesets_end);
             branch->changesets_end[-1] = changeset;
 
             changeset_update_branch_hash (&db, changeset);
-            changeset_emitted (&db, changeset);
         }
     }
 
+    // Prepare for the real changeset emission.  This time the tags go through
+    // the the usual emission process, and branches block revisions on the
+    // branch.
+    prepare_for_emission (&db);
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
         i->is_released = false;
 
     // Emit the changesets for real.
-    prepare_for_emission (&db);
     emitted_changesets = 0;
-    // FIXME - should not be splitting at this point.
+    // FIXME - handle emitting tags.
     while ((changeset = next_changeset (&db))) {
 
         struct tm dtm;
@@ -105,8 +106,9 @@ int main()
         printf ("%s %s %s %s\n%s\n",
                 date, branch, change->author, change->commitid, log);
 
-        if (changeset_update_branch_hash (&db, changeset) == 0)
-            printf ("[There were no real changes in this changeset]\n");
+        // FIXME - replace this.
+/*         if (changeset_update_branch_hash (&db, changeset) == 0) */
+/*             printf ("[There were no real changes in this changeset]\n"); */
 
         for (version_t * v = change; v; v = v->cs_sibling)
             if (!implicit_merge || v->implicit_merge)
@@ -116,6 +118,9 @@ int main()
 
         ++emitted_changesets;
         changeset_emitted (&db, changeset);
+
+        for (changeset_t * i = changeset->children; i; i = i->sibling)
+            heap_insert (&db.ready_changesets, i);
     }
 
     fflush (NULL);

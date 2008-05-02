@@ -27,12 +27,9 @@ static int compare_changeset (const void * AA, const void * BB)
     const changeset_t * A = AA;
     const changeset_t * B = BB;
 
-    // Implicit merges go before anything else, no matter what the timestamps.
-    if (A->type == ct_implicit_merge && B->type != ct_implicit_merge)
-        return -1;
-
-    if (A->type != ct_implicit_merge && B->type == ct_implicit_merge)
-        return 1;
+    // We emit implicit merges and branches as soon as they become ready.
+    if (A->type != B->type)
+        return A->type < B->type ? -1 : 1;
 
     if (A->time != B->time)
         return A->time > B->time;

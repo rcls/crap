@@ -27,8 +27,9 @@ void version_release (database_t * db, version_t * version)
 
 void changeset_emitted (database_t * db, changeset_t * changeset)
 {
+    /* FIXME - this could just as well be merged into next_changeset. */
     if (changeset->type == ct_implicit_merge)
-        return;
+        return;                         /* FIXME - might have children */
 
     for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
         heap_remove (&db->ready_versions, i);
@@ -89,14 +90,21 @@ size_t changeset_update_branch_hash (struct database * db,
     SHA1_Final ((unsigned char *) hash, &sha);
 
     // Iterate over all the tags that match.  FIXME the duplicate flag is no
-    // long accurate.
+    // long accurate.  FIXME - we want better logic for exact matches following
+    // a generic release.
     for (tag_t * i = database_tag_hash_find (db, hash); i;
          i = database_tag_hash_next (i)) {
         printf ("*** HIT %s %s%s ***\n",
                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
-                i->is_released ? " (DUPLICATE)" : "");
-        i->exact_match = true;
-        i->is_released = true;
+                i->exact_match ? " (DUPLICATE)" : "");
+        if (!i->is_released) {
+            i->exact_match = true;
+            i->is_released = true;
+            i->changeset.parent = changeset;
+            i->changeset.sibling = changeset->children;
+            changeset->children = &i->changeset;
+            heap_insert (&db->ready_tags, i);
+        }
     }
 
     return changes;

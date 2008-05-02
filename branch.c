@@ -207,18 +207,28 @@ static bool better_than (tag_t * new, tag_t * old)
 void assign_tag_point (database_t * db, tag_t * tag)
 {
     // Exact matches have already assigned tag points.
-    if (tag->exact_match)
+    if (tag->exact_match) {
+        fprintf (stderr, "Branch '%s' already exactly matched\n", tag->tag);
         return;
+    }
+
+    // Some branches have no parents.  I think this should only be the trunk.
+    if (tag->parents == tag->parents_end) {
+        fprintf (stderr, "Branch '%s' has no parents\n", tag->tag);
+        return;
+    }
+
+    fprintf (stderr, "Assign branch point to tag '%s'\n", tag->tag);
 
     // We're going to do this the hard way.
-    size_t best_weight = SIZE_MAX;
+    size_t best_weight = 0;
     tag_t * best_branch = NULL;
 
     // First of all, check to see which parent branches contain the most
     // versions from the tag.
     // counts.
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
-        size_t weight = 0;
+        size_t weight = 1;
         file_tag_t ** j = tag->tag_files;
         file_tag_t ** jj = i->branch->tag_files;
         while (j != tag->tag_files_end && j != i->branch->tag_files_end) {
@@ -231,7 +241,7 @@ void assign_tag_point (database_t * db, tag_t * tag)
                 continue;
             }
             // FIXME - misses vendor imports that get merged.
-            if ((*j)->version->branch->tag == i->branch
+            if (((*j)->version && (*j)->version->branch->tag == i->branch)
                 || (*j)->version == (*jj)->version)
                 ++weight;
             ++j;
@@ -286,5 +296,10 @@ void assign_tag_point (database_t * db, tag_t * tag)
 
 void prepare_for_tag_emission (struct database * db)
 {
-    abort();
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        i->is_released = false;
+        i->exact_match = false;
+    }
+
+    branch_heap_init (db, &db->ready_tags);
 }

@@ -98,7 +98,7 @@ struct tag {
     struct branch_tag * tags;
     struct branch_tag * tags_end;
 
-    /// Changesets on this branch.  FIXME - fill this in.
+    /// Changesets on this branch.
     struct changeset ** changesets;
     struct changeset ** changesets_end;
 
