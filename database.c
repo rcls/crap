@@ -105,6 +105,7 @@ void database_destroy (database_t * db)
         free (i->branch_versions);
         free (i->tags);
         free (i->parents);
+        free (i->changesets);
     }
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
@@ -115,6 +116,7 @@ void database_destroy (database_t * db)
     free (db->changesets);
     heap_destroy (&db->ready_versions);
     heap_destroy (&db->ready_changesets);
+    heap_destroy (&db->ready_tags);
     free (db->tag_hash);
 }
 
