@@ -290,9 +290,9 @@ void assign_tag_point (database_t * db, tag_t * tag)
     }
 
     // Set the tag as a child of the changeset.
-    tag->changeset.parent = &best_branch->changeset;
-    tag->changeset.sibling = best_branch->changeset.children;
-    best_branch->changeset.children = &tag->changeset;
+    tag->changeset.parent = best_cs;
+    tag->changeset.sibling = best_cs->children;
+    best_cs->children = &tag->changeset;
 }
 
 
