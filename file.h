@@ -98,10 +98,6 @@ struct tag {
     struct branch_tag * tags;
     struct branch_tag * tags_end;
 
-    /// Changesets on this branch.
-    struct changeset ** changesets;
-    struct changeset ** changesets_end;
-
     /// Have we been released for emission?  A tag may be released for one
     /// of two reasons; either all it's parents have been released, or we had
     /// an exact match in the tag hash.

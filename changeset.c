@@ -19,7 +19,7 @@ void changeset_init (changeset_t * cs)
     cs->unready_count = 0;
     cs->parent = NULL;
     cs->children = NULL;
-    cs->sibling = NULL;
+    cs->children_end = NULL;
 }
 
 
@@ -117,10 +117,11 @@ static void create_implicit_merge (database_t * db, changeset_t * cs)
 
 void changeset_add_child (changeset_t * parent, changeset_t * child)
 {
+    assert (child);
     assert (child->parent == NULL);
     child->parent = parent;
-    child->sibling = parent->children;
-    parent->children = child;
+    ARRAY_EXTEND (parent->children, parent->children_end);
+    parent->children_end[-1] = child;
 }
 
 

@@ -101,9 +101,6 @@ void tag_init (tag_t * tag, const char * name)
 
     tag->tags = NULL;
     tag->tags_end = NULL;
-
-    tag->changesets = NULL;
-    tag->changesets_end = NULL;
 }
 
 

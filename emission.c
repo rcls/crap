@@ -37,14 +37,8 @@ void changeset_emitted (database_t * db, changeset_t * changeset)
                 version_release (db, v);
         }
 
-    for (changeset_t * i = changeset->children; i; i = i->sibling)
-        changeset_release (db, i);
-
-    if (changeset->type != ct_tag)
-        return;
-
-    tag_t * tag = as_tag (changeset);
-    for (changeset_t ** i = tag->changesets; i != tag->changesets_end; ++i)
+    for (changeset_t ** i = changeset->children;
+         i != changeset->children_end; ++i)
         changeset_release (db, *i);
 }
 
@@ -107,10 +101,8 @@ size_t changeset_update_branch_hash (struct database * db,
         if (!i->is_released) {
             i->exact_match = true;
             i->is_released = true;
-            i->changeset.parent = changeset;
-            i->changeset.sibling = changeset->children;
-            changeset->children = &i->changeset;
             heap_insert (&db->ready_tags, i);
+            changeset_add_child (changeset, &i->changeset);
         }
     }
 

@@ -105,11 +105,13 @@ void database_destroy (database_t * db)
         free (i->branch_versions);
         free (i->tags);
         free (i->parents);
-        free (i->changesets);
+        free (i->changeset.children);
     }
 
-    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
+    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
+        free ((*i)->children);
         free (*i);
+    }
 
     free (db->files);
     free (db->tags);

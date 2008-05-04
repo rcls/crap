@@ -266,8 +266,8 @@ void assign_tag_point (database_t * db, tag_t * tag)
     ssize_t best = 0;
     changeset_t * best_cs = &best_branch->changeset;
 
-    for (changeset_t ** i = best_branch->changesets;
-         i != best_branch->changesets_end; ++i) {
+    for (changeset_t ** i = best_branch->changeset.children;
+         i != best_branch->changeset.children_end; ++i) {
         // Go through the changeset versions; if it matches the tag version,
         // then increment current; if the previous version matches the tag
         // version, then decrement current.  Just to make life fun, the
@@ -290,9 +290,8 @@ void assign_tag_point (database_t * db, tag_t * tag)
     }
 
     // Set the tag as a child of the changeset.
-    tag->changeset.parent = best_cs;
-    tag->changeset.sibling = best_cs->children;
-    best_cs->children = &tag->changeset;
+    ARRAY_EXTEND (best_cs->children, best_cs->children_end);
+    best_cs->children_end[-1] = &tag->changeset;
 }
 
 

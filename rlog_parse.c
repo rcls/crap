@@ -119,8 +119,9 @@ int main()
             changeset_emitted (&db, changeset);
             // Add the changeset to its branch.  FIXME handle vendor merges.
             tag_t * branch = changeset->versions->branch->tag;
-            ARRAY_EXTEND (branch->changesets, branch->changesets_end);
-            branch->changesets_end[-1] = changeset;
+            ARRAY_EXTEND (branch->changeset.children,
+                          branch->changeset.children_end);
+            branch->changeset.children_end[-1] = changeset;
 
             changeset_update_branch_hash (&db, changeset);
         }
@@ -141,14 +142,13 @@ int main()
         if ((*i)->type == ct_commit)
             for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
                 ++(*i)->unready_count;
-        for (changeset_t * j = (*i)->children; j; j = j->sibling)
-            ++j->unready_count;
+        for (changeset_t ** j = (*i)->children; j != (*i)->children_end; ++j)
+            ++(*j)->unready_count;
     }
     for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         i->is_released = false;
-        for (changeset_t * j = i->changeset.children; j; j = j->sibling)
-            ++j->unready_count;
-        for (changeset_t ** j = i->changesets; j != i->changesets_end; ++j)
+        for (changeset_t ** j = i->changeset.children;
+             j != i->changeset.children_end; ++j)
             ++(*j)->unready_count;
     }
 

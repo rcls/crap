@@ -30,14 +30,16 @@ struct changeset {
 
     struct version * versions;          ///< List of versions for a commit.
 
+    /// Primary parent of changeset.
+    changeset_t * parent;
+
     /// Child changeset list.  Children cannot be emitted until the parent is.
     /// Possible reasons for being a child:
     ///  - implicit merge of a vendor branch import.
     ///  - commit on a branch.  (NYI).
     ///  - tag/branch off a branch.  (NYI).
-    changeset_t * children;
-    changeset_t * sibling;              ///< Sibling in parent/child relation.
-    changeset_t * parent;               ///< Parent in parent/child relation.
+    changeset_t ** children;
+    changeset_t ** children_end;
 };
 
 
