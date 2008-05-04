@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-
 static void changeset_release (database_t * db, changeset_t * cs)
 {
     assert (cs->unready_count != 0);
@@ -28,17 +27,25 @@ void version_release (database_t * db, version_t * version)
 void changeset_emitted (database_t * db, changeset_t * changeset)
 {
     /* FIXME - this could just as well be merged into next_changeset. */
-    if (changeset->type == ct_implicit_merge)
-        return;                         /* FIXME - might have children */
+/*     if (changeset->type == ct_implicit_merge) */
+/*         return;                         /\* FIXME - might have children *\/ */
 
-    for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
-        heap_remove (&db->ready_versions, i);
-        for (version_t * v = i->children; v; v = v->sibling)
-            version_release (db, v);
-    }
+    if (changeset->type == ct_commit)
+        for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
+            heap_remove (&db->ready_versions, i);
+            for (version_t * v = i->children; v; v = v->sibling)
+                version_release (db, v);
+        }
 
     for (changeset_t * i = changeset->children; i; i = i->sibling)
         changeset_release (db, i);
+
+    if (changeset->type != ct_tag)
+        return;
+
+    tag_t * tag = as_tag (changeset);
+    for (changeset_t ** i = tag->changesets; i != tag->changesets_end; ++i)
+        changeset_release (db, *i);
 }
 
 

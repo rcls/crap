@@ -13,6 +13,71 @@
 #include <stdlib.h>
 #include <time.h>
 
+static const char * format_date (const time_t * time)
+{
+    struct tm dtm;
+    static char date[32];
+    size_t dl = strftime (date, sizeof (date), "%F %T %Z",
+                          localtime_r (time, &dtm));
+    if (dl == 0)
+        // Maybe someone gave us a crap timezone?
+        dl = strftime (date, sizeof (date), "%F %T %Z",
+                       gmtime_r (time, &dtm));
+
+    assert (dl != 0);
+    return date;
+}
+
+
+static void print_commit (const changeset_t * cs)
+{
+    const version_t * v = cs->versions;
+    printf ("%s %s %s %s\n%s\n",
+            format_date (&cs->time),
+            v->branch->tag->tag, v->author, v->commitid, v->log);
+
+    // FIXME - replace this.
+/*         if (changeset_update_branch_hash (&db, changeset) == 0) */
+/*             printf ("[There were no real changes in this changeset]\n"); */
+
+    for (const version_t * i = v; i; i = i->cs_sibling)
+        printf ("\t%s %s\n", i->file->rcs_path, i->version);
+
+    printf ("\n");
+}
+
+
+static void print_implicit_merge (const changeset_t * cs)
+{
+    const version_t * v = cs->parent->versions;
+    printf ("%s %s %s %s\n%s\n",
+            format_date (&cs->time),
+            v->branch->tag->tag, v->author, v->commitid, cs->versions->log);
+
+    // FIXME - replace this.
+/*         if (changeset_update_branch_hash (&db, changeset) == 0) */
+/*             printf ("[There were no real changes in this changeset]\n"); */
+
+    for (const version_t * i = v; i; i = i->cs_sibling)
+        if (v->implicit_merge)
+            printf ("\t%s %s\n", i->file->rcs_path, i->version);
+
+    printf ("\n");
+    
+
+}
+
+
+static void print_tag (changeset_t * cs)
+{
+    tag_t * tag = as_tag (cs);
+    tag->is_released = true;
+    printf ("%s %s %s\n",
+            format_date (&cs->time),
+            tag->branch_versions ? "BRANCH" : "TAG",
+            tag->tag);
+}
+
 
 int main()
 {
@@ -64,63 +129,62 @@ int main()
     // Prepare for the real changeset emission.  This time the tags go through
     // the the usual emission process, and branches block revisions on the
     // branch.
-    prepare_for_emission (&db);
-    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+
+    // Re-do the version->changeset unready counts.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
+        assert (i->changeset.unready_count == 0);
+    }
+    for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i) {
+        assert ((*i)->unready_count == 0);
+    }
+    for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i) {
+        if ((*i)->type == ct_commit)
+            for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
+                ++(*i)->unready_count;
+        for (changeset_t * j = (*i)->children; j; j = j->sibling)
+            ++j->unready_count;
+    }
+    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         i->is_released = false;
+        for (changeset_t * j = i->changeset.children; j; j = j->sibling)
+            ++j->unready_count;
+        for (changeset_t ** j = i->changesets; j != i->changesets_end; ++j)
+            ++(*j)->unready_count;
+    }
+
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+        if (i->changeset.unready_count == 0)
+            heap_insert (&db.ready_changesets, &i->changeset);
+    // Mark the initial versions as ready to emit.
+    for (file_t * f = db.files; f != db.files_end; ++f)
+        for (version_t * j = f->versions; j != f->versions_end; ++j)
+            if (j->parent == NULL)
+                version_release (&db, j);
 
     // Emit the changesets for real.
     emitted_changesets = 0;
     // FIXME - handle emitting tags.
     while ((changeset = next_changeset (&db))) {
-
-        struct tm dtm;
-        char date[32];
-        size_t dl = strftime (date, sizeof (date), "%F %T %Z",
-                              localtime_r (&changeset->time, &dtm));
-        if (dl == 0)
-            // Maybe someone gave us a crap timezone?
-            dl = strftime (date, sizeof (date), "%F %T %Z",
-                           gmtime_r (&changeset->time, &dtm));
-
-        assert (dl != 0);
-
-        version_t * change;
-        const char * branch;
-        const char * log;
-        bool implicit_merge = false;
-        if (changeset->type == ct_implicit_merge) {
-            change = changeset->parent->versions;
-            branch = "";
-            log = "Implicit merge of vendor branch to trunk.\n";
-            implicit_merge = true;
+        switch (changeset->type) {
+        case ct_tag:
+            print_tag (changeset);
+            break;
+        case ct_implicit_merge:
+            print_implicit_merge (changeset);
+            break;
+        case ct_commit:
+            print_commit (changeset);
+            break;
+        default:
+            assert ("Unknown changeset type" == 0);
         }
-        else {
-            change = changeset->versions;
-            if (change->branch)
-                branch = change->branch->tag->tag;
-            else
-                branch = "";
-            log = change->log;
-        }
-
-        printf ("%s %s %s %s\n%s\n",
-                date, branch, change->author, change->commitid, log);
-
-        // FIXME - replace this.
-/*         if (changeset_update_branch_hash (&db, changeset) == 0) */
-/*             printf ("[There were no real changes in this changeset]\n"); */
-
-        for (version_t * v = change; v; v = v->cs_sibling)
-            if (!implicit_merge || v->implicit_merge)
-                printf ("\t%s %s\n", v->file->rcs_path, v->version);
-
-        printf ("\n");
 
         ++emitted_changesets;
         changeset_emitted (&db, changeset);
-
-        for (changeset_t * i = changeset->children; i; i = i->sibling)
-            heap_insert (&db.ready_changesets, i);
+        // Pick off the versions.  FIXME - no need to even use this heap; just
+        // use a differnet changeset_emitted.
+/*         while (!heap_empty (&db.ready_versions)) */
+/*             version_release (&db, heap_pop (&db.ready_versions)); */
     }
 
     fflush (NULL);

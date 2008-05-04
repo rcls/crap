@@ -54,6 +54,8 @@ static int compare_pb (const void * AA, const void * BB)
 
 static parent_branch_t * unemitted_parent (tag_t * t)
 {
+    // FIXME - we should be more deterministic - i.e., the choice of parent
+    // should be more obviously related to external observables.
     parent_branch_t * i = t->parents_end;
     while (i != t->parents)
         if (!(--i)->branch->is_released)

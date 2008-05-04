@@ -86,6 +86,10 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
 void tag_init (tag_t * tag, const char * name)
 {
     changeset_init (&tag->changeset);
+    tag->changeset.type = ct_tag;
+    tag->changeset.time = -1 << (sizeof (time_t) * 8 - 1);
+    assert (tag->changeset.time < 0);
+    assert ((tag->changeset.time & (tag->changeset.time - 1)) == 0);
 
     tag->tag = name;
     tag->tag_files = NULL;

@@ -129,7 +129,7 @@ void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);
 /// Find a @c file_tag for the given @c file and @c tag.
 file_tag_t * find_file_tag (file_t * file, tag_t * tag);
 
-static inline tag_t * as_tag (changeset_t * cs)
+static inline tag_t * as_tag (const changeset_t * cs)
 {
     assert (cs->type == ct_tag);
     return (tag_t *) (((char *) cs) - offsetof (tag_t, changeset));

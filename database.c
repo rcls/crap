@@ -40,6 +40,9 @@ static int compare_changeset (const void * AA, const void * BB)
     if (A->type != B->type)
         return A->type > B->type ? 1 : -1;
 
+    if (A->type == ct_tag)
+        return strcmp (as_tag (A)->tag, as_tag (B)->tag);
+
     if (A->type == ct_implicit_merge) {
         A = A->parent;
         B = B->parent;
