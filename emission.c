@@ -91,18 +91,22 @@ size_t changeset_update_branch_hash (struct database * db,
     SHA1_Final ((unsigned char *) hash, &sha);
 
     // Iterate over all the tags that match.  FIXME the duplicate flag is no
-    // long accurate.  FIXME - we want better logic for exact matches following
-    // a generic release.
+    // longer accurate.
     for (tag_t * i = database_tag_hash_find (db, hash); i;
          i = database_tag_hash_next (i)) {
-        printf ("*** HIT %s %s%s ***\n",
+        fprintf (stderr, "*** HIT %s %s%s ***\n",
                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
                 i->exact_match ? " (DUPLICATE)" : "");
-        if (!i->is_released) {
+        if (!i->is_released || i->changeset.ready_index != SIZE_MAX) {
+            // FIXME - we want better logic for exact matches following a
+            // generic release.  Ideally an exact match would replace a generic
+            // release if this does not risk introducing cycles.
             i->exact_match = true;
+            changeset_add_child (changeset, &i->changeset);
+        }
+        if (!i->is_released) {
             i->is_released = true;
             heap_insert (&db->ready_tags, i);
-            changeset_add_child (changeset, &i->changeset);
         }
     }
 
@@ -114,16 +118,14 @@ static const version_t * preceed (const version_t * v)
 {
     // If cs is not ready to emit, then some version in cs is blocked.  The
     // earliest un-emitted ancestor of that version will be ready to emit.
-    // Search for it.  We could be a bit smarter by seraching harder for the
-    // oldest possible version.  But most cycles are trivial (length 1) so it's
-    // probably not worth the effort.
-    for (version_t * csv = v->commit->versions; csv; csv = csv->cs_sibling) {
-        if (csv->ready_index != SIZE_MAX)
-            continue;                   // Not blocked.
-        for (version_t * v = csv->parent; v; v = v->parent)
-            if (v->ready_index != SIZE_MAX)
-                return v;
-    }
+    // Search for it.  FIXME We should be a bit smarter by searching harder for
+    // the oldest possible version.
+    for (version_t * csv = v->commit->versions; csv; csv = csv->cs_sibling)
+        if (csv->ready_index == SIZE_MAX)
+            for (version_t * v = csv->parent; v; v = v->parent)
+                if (v->ready_index != SIZE_MAX)
+                    return v;
+
     abort();
 }
 

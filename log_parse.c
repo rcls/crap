@@ -324,10 +324,17 @@ static void fill_in_versions_and_parents (file_t * file)
 
         if (!ft->is_branch) {
             ft->version = file_find_version (file, ft->vers);
-            if (ft->version == NULL)
+            if (ft->version == NULL) {
                 warning ("%s: Tag %s version %s does not exist.\n",
                          file->rcs_path, ft->tag->tag, ft->vers);
-            else if (!ft->version->dead)
+                continue;
+            }
+            if (ft->version->time > ft->tag->changeset.time)
+                ft->tag->changeset.time = ft->version->time;
+
+            // FIXME - it would be better to keep dead version tags, because
+            // that would allow better tag matching.
+            if (!ft->version->dead)
                 ++ft;
             continue;
         }
