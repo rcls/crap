@@ -119,9 +119,7 @@ int main()
             changeset_emitted (&db, changeset);
             // Add the changeset to its branch.  FIXME handle vendor merges.
             tag_t * branch = changeset->versions->branch->tag;
-            ARRAY_EXTEND (branch->changeset.children,
-                          branch->changeset.children_end);
-            branch->changeset.children_end[-1] = changeset;
+            ARRAY_APPEND (branch->changeset.children, changeset);
 
             changeset_update_branch_hash (&db, changeset);
         }

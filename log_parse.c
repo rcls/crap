@@ -29,7 +29,7 @@ static file_tag_t * file_add_tag (string_hash_t * tags,
                                   file_t * f,
                                   const char * tag_name)
 {
-    ARRAY_EXTEND (f->file_tags, f->file_tags_end);
+    ARRAY_EXTEND (f->file_tags);
     file_tag_t * file_tag = &f->file_tags_end[-1];
     bool n;
     tag_hash_item_t * tag = string_hash_insert (

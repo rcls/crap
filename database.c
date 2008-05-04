@@ -125,7 +125,7 @@ void database_destroy (database_t * db)
 
 file_t * database_new_file (database_t * db)
 {
-    ARRAY_EXTEND (db->files, db->files_end);
+    ARRAY_EXTEND (db->files);
     file_t * result = &db->files_end[-1];
     result->versions = NULL;
     result->versions_end = NULL;
@@ -142,9 +142,8 @@ changeset_t * database_new_changeset (database_t * db)
     changeset_t * result = xmalloc (sizeof (changeset_t));
     changeset_init (result);
 
-    ARRAY_EXTEND (db->changesets, db->changesets_end);
+    ARRAY_APPEND (db->changesets, result);
 
-    db->changesets_end[-1] = result;
     return result;
 }
 

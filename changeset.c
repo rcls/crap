@@ -120,8 +120,7 @@ void changeset_add_child (changeset_t * parent, changeset_t * child)
     assert (child);
     assert (child->parent == NULL);
     child->parent = parent;
-    ARRAY_EXTEND (parent->children, parent->children_end);
-    parent->children_end[-1] = child;
+    ARRAY_APPEND (parent->children, child);
 }
 
 

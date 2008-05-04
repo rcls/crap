@@ -75,7 +75,7 @@ void heap_insert (heap_t * heap, void * item)
     assert (INDEX (item) == SIZE_MAX);
 
     // Create a bubble at the end.
-    ARRAY_EXTEND (heap->entries, heap->entries_end);
+    ARRAY_EXTEND (heap->entries);
 
     shuffle_up (heap, heap->entries_end - heap->entries - 1, item);
 }
