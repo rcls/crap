@@ -66,6 +66,7 @@ static parent_branch_t * unemitted_parent (tag_t * t)
 
 static void break_cycle (heap_t * heap, tag_t * t)
 {
+    // Find a cycle.
     tag_t * slow = t;
     tag_t * fast = t;
     do {
@@ -74,6 +75,7 @@ static void break_cycle (heap_t * heap, tag_t * t)
     }
     while (slow != fast);
 
+    // Walk through the cycle again, finding the parent with the lowest weight.
     tag_t * best = fast;
     parent_branch_t * best_parent = unemitted_parent (best);
     tag_t * i = best_parent->branch;
@@ -150,7 +152,19 @@ void branch_analyse (database_t * db)
 
     // Now do a cycle breaking pass of the branches.
     heap_t heap;
-    branch_heap_init (db, &heap);
+
+    heap_init (&heap, offsetof (tag_t, changeset.ready_index), tag_compare);
+
+    // Put the tags that are ready right now on to the heap.  Also sort the
+    // parents.
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        i->changeset.unready_count = i->parents_end - i->parents;
+        if (i->changeset.unready_count == 0) {
+            i->is_released = true;
+            heap_insert (&heap, i);
+        }
+    }
+
     while (branch_heap_next (&heap));
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
@@ -160,22 +174,6 @@ void branch_analyse (database_t * db)
         }
 
     heap_destroy (&heap);
-}
-
-
-void branch_heap_init (database_t * db, heap_t * heap)
-{
-    heap_init (heap, offsetof (tag_t, changeset.ready_index), tag_compare);
-
-    // Put the tags that are ready right now on to the heap.  Also sort the
-    // parents.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        i->changeset.unready_count = i->parents_end - i->parents;
-        if (i->changeset.unready_count == 0) {
-            i->is_released = true;
-            heap_insert (heap, i);
-        }
-    }
 }
 
 
@@ -296,10 +294,20 @@ void assign_tag_point (database_t * db, tag_t * tag)
 
 void prepare_for_tag_emission (struct database * db)
 {
+    heap_init (&db->ready_tags,
+               offsetof (tag_t, changeset.ready_index), tag_compare);
+
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         i->is_released = false;
         i->exact_match = false;
     }
 
-    branch_heap_init (db, &db->ready_tags);
+    // Put the tags that are ready right now on to the heap.
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        i->changeset.unready_count += i->parents_end - i->parents;
+        if (i->changeset.unready_count == 0) {
+            i->is_released = true;
+            heap_insert (&db->ready_tags, i);
+        }
+    }
 }

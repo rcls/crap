@@ -89,9 +89,9 @@ int main()
     read_files_versions (&db, &line, &len, stdin);
     free (line);
 
-    branch_analyse (&db);
-
     create_changesets (&db);
+
+    branch_analyse (&db);
 
     // Do a pass through the changesets, this time assigning branch-points.
     prepare_for_emission (&db, NULL);
