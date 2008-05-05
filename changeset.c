@@ -1,5 +1,6 @@
 #include "changeset.h"
 #include "database.h"
+#include "emission.h"
 #include "file.h"
 #include "string_cache.h"
 #include "utils.h"
@@ -85,6 +86,20 @@ static int version_compare_qsort (const void * AA, const void * BB)
 }
 
 
+static int version_compare_heap (const void * AA, const void * BB)
+{
+    const version_t * A = AA;
+    const version_t * B = BB;
+    if (A->time != B->time)
+        return A->time > B->time;
+
+    if (A->file != B->file)
+        return A->file > B->file;
+
+    return strcmp (A->version, B->version);
+}
+
+
 static int cs_compare (const void * AA, const void * BB)
 {
     const changeset_t * A = * (changeset_t * const *) AA;
@@ -155,7 +170,7 @@ void create_changesets (database_t * db)
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (strings_match (tail, next)
-            && next->time - current->time < FUZZ_TIME) {
+            && next->time - current->time <= FUZZ_TIME) {
             tail->cs_sibling = next;
         }
         else {
@@ -185,4 +200,23 @@ void create_changesets (database_t * db)
 
     qsort (db->changesets, db->changesets_end - db->changesets,
            sizeof (changeset_t *), cs_compare);
+
+    // Do a pass through the changesets; this breaks any cycles.
+    heap_t ready_versions;
+    heap_init (&ready_versions,
+               offsetof (version_t, ready_index), version_compare_heap);
+
+    prepare_for_emission (db, &ready_versions);
+    size_t emitted_changesets = 0;
+    changeset_t * changeset;
+    while ((changeset = next_changeset_split (db, &ready_versions))) {
+        changeset_emitted (db, &ready_versions, changeset);
+        ++emitted_changesets;
+    }
+
+    assert (heap_empty (&ready_versions));
+    assert (heap_empty (&db->ready_changesets));
+    assert (emitted_changesets == db->changesets_end - db->changesets);
+
+    heap_destroy (&ready_versions);
 }

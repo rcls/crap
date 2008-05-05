@@ -93,21 +93,8 @@ int main()
 
     create_changesets (&db);
 
-    // Do a pass through the changesets; this breaks any cycles.
-    prepare_for_emission (&db);
-    size_t emitted_changesets = 0;
-    changeset_t * changeset;
-    while ((changeset = next_changeset_split (&db))) {
-        changeset_emitted (&db, changeset);
-        ++emitted_changesets;
-    }
-
-    assert (heap_empty (&db.ready_changesets));
-    assert (emitted_changesets == db.changesets_end - db.changesets);
-
-    // Do a second pass through the changesets, this time assigning
-    // branch-points.
-    prepare_for_emission (&db);
+    // Do a pass through the changesets, this time assigning branch-points.
+    prepare_for_emission (&db, NULL);
     prepare_for_tag_emission (&db);
 
     tag_t * tag;
@@ -115,8 +102,9 @@ int main()
         fprintf (stderr, "Process tag '%s'\n", tag->tag);
         assign_tag_point (&db, tag);
 
+        changeset_t * changeset;
         while ((changeset = next_changeset (&db))) {
-            changeset_emitted (&db, changeset);
+            changeset_emitted (&db, NULL, changeset);
             // Add the changeset to its branch.  FIXME handle vendor merges.
             tag_t * branch = changeset->versions->branch->tag;
             ARRAY_APPEND (branch->changeset.children, changeset);
@@ -129,20 +117,6 @@ int main()
     // the the usual emission process, and branches block revisions on the
     // branch.
 
-    // Re-do the version->changeset unready counts.
-    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
-        assert (i->changeset.unready_count == 0);
-    }
-    for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i) {
-        assert ((*i)->unready_count == 0);
-    }
-    for (changeset_t ** i = db.changesets; i != db.changesets_end; ++i) {
-        if ((*i)->type == ct_commit)
-            for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
-                ++(*i)->unready_count;
-        for (changeset_t ** j = (*i)->children; j != (*i)->children_end; ++j)
-            ++(*j)->unready_count;
-    }
     for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         i->is_released = false;
         for (changeset_t ** j = i->changeset.children;
@@ -150,18 +124,17 @@ int main()
             ++(*j)->unready_count;
     }
 
+    // Re-do the version->changeset unready counts.
+    prepare_for_emission (&db, NULL);
+
+    // Mark the initial tags as ready to emit.
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
         if (i->changeset.unready_count == 0)
             heap_insert (&db.ready_changesets, &i->changeset);
-    // Mark the initial versions as ready to emit.
-    for (file_t * f = db.files; f != db.files_end; ++f)
-        for (version_t * j = f->versions; j != f->versions_end; ++j)
-            if (j->parent == NULL)
-                version_release (&db, j);
 
     // Emit the changesets for real.
-    emitted_changesets = 0;
-    // FIXME - handle emitting tags.
+    size_t emitted_changesets = 0;
+    changeset_t * changeset;
     while ((changeset = next_changeset (&db))) {
         switch (changeset->type) {
         case ct_tag:
@@ -178,11 +151,7 @@ int main()
         }
 
         ++emitted_changesets;
-        changeset_emitted (&db, changeset);
-        // Pick off the versions.  FIXME - no need to even use this heap; just
-        // use a differnet changeset_emitted.
-/*         while (!heap_empty (&db.ready_versions)) */
-/*             version_release (&db, heap_pop (&db.ready_versions)); */
+        changeset_emitted (&db, NULL, changeset);
     }
 
     fflush (NULL);

@@ -320,7 +320,7 @@ static void fill_in_versions_and_parents (file_t * file)
     file_tag_t * ft = file->file_tags;
     for (file_tag_t * i = file->file_tags; i != file->file_tags_end; ++i) {
         if (i != ft)
-            memcpy (ft, i, sizeof (file_tag_t));
+            *ft = *i;
 
         if (!ft->is_branch) {
             ft->version = file_find_version (file, ft->vers);

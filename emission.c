@@ -8,7 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-static void changeset_release (database_t * db, changeset_t * cs)
+
+void changeset_release (database_t * db, changeset_t * cs)
 {
     assert (cs->unready_count != 0);
 
@@ -16,25 +17,27 @@ static void changeset_release (database_t * db, changeset_t * cs)
         heap_insert (&db->ready_changesets, cs);
 }
 
-void version_release (database_t * db, version_t * version)
+void version_release (database_t * db, heap_t * version_heap,
+                      version_t * version)
 {
-    heap_insert (&db->ready_versions, version);
+    if (version_heap)
+        heap_insert (version_heap, version);
 
     changeset_release (db, version->commit);
 }
 
 
-void changeset_emitted (database_t * db, changeset_t * changeset)
+void changeset_emitted (database_t * db, heap_t * ready_versions,
+                        changeset_t * changeset)
 {
     /* FIXME - this could just as well be merged into next_changeset. */
-/*     if (changeset->type == ct_implicit_merge) */
-/*         return;                         /\* FIXME - might have children *\/ */
 
     if (changeset->type == ct_commit)
         for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
-            heap_remove (&db->ready_versions, i);
+            if (ready_versions)
+                heap_remove (ready_versions, i);
             for (version_t * v = i->children; v; v = v->sibling)
-                version_release (db, v);
+                version_release (db, ready_versions, v);
         }
 
     for (changeset_t ** i = changeset->children;
@@ -193,14 +196,14 @@ static const version_t * cycle_find (const version_t * v)
 }
 
 
-changeset_t * next_changeset_split (database_t * db)
+changeset_t * next_changeset_split (database_t * db, heap_t * ready_versions)
 {
-    if (heap_empty (&db->ready_versions))
+    if (heap_empty (ready_versions))
         return NULL;
 
     if (heap_empty (&db->ready_changesets)) {
         // Find a cycle.
-        const version_t * slow = heap_front (&db->ready_versions);
+        const version_t * slow = heap_front (ready_versions);
         const version_t * fast = slow;
         do {
             slow = preceed (slow);
@@ -209,7 +212,7 @@ changeset_t * next_changeset_split (database_t * db)
         while (slow != fast);
 
         // And split it.
-        cycle_split (db, cycle_find (heap_front (&db->ready_versions))->commit);
+        cycle_split (db, cycle_find (heap_front (ready_versions))->commit);
 
         assert (db->ready_changesets.entries
                 != db->ready_changesets.entries_end);
@@ -228,7 +231,7 @@ changeset_t * next_changeset (database_t * db)
 }
 
 
-void prepare_for_emission (database_t * db)
+void prepare_for_emission (database_t * db, heap_t * ready_versions)
 {
     // Re-do the changeset unready counts.
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
@@ -236,13 +239,13 @@ void prepare_for_emission (database_t * db)
             for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
                 ++(*i)->unready_count;
 
-        if ((*i)->parent)
-            ++(*i)->unready_count;
+        for (changeset_t ** j = (*i)->children; j != (*i)->children_end; ++j)
+            ++(*j)->unready_count;
     }
 
     // Mark the initial versions as ready to emit.
     for (file_t * f = db->files; f != db->files_end; ++f)
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             if (j->parent == NULL)
-                version_release (db, j);
+                version_release (db, ready_versions, j);
 }

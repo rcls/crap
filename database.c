@@ -8,19 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int compare_version (const void * AA, const void * BB)
-{
-    const version_t * A = AA;
-    const version_t * B = BB;
-    if (A->time != B->time)
-        return A->time > B->time;
-
-    if (A->file != B->file)
-        return A->file > B->file;
-
-    return strcmp (A->version, B->version);
-}
-
 
 static int compare_changeset (const void * AA, const void * BB)
 {
@@ -85,8 +72,6 @@ void database_init (database_t * db)
     db->tag_hash_num_entries = 0;
     db->tag_hash_num_buckets = 0;
 
-    heap_init (&db->ready_versions,
-               offsetof (version_t, ready_index), compare_version);
     heap_init (&db->ready_changesets,
                offsetof (changeset_t, ready_index), compare_changeset);
 }
@@ -116,7 +101,6 @@ void database_destroy (database_t * db)
     free (db->files);
     free (db->tags);
     free (db->changesets);
-    heap_destroy (&db->ready_versions);
     heap_destroy (&db->ready_changesets);
     heap_destroy (&db->ready_tags);
     free (db->tag_hash);

@@ -17,7 +17,6 @@ typedef struct database {
     struct changeset ** changesets;
     struct changeset ** changesets_end;
 
-    heap_t ready_versions;
     heap_t ready_changesets;
     heap_t ready_tags;
 
