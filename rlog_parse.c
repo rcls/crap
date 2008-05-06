@@ -82,6 +82,14 @@ static void print_tag (changeset_t * cs)
 }
 
 
+static int tag_compare (const void * AA, const void * BB)
+{
+    const tag_t * A = AA;
+    const tag_t * B = BB;
+    return A > B;
+}
+
+
 int main()
 {
     char * line = NULL;
@@ -96,24 +104,56 @@ int main()
 
     branch_analyse (&db);
 
-    // Do a pass through the changesets, this time assigning branch-points.
-    prepare_for_emission (&db, NULL);
-    prepare_for_tag_emission (&db);
+    // Mark commits as children of their branch.
+    for (changeset_t ** j = db.changesets; j != db.changesets_end; ++j)
+        if ((*j)->type == ct_commit) {
+            if ((*j)->versions->branch)
+                ARRAY_APPEND ((*j)->versions->branch->tag->changeset.children,
+                              *j);
+        }
+        else if ((*j)->type == ct_implicit_merge)
+            ARRAY_APPEND (db.tags[0].changeset.children, *j);
+        else
+            abort();
 
-    // FIXME - we do not seem to interleave tag & changeset emissions correctly.
+    // Do a pass through the changesets, this time assigning branch-points.
+    heap_init (&db.ready_tags,
+               offsetof (tag_t, changeset.ready_index), tag_compare);
+
+    // Child unready counts.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
+        i->is_released = false;
+        i->exact_match = false;
+        for (changeset_t ** j = i->changeset.children;
+             j != i->changeset.children_end; ++j)
+            ++(*j)->unready_count;
+        for (branch_tag_t * j = i->tags; j != i->tags_end; ++j)
+            ++j->tag->changeset.unready_count;
+    }
+    prepare_for_emission (&db, NULL);
+
+    // Put the tags that are ready right now on to the heap.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+        if (i->changeset.unready_count == 0) {
+            i->is_released = true;
+            heap_insert (&db.ready_tags, i);
+        }
+
     tag_t * tag;
     while ((tag = branch_heap_next (&db.ready_tags))) {
+        // Release all the children; none should be tags.  (branch_heap_next has
+        // released the tags).
+        for (changeset_t ** i = tag->changeset.children;
+             i != tag->changeset.children_end; ++i) {
+            assert ((*i)->type != ct_tag);
+            changeset_release (&db, *i);
+        }
+
         assign_tag_point (&db, tag);
 
         changeset_t * changeset;
         while ((changeset = next_changeset (&db))) {
             changeset_emitted (&db, NULL, changeset);
-            // Add the changeset to its branch.  FIXME handle vendor merges.
-            if (changeset->type == ct_commit &&
-                changeset->versions->branch) {
-                tag_t * branch = changeset->versions->branch->tag;
-                ARRAY_APPEND (branch->changeset.children, changeset);
-            }
             changeset_update_branch_hash (&db, changeset);
         }
     }

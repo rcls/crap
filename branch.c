@@ -303,24 +303,3 @@ void assign_tag_point (database_t * db, tag_t * tag)
     // Set the tag as a child of the changeset.
     ARRAY_APPEND (best_cs->children, &tag->changeset);
 }
-
-
-void prepare_for_tag_emission (struct database * db)
-{
-    heap_init (&db->ready_tags,
-               offsetof (tag_t, changeset.ready_index), tag_compare);
-
-    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        i->is_released = false;
-        i->exact_match = false;
-    }
-
-    // Put the tags that are ready right now on to the heap.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        i->changeset.unready_count += i->parents_end - i->parents;
-        if (i->changeset.unready_count == 0) {
-            i->is_released = true;
-            heap_insert (&db->ready_tags, i);
-        }
-    }
-}
