@@ -178,7 +178,8 @@ int main()
             heap_insert (&db.ready_changesets, &i->changeset);
 
     // Emit the changesets for real.
-    size_t emitted_changesets = 0;
+    size_t emitted_commits = 0;
+    size_t emitted_implicit_merges = 0;
     changeset_t * changeset;
     while ((changeset = next_changeset (&db))) {
         switch (changeset->type) {
@@ -186,11 +187,11 @@ int main()
             print_tag (changeset);
             break;
         case ct_implicit_merge:
-            ++emitted_changesets;
+            ++emitted_implicit_merges;
             print_implicit_merge (changeset);
             break;
         case ct_commit:
-            ++emitted_changesets;
+            ++emitted_commits;
             print_commit (changeset);
             break;
         default:
@@ -201,8 +202,12 @@ int main()
     }
 
     fflush (NULL);
-    fprintf (stderr, "Emitted %u of %u changesets.\n",
-             emitted_changesets, db.changesets_end - db.changesets);
+    fprintf (stderr,
+             "Emitted %u commits and %u implicit merges (total %s %u).\n",
+             emitted_commits, emitted_implicit_merges,
+             emitted_commits + emitted_implicit_merges
+             == db.changesets_end - db.changesets ? "=" : "!=",
+             db.changesets_end - db.changesets);
 
     size_t matched_branches = 0;
     size_t late_branches = 0;
