@@ -226,12 +226,12 @@ void assign_tag_point (database_t * db, tag_t * tag)
 
     // First of all, check to see which parent branches contain the most
     // versions from the tag.
-    // counts.
+    // FIXME - no need to do this if only one parent.
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
         size_t weight = 1;
         file_tag_t ** j = tag->tag_files;
         file_tag_t ** jj = i->branch->tag_files;
-        while (j != tag->tag_files_end && j != i->branch->tag_files_end) {
+        while (j != tag->tag_files_end && jj != i->branch->tag_files_end) {
             if ((*j)->file < (*jj)->file) {
                 ++j;
                 continue;
@@ -241,7 +241,8 @@ void assign_tag_point (database_t * db, tag_t * tag)
                 continue;
             }
             // FIXME - misses vendor imports that get merged.
-            if (((*j)->version && (*j)->version->branch->tag == i->branch)
+            if (((*j)->version && (*j)->version->branch
+                 && (*j)->version->branch->tag == i->branch)
                 || (*j)->version == (*jj)->version)
                 ++weight;
             ++j;
@@ -271,8 +272,17 @@ void assign_tag_point (database_t * db, tag_t * tag)
         // version, then decrement current.  Just to make life fun, the
         // changeset versions are not sorted by file, so we have to search for
         // them.  FIXME - again, this misses vendor imports.
-        for (version_t * j = (*i)->versions; j; j = j->cs_sibling) {
+        version_t * v;
+        if ((*i)->type == ct_implicit_merge)
+            v = (*i)->parent->versions;
+        else if ((*i)->type == ct_commit)
+            v = (*i)->versions;
+        else
+            continue;                   // Tags play no role here.
+        for (version_t * j = v; j; j = j->cs_sibling) {
             file_tag_t * ft = find_file_tag (j->file, tag);
+            if ((*i)->type == ct_implicit_merge && !j->implicit_merge)
+                continue;
             // FIXME - we should process ft->version==NULL.
             if (ft == NULL || ft->version == NULL)
                 continue;

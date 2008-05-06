@@ -34,7 +34,10 @@ static void print_commit (const changeset_t * cs)
     const version_t * v = cs->versions;
     printf ("%s %s %s %s\n%s\n",
             format_date (&cs->time),
-            v->branch->tag->tag, v->author, v->commitid, v->log);
+            v->branch
+            ? *v->branch->tag->tag ? v->branch->tag->tag : "<trunk>"
+            : "<anon>",
+            v->author, v->commitid, v->log);
 
     // FIXME - replace this.
 /*         if (changeset_update_branch_hash (&db, changeset) == 0) */
@@ -52,7 +55,7 @@ static void print_implicit_merge (const changeset_t * cs)
     const version_t * v = cs->parent->versions;
     printf ("%s %s %s %s\n%s\n",
             format_date (&cs->time),
-            v->branch->tag->tag, v->author, v->commitid, cs->versions->log);
+            v->branch->tag->tag, v->author, v->commitid, v->log);
 
     // FIXME - replace this.
 /*         if (changeset_update_branch_hash (&db, changeset) == 0) */
@@ -106,9 +109,11 @@ int main()
         while ((changeset = next_changeset (&db))) {
             changeset_emitted (&db, NULL, changeset);
             // Add the changeset to its branch.  FIXME handle vendor merges.
-            tag_t * branch = changeset->versions->branch->tag;
-            ARRAY_APPEND (branch->changeset.children, changeset);
-
+            if (changeset->type == ct_commit &&
+                changeset->versions->branch) {
+                tag_t * branch = changeset->versions->branch->tag;
+                ARRAY_APPEND (branch->changeset.children, changeset);
+            }
             changeset_update_branch_hash (&db, changeset);
         }
     }
