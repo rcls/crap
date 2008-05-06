@@ -100,9 +100,9 @@ int main()
     prepare_for_emission (&db, NULL);
     prepare_for_tag_emission (&db);
 
+    // FIXME - we do not seem to interleave tag & changeset emissions correctly.
     tag_t * tag;
     while ((tag = branch_heap_next (&db.ready_tags))) {
-        fprintf (stderr, "Process tag '%s'\n", tag->tag);
         assign_tag_point (&db, tag);
 
         changeset_t * changeset;
@@ -146,16 +146,17 @@ int main()
             print_tag (changeset);
             break;
         case ct_implicit_merge:
+            ++emitted_changesets;
             print_implicit_merge (changeset);
             break;
         case ct_commit:
+            ++emitted_changesets;
             print_commit (changeset);
             break;
         default:
             assert ("Unknown changeset type" == 0);
         }
 
-        ++emitted_changesets;
         changeset_emitted (&db, NULL, changeset);
     }
 
@@ -163,28 +164,29 @@ int main()
     fprintf (stderr, "Emitted %u of %u changesets.\n",
              emitted_changesets, db.changesets_end - db.changesets);
 
-    size_t emitted_tags = 0;
-    size_t emitted_branches = 0;
-    size_t tags = 0;
-    size_t branches = 0;
-    for (tag_t * i = db.tags; i != db.tags_end; ++i)
-        if (i->branch_versions) {
-            ++branches;
-            emitted_branches += i->is_released;
-            if (!i->is_released)
-                fprintf (stderr, "Missed branch %s\n", i->tag);
-        }
-        else {
-            ++tags;
-            emitted_tags += i->is_released;
-            if (!i->is_released)
-                fprintf (stderr, "Missed tag %s\n", i->tag);
-        }
+    size_t matched_branches = 0;
+    size_t late_branches = 0;
+    size_t matched_tags = 0;
+    size_t late_tags = 0;
+    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
+        assert (i->is_released);
+        if (i->branch_versions)
+            if (i->exact_match)
+                ++matched_branches;
+            else
+                ++late_branches;
+        else
+            if (i->exact_match)
+                ++matched_tags;
+            else
+                ++late_tags;
+    }
 
     fprintf (stderr,
-             "Emitted %u + %u = %u of %u + %u = %u branches + tags = total.\n",
-             emitted_branches, emitted_tags, emitted_branches + emitted_tags,
-             branches, tags, branches + tags);
+             "Matched %5u + %5u = %5u branches + tags.\n"
+             "Late    %5u + %5u = %5u branches + tags.\n",
+             matched_branches, matched_tags, matched_branches + matched_tags,
+             late_branches, late_tags, late_branches + late_tags);
 
     string_cache_stats (stderr);
 

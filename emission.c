@@ -98,9 +98,10 @@ size_t changeset_update_branch_hash (struct database * db,
     for (tag_t * i = database_tag_hash_find (db, hash); i;
          i = database_tag_hash_next (i)) {
         fprintf (stderr, "*** HIT %s %s%s ***\n",
-                i->branch_versions ? "BRANCH" : "TAG", i->tag,
-                i->exact_match ? " (DUPLICATE)" : "");
-        if (!i->is_released || i->changeset.ready_index != SIZE_MAX) {
+                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
+                 i->changeset.parent
+                 ? i->exact_match ? " (DUPLICATE)" : " (ALREADY EMITTED)" : "");
+        if (i->changeset.parent == NULL) {
             // FIXME - we want better logic for exact matches following a
             // generic release.  Ideally an exact match would replace a generic
             // release if this does not risk introducing cycles.

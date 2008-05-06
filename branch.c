@@ -206,19 +206,19 @@ static bool better_than (tag_t * new, tag_t * old)
 
 void assign_tag_point (database_t * db, tag_t * tag)
 {
+    const char * bt = tag->branch_versions ? "Branch" : "Tag";
+
     // Exact matches have already assigned tag points.
     if (tag->exact_match) {
-        fprintf (stderr, "Branch '%s' already exactly matched\n", tag->tag);
+        fprintf (stderr, "%s '%s' already exactly matched\n", bt, tag->tag);
         return;
     }
 
     // Some branches have no parents.  I think this should only be the trunk.
     if (tag->parents == tag->parents_end) {
-        fprintf (stderr, "Branch '%s' has no parents\n", tag->tag);
+        fprintf (stderr, "%s '%s' has no parents\n", bt, tag->tag);
         return;
     }
-
-    fprintf (stderr, "Assign branch point to tag '%s'\n", tag->tag);
 
     // We're going to do this the hard way.
     size_t best_weight = 0;
@@ -260,6 +260,9 @@ void assign_tag_point (database_t * db, tag_t * tag)
     // keeping tabs on how many file versions match.  The one with the most
     // matches wins.
     assert (best_branch != NULL);
+
+    fprintf (stderr, "%s '%s' placed on branch '%s'\n",
+             bt, tag->tag, best_branch->tag);
 
     ssize_t current = 0;
     ssize_t best = 0;
