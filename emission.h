@@ -22,6 +22,11 @@ void changeset_emitted (struct database * db, struct heap * ready_versions,
 /// number of files that actually changed.  This may be zero if the changeset
 /// consisted entirely of dead trunk 1.1 revisions corresponding to branch
 /// additions.
+size_t changeset_update_branch_versions (struct database * db,
+                                         struct changeset * changeset);
+
+/// Record the new changeset versions; update the branch hash and find any
+/// matching tags.
 size_t changeset_update_branch_hash (struct database * db,
                                      struct changeset * changeset);
 

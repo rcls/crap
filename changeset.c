@@ -132,7 +132,6 @@ static void create_implicit_merge (database_t * db, changeset_t * cs)
 
 void changeset_add_child (changeset_t * parent, changeset_t * child)
 {
-    assert (child);
     assert (child->parent == NULL);
     child->parent = parent;
     ARRAY_APPEND (parent->children, child);

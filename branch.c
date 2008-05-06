@@ -301,5 +301,5 @@ void assign_tag_point (database_t * db, tag_t * tag)
     }
 
     // Set the tag as a child of the changeset.
-    ARRAY_APPEND (best_cs->children, &tag->changeset);
+    changeset_add_child (best_cs, &tag->changeset);
 }

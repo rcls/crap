@@ -662,6 +662,9 @@ void read_files_versions (database_t * db,
                 i->branch_versions = ARRAY_CALLOC (version_t *,
                                                    db->files_end - db->files);
         }
+        if (i->branch_versions)
+            for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+                i->branch_versions[(*j)->file - db->files] = (*j)->version;
 
         SHA_CTX sha;
         SHA1_Init (&sha);
@@ -674,10 +677,4 @@ void read_files_versions (database_t * db,
 
         i->is_released = false;
     }
-
-    // Fill in all branches with their initial versions.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i)
-        if (i->branch_versions)
-            for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-                i->branch_versions[(*j)->file - db->files] = (*j)->version;
 }

@@ -71,14 +71,59 @@ static void print_implicit_merge (const changeset_t * cs)
 }
 
 
-static void print_tag (changeset_t * cs)
+static void print_tag (const database_t * db, const tag_t * tag)
 {
-    tag_t * tag = as_tag (cs);
-    tag->is_released = true;
     printf ("%s %s %s\n",
-            format_date (&cs->time),
+            format_date (&tag->changeset.time),
             tag->branch_versions ? "BRANCH" : "TAG",
             tag->tag);
+
+    if (tag->exact_match)
+        printf ("Exact match\n");
+
+    if (tag->changeset.parent == NULL) {
+        // Special case.
+        printf ("No parent; create from scratch\n");
+        for (file_tag_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
+            if ((*i)->version && !(*i)->version->dead)
+                printf ("\t%s %s\n",
+                        (*i)->version->file->rcs_path, (*i)->version->version);
+        printf ("\n");
+        return;
+    }
+
+    tag_t * branch;
+    // FIXME - how many places do we have this kind of logic?
+    if (tag->changeset.parent->type == ct_commit)
+        branch = tag->changeset.parent->versions->branch->tag;
+    else if (tag->changeset.parent->type == ct_implicit_merge)
+        branch = &db->tags[0];
+    else if (tag->changeset.parent->type == ct_tag)
+        branch = as_tag (tag->changeset.parent);
+    else
+        abort();
+
+    printf ("Parent branch is '%s'\n", branch->tag);
+
+    file_tag_t ** tf = tag->tag_files;
+    // Go through the current versions on the branch and note any version
+    // fix-ups required.
+    for (file_t * i = db->files; i != db->files_end; ++i) {
+        version_t * bv = branch->branch_versions[i - db->files];
+        if (bv != NULL && bv->dead)
+            bv = NULL;
+        version_t * tv = NULL;
+        if (tf != tag->tag_files_end && (*tf)->file == i)
+            tv = (*tf++)->version;
+        if (tv != NULL && tv->dead)
+            tv = NULL;
+
+        if (bv != tv)
+            printf ("\t%s %s (was %s)\n", i->rcs_path,
+                    tv ? tv->version : "dead", bv ? bv->version : "dead");
+    }
+
+    printf ("\n");
 }
 
 
@@ -172,10 +217,18 @@ int main()
     // Re-do the version->changeset unready counts.
     prepare_for_emission (&db, NULL);
 
-    // Mark the initial tags as ready to emit.
-    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+    // Mark the initial tags as ready to emit, and fill in branches with their
+    // initial versions.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         if (i->changeset.unready_count == 0)
             heap_insert (&db.ready_changesets, &i->changeset);
+        if (i->branch_versions) {
+            memset (i->branch_versions, 0,
+                    sizeof (version_t *) * (db.files_end - db.files));
+            for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+                i->branch_versions[(*j)->file - db.files] = (*j)->version;
+        }
+    }
 
     // Emit the changesets for real.
     size_t emitted_commits = 0;
@@ -184,16 +237,22 @@ int main()
     while ((changeset = next_changeset (&db))) {
         switch (changeset->type) {
         case ct_tag:
-            print_tag (changeset);
+            ;
+            tag_t * tag = as_tag (changeset);
+            tag->is_released = true;
+            print_tag (&db, tag);
             break;
         case ct_implicit_merge:
             ++emitted_implicit_merges;
+            changeset_update_branch_versions (&db, changeset);
             print_implicit_merge (changeset);
             break;
         case ct_commit:
             ++emitted_commits;
+            changeset_update_branch_versions (&db, changeset);
             print_commit (changeset);
             break;
+
         default:
             assert ("Unknown changeset type" == 0);
         }

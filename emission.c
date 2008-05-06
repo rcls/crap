@@ -46,8 +46,8 @@ void changeset_emitted (database_t * db, heap_t * ready_versions,
 }
 
 
-size_t changeset_update_branch_hash (struct database * db,
-                                     struct changeset * changeset)
+size_t changeset_update_branch_versions (struct database * db,
+                                         struct changeset * changeset)
 {
     version_t ** branch;
     bool implicit_merge = false;
@@ -79,8 +79,24 @@ size_t changeset_update_branch_hash (struct database * db,
         }
     }
 
+    return changes;
+}
+
+
+size_t changeset_update_branch_hash (struct database * db,
+                                     struct changeset * changeset)
+{
+    size_t changes = changeset_update_branch_versions (db, changeset);
     if (changes == 0)
         return 0;
+
+    version_t ** branch;
+    if (changeset->type == ct_commit)
+        branch = changeset->versions->branch->tag->branch_versions;
+    else if (changeset->type == ct_implicit_merge)
+        branch = db->tags[0].branch_versions;
+    else
+        abort();        
 
     // Compute the SHA1 hash of the current branch state.
     SHA_CTX sha;
