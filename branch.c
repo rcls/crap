@@ -283,15 +283,15 @@ void assign_tag_point (database_t * db, tag_t * tag)
         else
             continue;                   // Tags play no role here.
         for (version_t * j = v; j; j = j->cs_sibling) {
-            file_tag_t * ft = find_file_tag (j->file, tag);
             if ((*i)->type == ct_implicit_merge && !j->implicit_merge)
                 continue;
+            file_tag_t * ft = find_file_tag (j->file, tag);
             // FIXME - we should process ft->version==NULL.
             if (ft == NULL || ft->version == NULL)
                 continue;
             if (ft->version == j)
                 ++current;
-            else if (ft->version->parent == j)
+            else if (ft->version == j->parent)
                 --current;
         }
         if (current > best) {
