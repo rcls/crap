@@ -88,7 +88,7 @@ static void print_tag (const database_t * db, const tag_t * tag)
             if ((*i)->version && !(*i)->version->dead)
                 printf ("\t%s %s\n",
                         (*i)->version->file->rcs_path, (*i)->version->version);
-        printf ("\n");
+        printf ("WIERD: exact but create from scratch\n\n");
         return;
     }
 
@@ -108,6 +108,8 @@ static void print_tag (const database_t * db, const tag_t * tag)
     file_tag_t ** tf = tag->tag_files;
     // Go through the current versions on the branch and note any version
     // fix-ups required.
+    size_t fixups = 0;
+    size_t keep = 0;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = branch->branch_versions[i - db->files];
         if (bv != NULL && bv->dead)
@@ -118,12 +120,21 @@ static void print_tag (const database_t * db, const tag_t * tag)
         if (tv != NULL && tv->dead)
             tv = NULL;
 
-        if (bv != tv)
+        if (bv != tv) {
+            ++fixups;
             printf ("\t%s %s (was %s)\n", i->rcs_path,
                     tv ? tv->version : "dead", bv ? bv->version : "dead");
+        }
+        else if (bv != NULL)
+            ++keep;
     }
 
-    printf ("\n");
+    if (fixups == 0 && !tag->exact_match)
+        printf ("WIERD: no fixups but not exact match\n");
+    else if (fixups != 0 && tag->exact_match)
+        printf ("WIERD: fixups for exact match\n");
+
+    printf ("Keep %u live file versions\n\n", keep);
 }
 
 

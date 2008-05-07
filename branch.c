@@ -276,10 +276,10 @@ void assign_tag_point (database_t * db, tag_t * tag)
         // changeset versions are not sorted by file, so we have to search for
         // them.  FIXME - again, this misses vendor imports.
         version_t * v;
-        if ((*i)->type == ct_implicit_merge)
-            v = (*i)->parent->versions;
-        else if ((*i)->type == ct_commit)
+        if ((*i)->type == ct_commit)
             v = (*i)->versions;
+        else if ((*i)->type == ct_implicit_merge)
+            v = (*i)->parent->versions;
         else
             continue;                   // Tags play no role here.
         for (version_t * j = v; j; j = j->cs_sibling) {
