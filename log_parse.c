@@ -348,6 +348,9 @@ static void fill_in_versions_and_parents (file_t * file)
         else
             ft->version = NULL;
 
+        if (ft->version != NULL && ft->version->time > ft->tag->changeset.time)
+            ft->tag->changeset.time = ft->version->time;
+
         if (ft->version && ft->version->dead)
             // This hits for branch additions.  We don't log, and unlike tags
             // on dead versions, we keep the file_tag.
