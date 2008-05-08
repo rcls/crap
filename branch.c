@@ -113,6 +113,25 @@ static void break_cycle (heap_t * heap, tag_t * t)
 }
 
 
+static tag_t * branch_heap_next (heap_t * heap)
+{
+    if (heap_empty (heap))
+        return NULL;
+
+    tag_t * tag = heap_pop (heap);
+
+    for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
+        assert (i->tag->changeset.unready_count != 0);
+        if (--i->tag->changeset.unready_count == 0 && !i->tag->is_released) {
+            i->tag->is_released = true;
+            heap_insert (heap, i->tag);
+        }
+    }
+
+    return tag;
+}
+
+
 // FIXME - we don't cope optimally with the situation where a branch is
 // created, files deleted, and then the branch tagged (without rtag).  We'll
 // never know that the tag was placed on the branch; instead we'll place the tag
@@ -175,25 +194,6 @@ static void branch_graph (database_t * db)
         }
 
     heap_destroy (&heap);
-}
-
-
-tag_t * branch_heap_next (heap_t * heap)
-{
-    if (heap_empty (heap))
-        return NULL;
-
-    tag_t * tag = heap_pop (heap);
-
-    for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
-        assert (i->tag->changeset.unready_count != 0);
-        if (--i->tag->changeset.unready_count == 0 && !i->tag->is_released) {
-            i->tag->is_released = true;
-            heap_insert (heap, i->tag);
-        }
-    }
-
-    return tag;
 }
 
 
