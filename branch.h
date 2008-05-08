@@ -23,6 +23,4 @@ typedef struct parent_branch {
 void branch_analyse (struct database * db);
 struct tag * branch_heap_next (struct heap * heap);
 
-void assign_tag_point (struct database * db, struct tag * tag);
-
 #endif

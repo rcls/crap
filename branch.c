@@ -14,6 +14,7 @@
 
 #include "branch.h"
 #include "database.h"
+#include "emission.h"
 #include "file.h"
 #include "utils.h"
 
@@ -116,7 +117,7 @@ static void break_cycle (heap_t * heap, tag_t * t)
 // created, files deleted, and then the branch tagged (without rtag).  We'll
 // never know that the tag was placed on the branch; instead we'll place the tag
 // on the trunk.
-void branch_analyse (database_t * db)
+static void branch_graph (database_t * db)
 {
     // First, go through each tag, and put it on all the branches.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
@@ -204,7 +205,7 @@ static bool better_than (tag_t * new, tag_t * old)
 }
 
 
-void assign_tag_point (database_t * db, tag_t * tag)
+static void assign_tag_point (database_t * db, tag_t * tag)
 {
     const char * bt = tag->branch_versions ? "Branch" : "Tag";
 
@@ -302,4 +303,69 @@ void assign_tag_point (database_t * db, tag_t * tag)
 
     // Set the tag as a child of the changeset.
     changeset_add_child (best_cs, &tag->changeset);
+}
+
+
+static void branch_tree (database_t * db)
+{
+    // Mark commits as children of their branch.
+    for (changeset_t ** j = db->changesets; j != db->changesets_end; ++j)
+        if ((*j)->type == ct_commit) {
+            if ((*j)->versions->branch)
+                ARRAY_APPEND ((*j)->versions->branch->tag->changeset.children,
+                              *j);
+        }
+        else if ((*j)->type == ct_implicit_merge)
+            ARRAY_APPEND (db->tags[0].changeset.children, *j);
+        else
+            abort();
+
+    // Do a pass through the changesets, this time assigning branch-points.
+    heap_init (&db->ready_tags,
+               offsetof (tag_t, changeset.ready_index), tag_compare);
+
+    // Child unready counts.
+    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        i->is_released = false;
+        i->exact_match = false;
+        for (changeset_t ** j = i->changeset.children;
+             j != i->changeset.children_end; ++j)
+            ++(*j)->unready_count;
+        for (branch_tag_t * j = i->tags; j != i->tags_end; ++j)
+            ++j->tag->changeset.unready_count;
+    }
+    prepare_for_emission (db, NULL);
+
+    // Put the tags that are ready right now on to the heap.
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+        if (i->changeset.unready_count == 0) {
+            i->is_released = true;
+            heap_insert (&db->ready_tags, i);
+        }
+
+    tag_t * tag;
+    while ((tag = branch_heap_next (&db->ready_tags))) {
+        // Release all the children; none should be tags.  (branch_heap_next has
+        // released the tags).
+        for (changeset_t ** i = tag->changeset.children;
+             i != tag->changeset.children_end; ++i) {
+            assert ((*i)->type != ct_tag);
+            changeset_release (db, *i);
+        }
+
+        assign_tag_point (db, tag);
+
+        changeset_t * changeset;
+        while ((changeset = next_changeset (db))) {
+            changeset_emitted (db, NULL, changeset);
+            changeset_update_branch_hash (db, changeset);
+        }
+    }
+}
+
+
+void branch_analyse (database_t * db)
+{
+    branch_graph (db);
+    branch_tree (db);
 }

@@ -31,11 +31,11 @@ size_t changeset_update_branch_hash (struct database * db,
                                      struct changeset * changeset);
 
 /// Find the next changeset to emit; split cycles if necessary.
-changeset_t * next_changeset_split (struct database * db,
-                                    struct heap * ready_versions);
+struct changeset * next_changeset_split (struct database * db,
+                                         struct heap * ready_versions);
 
 /// Find the next changeset to emit.
-changeset_t * next_changeset (struct database * db);
+struct changeset * next_changeset (struct database * db);
 
 /// Set up all the unready_counts, and mark initial versions as ready to emit.
 void prepare_for_emission (struct database * db, struct heap * ready_versions);
