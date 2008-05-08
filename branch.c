@@ -300,7 +300,8 @@ static void assign_tag_point (database_t * db, tag_t * tag)
 
 
 /// Record the new changeset versions; update the branch hash and find any
-/// matching tags.
+/// matching tags.  FIXME - suspect we're not coping with vendor merges
+/// correctly.
 static void update_branch_hash (struct database * db,
                                 struct changeset * changeset,
                                 struct heap * ready_tags)
@@ -392,8 +393,8 @@ static void branch_tree (database_t * db)
         tag_t * tag = heap_pop (&ready_tags);
         tag_released (&ready_tags, tag);
 
-        // Release all the children; none should be tags.  (branch_heap_next has
-        // released the tags).
+        // Release all the children; none should be tags.  (tag_released has
+        // released the child tags).
         for (changeset_t ** i = tag->changeset.children;
              i != tag->changeset.children_end; ++i) {
             assert ((*i)->type != ct_tag);
