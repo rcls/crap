@@ -20,6 +20,6 @@ CC=gcc
 
 .PHONY: all clean
 clean:
-	rm *.a *.o
+	rm *.a *.o core.* vgcore.*
 
 -include .deps/*.d

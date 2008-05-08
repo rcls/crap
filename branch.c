@@ -113,13 +113,9 @@ static void break_cycle (heap_t * heap, tag_t * t)
 }
 
 
-static tag_t * branch_heap_next (heap_t * heap)
+// Release all the child tags.
+static void tag_released (heap_t * heap, tag_t * tag)
 {
-    if (heap_empty (heap))
-        return NULL;
-
-    tag_t * tag = heap_pop (heap);
-
     for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
         assert (i->tag->changeset.unready_count != 0);
         if (--i->tag->changeset.unready_count == 0 && !i->tag->is_released) {
@@ -127,8 +123,6 @@ static tag_t * branch_heap_next (heap_t * heap)
             heap_insert (heap, i->tag);
         }
     }
-
-    return tag;
 }
 
 
@@ -156,7 +150,7 @@ static void branch_graph (database_t * db)
         }
     }
 
-    // Now go through each branch and put it onto each tag.
+    // Go through each branch and put it onto each tag.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         for (branch_tag_t * j = i->tags; j != i->tags_end; ++j) {
             ARRAY_EXTEND (j->tag->parents);
@@ -165,32 +159,30 @@ static void branch_graph (database_t * db)
             ++j->tag->changeset.unready_count;
         }
 
-    // Sort the parent lists.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i)
-        qsort (i->parents, i->parents_end - i->parents,
-               sizeof (parent_branch_t), compare_pb);
-
-    // Now do a cycle breaking pass of the branches.
+    // Do a cycle breaking pass of the branches.
     heap_t heap;
 
     heap_init (&heap, offsetof (tag_t, changeset.ready_index), tag_compare);
 
-    // Put the tags that are ready right now on to the heap.  Also sort the
-    // parents.
+    // Release all the tags that are ready right now; also sort the parent
+    // lists.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        i->changeset.unready_count = i->parents_end - i->parents;
+        qsort (i->parents, i->parents_end - i->parents,
+               sizeof (parent_branch_t), compare_pb);
         if (i->changeset.unready_count == 0) {
             i->is_released = true;
             heap_insert (&heap, i);
         }
     }
 
-    while (branch_heap_next (&heap));
+    while (!heap_empty (&heap))
+        tag_released (&heap, heap_pop (&heap));
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         while (!i->is_released) {
             break_cycle (&heap, i);
-            while (branch_heap_next (&heap));
+            while (!heap_empty (&heap))
+                tag_released (&heap, heap_pop (&heap));
         }
 
     heap_destroy (&heap);
@@ -343,8 +335,10 @@ static void branch_tree (database_t * db)
             heap_insert (&db->ready_tags, i);
         }
 
-    tag_t * tag;
-    while ((tag = branch_heap_next (&db->ready_tags))) {
+    while (!heap_empty (&db->ready_tags)) {
+        tag_t * tag = heap_pop (&db->ready_tags);
+        tag_released (&db->ready_tags, tag);
+
         // Release all the children; none should be tags.  (branch_heap_next has
         // released the tags).
         for (changeset_t ** i = tag->changeset.children;
