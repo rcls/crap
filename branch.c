@@ -18,6 +18,7 @@
 #include "file.h"
 #include "utils.h"
 
+#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -298,6 +299,57 @@ static void assign_tag_point (database_t * db, tag_t * tag)
 }
 
 
+/// Record the new changeset versions; update the branch hash and find any
+/// matching tags.
+static void update_branch_hash (struct database * db,
+                                struct changeset * changeset,
+                                struct heap * ready_tags)
+{
+    if (changeset_update_branch_versions (db, changeset) == 0)
+        return;
+
+    version_t ** branch;
+    if (changeset->type == ct_commit)
+        branch = changeset->versions->branch->tag->branch_versions;
+    else if (changeset->type == ct_implicit_merge)
+        branch = db->tags[0].branch_versions;
+    else
+        abort();        
+
+    // Compute the SHA1 hash of the current branch state.
+    SHA_CTX sha;
+    SHA1_Init (&sha);
+    version_t ** branch_end = branch + (db->files_end - db->files);
+    for (version_t ** i = branch; i != branch_end; ++i)
+        if (*i != NULL && !(*i)->dead)
+            SHA1_Update (&sha, i, sizeof (version_t *));
+
+    uint32_t hash[5];
+    SHA1_Final ((unsigned char *) hash, &sha);
+
+    // Iterate over all the tags that match.  FIXME the duplicate flag is no
+    // longer accurate.
+    for (tag_t * i = database_tag_hash_find (db, hash); i;
+         i = database_tag_hash_next (i)) {
+        fprintf (stderr, "*** HIT %s %s%s ***\n",
+                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
+                 i->changeset.parent
+                 ? i->exact_match ? " (DUPLICATE)" : " (ALREADY EMITTED)" : "");
+        if (i->changeset.parent == NULL) {
+            // FIXME - we want better logic for exact matches following a
+            // generic release.  Ideally an exact match would replace a generic
+            // release if this does not risk introducing cycles.
+            i->exact_match = true;
+            changeset_add_child (changeset, &i->changeset);
+        }
+        if (!i->is_released) {
+            i->is_released = true;
+            heap_insert (ready_tags, i);
+        }
+    }
+}
+
+
 static void branch_tree (database_t * db)
 {
     // Mark commits as children of their branch.
@@ -313,7 +365,8 @@ static void branch_tree (database_t * db)
             abort();
 
     // Do a pass through the changesets, this time assigning branch-points.
-    heap_init (&db->ready_tags,
+    heap_t ready_tags;
+    heap_init (&ready_tags,
                offsetof (tag_t, changeset.ready_index), tag_compare);
 
     // Child unready counts.
@@ -332,12 +385,12 @@ static void branch_tree (database_t * db)
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         if (i->changeset.unready_count == 0) {
             i->is_released = true;
-            heap_insert (&db->ready_tags, i);
+            heap_insert (&ready_tags, i);
         }
 
-    while (!heap_empty (&db->ready_tags)) {
-        tag_t * tag = heap_pop (&db->ready_tags);
-        tag_released (&db->ready_tags, tag);
+    while (!heap_empty (&ready_tags)) {
+        tag_t * tag = heap_pop (&ready_tags);
+        tag_released (&ready_tags, tag);
 
         // Release all the children; none should be tags.  (branch_heap_next has
         // released the tags).
@@ -352,9 +405,11 @@ static void branch_tree (database_t * db)
         changeset_t * changeset;
         while ((changeset = next_changeset (db))) {
             changeset_emitted (db, NULL, changeset);
-            changeset_update_branch_hash (db, changeset);
+            update_branch_hash (db, changeset, &ready_tags);
         }
     }
+
+    heap_destroy (&ready_tags);
 }
 
 

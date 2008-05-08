@@ -4,7 +4,6 @@
 #include "file.h"
 
 #include <assert.h>
-#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -76,57 +75,6 @@ size_t changeset_update_branch_versions (struct database * db,
         if (branch[i->file - db->files] != v) {
             branch[i->file - db->files] = v;
             ++changes;
-        }
-    }
-
-    return changes;
-}
-
-
-size_t changeset_update_branch_hash (struct database * db,
-                                     struct changeset * changeset)
-{
-    size_t changes = changeset_update_branch_versions (db, changeset);
-    if (changes == 0)
-        return 0;
-
-    version_t ** branch;
-    if (changeset->type == ct_commit)
-        branch = changeset->versions->branch->tag->branch_versions;
-    else if (changeset->type == ct_implicit_merge)
-        branch = db->tags[0].branch_versions;
-    else
-        abort();        
-
-    // Compute the SHA1 hash of the current branch state.
-    SHA_CTX sha;
-    SHA1_Init (&sha);
-    version_t ** branch_end = branch + (db->files_end - db->files);
-    for (version_t ** i = branch; i != branch_end; ++i)
-        if (*i != NULL && !(*i)->dead)
-            SHA1_Update (&sha, i, sizeof (version_t *));
-
-    uint32_t hash[5];
-    SHA1_Final ((unsigned char *) hash, &sha);
-
-    // Iterate over all the tags that match.  FIXME the duplicate flag is no
-    // longer accurate.
-    for (tag_t * i = database_tag_hash_find (db, hash); i;
-         i = database_tag_hash_next (i)) {
-        fprintf (stderr, "*** HIT %s %s%s ***\n",
-                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
-                 i->changeset.parent
-                 ? i->exact_match ? " (DUPLICATE)" : " (ALREADY EMITTED)" : "");
-        if (i->changeset.parent == NULL) {
-            // FIXME - we want better logic for exact matches following a
-            // generic release.  Ideally an exact match would replace a generic
-            // release if this does not risk introducing cycles.
-            i->exact_match = true;
-            changeset_add_child (changeset, &i->changeset);
-        }
-        if (!i->is_released) {
-            i->is_released = true;
-            heap_insert (&db->ready_tags, i);
         }
     }
 

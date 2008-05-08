@@ -102,7 +102,6 @@ void database_destroy (database_t * db)
     free (db->tags);
     free (db->changesets);
     heap_destroy (&db->ready_changesets);
-    heap_destroy (&db->ready_tags);
     free (db->tag_hash);
 }
 

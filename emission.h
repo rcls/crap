@@ -25,11 +25,6 @@ void changeset_emitted (struct database * db, struct heap * ready_versions,
 size_t changeset_update_branch_versions (struct database * db,
                                          struct changeset * changeset);
 
-/// Record the new changeset versions; update the branch hash and find any
-/// matching tags.
-size_t changeset_update_branch_hash (struct database * db,
-                                     struct changeset * changeset);
-
 /// Find the next changeset to emit; split cycles if necessary.
 struct changeset * next_changeset_split (struct database * db,
                                          struct heap * ready_versions);
