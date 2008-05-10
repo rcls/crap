@@ -3,7 +3,9 @@
 #include "database.h"
 #include "emission.h"
 #include "file.h"
+#include "log.h"
 #include "log_parse.h"
+#include "server.h"
 #include "string_cache.h"
 #include "utils.h"
 
@@ -118,14 +120,25 @@ static void print_tag (const database_t * db, const tag_t * tag)
 }
 
 
-int main()
+int main (int argc, const char * const * argv)
 {
+    if (argc != 3)
+        fatal ("Usage: %s <root> <repo>\n", argv[0]);
+
+    FILE * stream = connect_to_server (argv[1]);
+
+    fprintf (stream,
+             "Global_option -q\n"
+             "Argument --\n"
+             "Argument %s\n"
+             "rlog\n", argv[2]);
+    
     char * line = NULL;
     size_t len = 0;
 
     database_t db;
 
-    read_files_versions (&db, &line, &len, stdin);
+    read_files_versions (&db, &line, &len, stream);
     free (line);
 
     create_changesets (&db);

@@ -60,6 +60,7 @@ static FILE * connect_to_pserver (const char * root,
     const char * path = strchr (host, '/');
     if (path == NULL)
         fatal ("No path in CVS root '%s'\n", root);
+    *rroot = path;
 
     size_t host_len = path - host;
 
@@ -212,36 +213,66 @@ static FILE * connect_to_ext (const char * root, const char * path,
 static FILE * connect_to_fake (const char * root, const char ** rroot)
 {
     const char * program = root + strlen (":fake:");
-    const char * colon = strchr (program, ':');
-    if (colon == NULL)
+    const char * colon1 = strchr (program, ':');
+    if (colon1 == NULL)
+        fatal ("Root '%s' has no remote root\n", root);
+    const char * colon2 = strchr (colon1 + 1, ':');
+    if (colon2 == NULL)
         fatal ("Root '%s' has no remote root\n", root);
 
-    *rroot = colon + 1;
-    program = strndup (program, colon - program);
-    const char * const argv[] = { program, colon + 1, NULL };
+    *rroot = colon2 + 1;
+    program = strndup (program, colon1 - program);
+    const char * argument = strndup (colon1 + 1, colon2 - colon1 - 1);
+    const char * const argv[] = { program, argument, NULL };
     FILE * stream = connect_to_program (program, argv);
     xfree (program);
+    xfree (argument);
     return stream;
 }
 
 
-int main (int argc, const char * const * argv)
+FILE * connect_to_server (const char * root)
 {
-    if (argc != 3)
-        fatal ("Usage: %s <root> <repo>\n", argv[0]);
-
     FILE * stream;
     const char * rroot;
-    if (starts_with (argv[1], ":pserver:"))
-        stream = connect_to_pserver (argv[1], &rroot);
-    else if (starts_with (argv[1], ":fake:"))
-        stream = connect_to_fake (argv[1], &rroot);
-    else if (starts_with (argv[1], ":ext:"))
-        stream = connect_to_ext (argv[1], argv[1] + 5, &rroot);
-    else if (argv[1][0] != '/' && strchr (argv[1], ':') != NULL)
-        stream = connect_to_ext (argv[1], argv[1], &rroot);
+    if (starts_with (root, ":pserver:"))
+        stream = connect_to_pserver (root, &rroot);
+    else if (starts_with (root, ":fake:"))
+        stream = connect_to_fake (root, &rroot);
+    else if (starts_with (root, ":ext:"))
+        stream = connect_to_ext (root, root + 5, &rroot);
+    else if (root[0] != '/' && strchr (root, ':') != NULL)
+        stream = connect_to_ext (root, root, &rroot);
     else
-        stream = connect_to_fork (argv[1], &rroot);
+        stream = connect_to_fork (root, &rroot);
 
-    return 0;
+    fprintf (stream,
+             "Root %s\n"
+
+             "Valid-responses ok error Valid-requests Checked-in New-entry "
+             "Checksum Copy-file Updated Created Update-existing Merged "
+             "Patched Rcs-diff Mode Mod-time Removed Remove-entry "
+             "Set-static-directory Clear-static-directory Set-sticky "
+             "Clear-sticky Template Notified Module-expansion "
+             "Wrapper-rcsOption M Mbinary E F MT\n"
+
+             "valid-requests\n"
+             "UseUnchanged\n",
+             rroot);
+
+    size_t len = 0;
+    char * line = NULL;
+    next_line (&line, &len, stream);
+    if (!starts_with (line, "Valid-requests "))
+        fatal ("Did not get valid requests ('%s')\n", line);
+
+    fprintf (stderr, "%s\n", line);
+
+    next_line (&line, &len, stream);
+    if (strcmp (line, "ok") != 0)
+        fatal ("Did not get 'ok'!\n");
+
+    xfree (line);
+
+    return stream;
 }
