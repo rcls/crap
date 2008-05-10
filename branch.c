@@ -255,7 +255,7 @@ static void assign_tag_point (database_t * db, tag_t * tag)
     // matches wins.
     assert (best_branch != NULL);
 
-    fprintf (stderr, "%s '%s' placed on branch '%s'\n",
+    fprintf (stderr, "%s '%s' placing on branch '%s'\n",
              bt, tag->tag, best_branch->tag);
 
     ssize_t current = 0;
@@ -270,24 +270,26 @@ static void assign_tag_point (database_t * db, tag_t * tag)
         // changeset versions are not sorted by file, so we have to search for
         // them.  FIXME - again, this misses vendor imports.
         version_t * v;
-        if ((*i)->type == ct_commit)
-            v = (*i)->versions;
-        else if ((*i)->type == ct_implicit_merge)
-            v = (*i)->parent->versions;
-        else
+        if ((*i)->type != ct_commit)
             continue;                   // Tags play no role here.
+        v = (*i)->versions;
         for (version_t * j = v; j; j = j->cs_sibling) {
-            if ((*i)->type == ct_implicit_merge && !j->implicit_merge)
+            if (!j->used) {
+                assert (j->implicit_merge);
                 continue;
+            }
             file_tag_t * ft = find_file_tag (j->file, tag);
             // FIXME - we should process ft->version==NULL.
             if (ft == NULL || ft->version == NULL)
                 continue;
-            if (ft->version == j)
+            assert (!ft->version->implicit_merge);
+            if (ft->version == version_normalise (j))
                 ++current;
-            else if (ft->version == j->parent)
+            else if (j->parent != NULL
+                     && ft->version == version_normalise (j->parent))
                 --current;
         }
+
         if (current > best) {
             best = current;
             best_cs = *i;
@@ -312,8 +314,6 @@ static void update_branch_hash (struct database * db,
     version_t ** branch;
     if (changeset->type == ct_commit)
         branch = changeset->versions->branch->tag->branch_versions;
-    else if (changeset->type == ct_implicit_merge)
-        branch = db->tags[0].branch_versions;
     else
         abort();        
 
@@ -351,20 +351,23 @@ static void update_branch_hash (struct database * db,
 }
 
 
+// Do a pass through the changesets, assigning them to their branch in emission
+// order.
+static void branch_changesets (database_t * db)
+{
+    prepare_for_emission (db, NULL);
+
+    for (changeset_t * i; (i = next_changeset (db));) {
+        changeset_emitted (db, NULL, i);
+        assert (i->type == ct_commit);
+        if (i->versions->branch)
+            ARRAY_APPEND (i->versions->branch->tag->changeset.children, i);
+    }
+}
+
+
 static void branch_tree (database_t * db)
 {
-    // Mark commits as children of their branch.
-    for (changeset_t ** j = db->changesets; j != db->changesets_end; ++j)
-        if ((*j)->type == ct_commit) {
-            if ((*j)->versions->branch)
-                ARRAY_APPEND ((*j)->versions->branch->tag->changeset.children,
-                              *j);
-        }
-        else if ((*j)->type == ct_implicit_merge)
-            ARRAY_APPEND (db->tags[0].changeset.children, *j);
-        else
-            abort();
-
     // Do a pass through the changesets, this time assigning branch-points.
     heap_t ready_tags;
     heap_init (&ready_tags,
@@ -417,5 +420,6 @@ static void branch_tree (database_t * db)
 void branch_analyse (database_t * db)
 {
     branch_graph (db);
+    branch_changesets (db);
     branch_tree (db);
 }

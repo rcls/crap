@@ -273,7 +273,10 @@ static int version_compare (const void * AA, const void * BB)
 {
     const version_t * A = AA;
     const version_t * B = BB;
-    return strcmp (A->version, B->version);
+    if (A->version != B->version)
+        return strcmp (A->version, B->version);
+    else
+        return A->implicit_merge - B->implicit_merge;
 }
 
 
@@ -309,6 +312,13 @@ static void fill_in_versions_and_parents (file_t * file)
         while (predecessor (vers, false)) {
             v->parent = file_find_version (file, vers);
             if (v->parent) {
+                // The parent of an implicit merge should be an implicit merge
+                // if possible.
+                if (v->implicit_merge && v->parent != file->versions_end
+                    && v->parent[1].implicit_merge) {
+                    assert (v->parent->version == v->parent[1].version);
+                    ++v->parent;
+                }
                 v->sibling = v->parent->children;
                 v->parent->children = v;
                 break;
@@ -361,7 +371,7 @@ static void fill_in_versions_and_parents (file_t * file)
     }
     file->file_tags_end = ft;
 
-    // Sort the branches by tag.
+    // Sort the branches by version.
     qsort (file->branches, file->branches_end - file->branches,
            sizeof (file_tag_t *), branch_compare);
 
@@ -378,51 +388,29 @@ static void fill_in_versions_and_parents (file_t * file)
 
     // Fill in the branch pointers on the versions.
     for (version_t * i = file->versions; i != file->versions_end; ++i)
-        i->branch = file_find_branch (file, i->version);
-
-    // Now check for vendor branch imports that should be merged to head.  We
-    // look for 1.1.1.x versions that have a date prior to any 1.2 version.
-    // FIXME - 1.2 might have been outdated.
-
-    // We need to check if the initial revision was created by an import or
-    // somehow else.  If it was created by an import, then it will be not dead,
-    // and identical to 1.1.1.1 (FIXME - first on 1.1 branch.).
-    // FIXME - a better way of detecting what imports should be merged would
-    // be to do it at the time of emission.
-    version_t * v1_1 = file_find_version (file, "1.1");
-    if (v1_1 != NULL)
-        if (v1_1->dead || strcmp (v1_1->log, "Initial revision\n") != 0)
-            return;
-
-    version_t * v1_2 = file_find_version (file, "1.2");
-    for (version_t * i = file->versions; i != file->versions_end; ++i) {
-        if (strncmp (i->version, "1.1.1.", 6) != 0
-            || strchr (i->version + 6, '.') != NULL)
-            continue;
-        if (v1_2 && i->time >= v1_2->time)
-            continue;
-        i->implicit_merge = true;
-
-        // Mark 1.1 as dead; the implicit merge will create it instead.
-        v1_1->dead = true;
-    }
+        if (i->implicit_merge) {
+            i->branch = file_find_branch (file, "1.1"); // FIXME.
+            assert (i->branch);
+        }
+        else
+            i->branch = file_find_branch (file, i->version);
 }
 
 
-static void read_file_version (file_t * result,
+static void read_file_version (file_t * file,
                                char ** __restrict__ l, size_t * buffer_len,
                                FILE * f)
 {
     if (!starts_with (*l, "M revision "))
         fatal ("Log (%s) did not have expected 'revision' line: %s\n",
-               result->rcs_path, *l);
+               file->rcs_path, *l);
 
-    version_t * version = file_new_version (result);
+    version_t * version = file_new_version (file);
 
     version->version = cache_string (*l + 11);
     if (!valid_version (version->version))
         fatal ("Log (%s) has malformed version %s\n",
-               result->rcs_path, version->version);
+               file->rcs_path, version->version);
 
     version->author = NULL;
     version->commitid = cache_string ("");
@@ -442,27 +430,27 @@ static void read_file_version (file_t * result,
         if (starts_with (*l, "MT date ")) {
             if (!parse_cvs_date (&version->time, &version->offset, *l + 8))
                 fatal ("Log (%s) date line has unknown format: %s\n",
-                       result->rcs_path, *l);
+                       file->rcs_path, *l);
             have_date = true;
         }
         if (author_next) {
             if (!starts_with (*l, "MT text "))
                 fatal ("Log (%s) author line is not text: %s\n",
-                       result->rcs_path, *l);
+                       file->rcs_path, *l);
             version->author = cache_string (*l + 8);
             author_next = false;
         }
         if (state_next) {
             if (!starts_with (*l, "MT text "))
                 fatal ("Log (%s) state line is not text: %s\n",
-                       result->rcs_path, *l);
+                       file->rcs_path, *l);
             version->dead = starts_with (*l, "MT text dead");
             state_next = false;
         }
         if (commitid_next) {
             if (!starts_with (*l, "MT text "))
                 fatal ("Log (%s) commitid line is not text: %s\n",
-                       result->rcs_path, *l);
+                       file->rcs_path, *l);
             version->commitid = cache_string (*l + 8);
             commitid_next = false;
         }
@@ -482,10 +470,10 @@ static void read_file_version (file_t * result,
         len = next_line (l, buffer_len, f);
 
     if (!have_date)
-        fatal ("Log (%s) does not have date.\n", result->rcs_path);
+        fatal ("Log (%s) does not have date.\n", file->rcs_path);
 
     if (version->author == NULL)
-        fatal ("Log (%s) does not have author.\n", result->rcs_path);
+        fatal ("Log (%s) does not have author.\n", file->rcs_path);
 
     // Snarf the log entry.
     char * log = NULL;
@@ -501,6 +489,15 @@ static void read_file_version (file_t * result,
 
     version->log = cache_string_n (log, log_len);
     free (log);
+
+    // FIXME - improve this test.
+    if (strncmp (version->version, "1.1.1.", 6) == 0
+        && strchr (version->version + 6, '.') == NULL) {
+        // Looks like like a vendor import; create an implicit merge item.
+        ARRAY_EXTEND (file->versions);
+        file->versions_end[-1] = file->versions_end[-2];
+        file->versions_end[-1].implicit_merge = true;
+    }
 }
 
 

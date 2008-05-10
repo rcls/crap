@@ -30,11 +30,6 @@ static int compare_changeset (const void * AA, const void * BB)
     if (A->type == ct_tag)
         return strcmp (as_tag (A)->tag, as_tag (B)->tag);
 
-    if (A->type == ct_implicit_merge) {
-        A = A->parent;
-        B = B->parent;
-    }
-
     if (A->versions->author != B->versions->author)
         return strcmp (A->versions->author, B->versions->author);
 
@@ -52,6 +47,8 @@ static int compare_changeset (const void * AA, const void * BB)
 
     if (A->versions->branch->tag != B->versions->branch->tag)
         return A->versions->branch->tag < B->versions->branch->tag ? -1 : 1;
+
+    assert (A->versions->implicit_merge == B->versions->implicit_merge);
 
     if (A->versions->file != B->versions->file)
         return A->versions->file > B->versions->file;

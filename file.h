@@ -24,7 +24,7 @@ struct file {
     file_tag_t * file_tags;
     file_tag_t * file_tags_end;
 
-    file_tag_t ** branches;
+    file_tag_t ** branches;             // FIXME - do we need this?
     file_tag_t ** branches_end;
 };
 
@@ -42,15 +42,19 @@ file_tag_t * file_find_branch (const file_t * f, const char * s);
 struct version {
     file_t * file;
     const char * version;
-    bool dead;
+    bool dead;                          ///< A dead revision marking a delete.
 
-    /// Indicate that this revision is part of a vendor branch import that
-    /// should be implicitly merged to the trunk.
+    /// Indicate that this revision is the implicit merge of a vendor branch
+    /// import to the trunk.
     bool implicit_merge;
 
+    /// An implicit merge might not actually get used; this flag is set to
+    /// indicate if the revision was actually used.
+    bool used;
+
     version_t * parent;
-    version_t * children;               /// A child, or NULL.
-    version_t * sibling;                /// A sibling, or NULL.
+    version_t * children;               ///< A child, or NULL.
+    version_t * sibling;                ///< A sibling, or NULL.
 
     const char * author;
     const char * commitid;
@@ -64,6 +68,12 @@ struct version {
 
     size_t ready_index;                 ///< Heap index for emitting versions.
 };
+
+
+static inline version_t * version_normalise (version_t * v)
+{
+    return v->implicit_merge ? v - 1 : v;
+}
 
 
 struct file_tag {

@@ -38,7 +38,7 @@ version_t * file_find_version (const file_t * f, const char * s)
         else if (c > 0)
             count = mid;
         else
-            return base + mid;
+            return version_normalise (base + mid);
     }
 
     return NULL;

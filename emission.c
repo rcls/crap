@@ -6,6 +6,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 
 void changeset_release (database_t * db, changeset_t * cs)
@@ -48,32 +49,27 @@ void changeset_emitted (database_t * db, heap_t * ready_versions,
 size_t changeset_update_branch_versions (struct database * db,
                                          struct changeset * changeset)
 {
-    version_t ** branch;
-    bool implicit_merge = false;
-    version_t * versions = changeset->versions;
-    if (changeset->type == ct_implicit_merge) {
-        assert (db->tags[0].tag[0] == 0);
-        branch = db->tags[0].branch_versions;
-        assert (branch);
-        implicit_merge = true;
-        versions = changeset->parent->versions;
-    }
-    else if (changeset->versions->branch == NULL)
+    if (changeset->versions->branch == NULL)
         // FIXME - what should we do about changesets on anonymous branches?
         // Stringing them together into branches is probably more bother
         // than it's worth, so we should probably really just never actually
         // create those changesets.
         return 0;                   // Changeset on unknown branch.
-    else
-        branch = changeset->versions->branch->tag->branch_versions;
 
+    version_t ** branch = changeset->versions->branch->tag->branch_versions;
+    version_t * versions = changeset->versions;
     size_t changes = 0;
+
     for (version_t * i = versions; i; i = i->cs_sibling) {
-        if (implicit_merge && !i->implicit_merge)
+        version_t ** bv = &branch[i->file - db->files];
+        i->used = !i->implicit_merge || *bv == NULL || (*bv)->implicit_merge
+            || strcmp ((*bv)->version, "1.1") == 0;
+        if (!i->used)
             continue;
+
         version_t * v = i->dead ? NULL : i;
-        if (branch[i->file - db->files] != v) {
-            branch[i->file - db->files] = v;
+        if (*bv != v) {
+            *bv = v;
             ++changes;
         }
     }

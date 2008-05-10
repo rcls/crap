@@ -31,7 +31,8 @@ static bool strings_match (const version_t * A, const version_t * B)
     return A->author   == B->author
         && A->commitid == B->commitid
         && Abranch     == Bbranch
-        && A->log      == B->log;
+        && A->log      == B->log
+        && A->implicit_merge == B->implicit_merge;
 }
 
 
@@ -56,6 +57,9 @@ static int version_compare (const version_t * A, version_t * B)
         if (r != 0)
             return r;
     }
+
+    if (A->implicit_merge != B->implicit_merge)
+        return B->implicit_merge - A->implicit_merge;
 
     unsigned long Alh = string_hash_get (A->log);
     unsigned long Blh = string_hash_get (B->log);
@@ -114,19 +118,7 @@ static int cs_compare (const void * AA, const void * BB)
     if (A->type == ct_commit)
         return version_compare (A->versions, B->versions);
 
-    if (A->type == ct_implicit_merge)
-        return version_compare (A->parent->versions, B->parent->versions);
-
     abort();
-}
-
-
-static void create_implicit_merge (database_t * db, changeset_t * cs)
-{
-    changeset_t * merge = database_new_changeset (db);
-    merge->type = ct_implicit_merge;
-    merge->time = cs->time;
-    changeset_add_child (cs, merge);
 }
 
 
@@ -186,16 +178,6 @@ void create_changesets (database_t * db)
     tail->cs_sibling = NULL;
 
     free (version_list);
-
-    // Now walk through the commit changesets and process the implicit merges.
-    // We create an implicit_merge changeset for each one that needs it.
-    size_t num_commits = db->changesets_end - db->changesets;
-    for (size_t i = 0; i != num_commits; ++i)
-        for (version_t * v = db->changesets[i]->versions; v; v = v->cs_sibling)
-            if (v->implicit_merge) {
-                create_implicit_merge (db, db->changesets[i]);
-                break;
-            }
 
     qsort (db->changesets, db->changesets_end - db->changesets,
            sizeof (changeset_t *), cs_compare);

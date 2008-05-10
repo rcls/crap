@@ -9,7 +9,6 @@ typedef struct changeset changeset_t;
 
 /// The possible types of changeset.
 typedef enum changeset_type {
-    ct_implicit_merge,        ///< Implicit merge from vendor branch to trunk.
     ct_tag,                   ///< Tag / branch.
     ct_commit,                ///< A normal commit.
 } changeset_type_t;
@@ -36,8 +35,8 @@ struct changeset {
     /// Child changeset list.  Children cannot be emitted until the parent is.
     /// Possible reasons for being a child:
     ///  - implicit merge of a vendor branch import.
-    ///  - commit on a branch.  (NYI).
-    ///  - tag/branch off a branch.  (NYI).
+    ///  - commit on a branch.
+    ///  - tag/branch off a branch.
     changeset_t ** children;
     changeset_t ** children_end;
 };

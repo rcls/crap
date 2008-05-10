@@ -33,7 +33,7 @@ void string_cache_destroy();
 
 /// Support for hashes indexed by a cached string.
 typedef struct string_hash_head {
-    const char * string;                /// Must be cached.
+    const char * string;                ///< Must be cached.
     struct string_hash_head * next;
 } string_hash_head_t;
 
@@ -41,7 +41,7 @@ typedef struct string_hash_head {
 /// A hash table.
 typedef struct string_hash {
     size_t num_entries;
-    size_t num_buckets;                 /// Always a power of two.
+    size_t num_buckets;                 ///< Always a power of two.
     string_hash_head_t ** buckets;
 } string_hash_t;
 

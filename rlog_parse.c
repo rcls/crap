@@ -32,7 +32,7 @@ static const char * format_date (const time_t * time)
 static void print_commit (const changeset_t * cs)
 {
     const version_t * v = cs->versions;
-    printf ("%s %s %s %s\n%s\n",
+    printf ("%s %s %s %s COMMIT\n%s\n",
             format_date (&cs->time),
             v->branch
             ? *v->branch->tag->tag ? v->branch->tag->tag : "<trunk>"
@@ -44,30 +44,11 @@ static void print_commit (const changeset_t * cs)
 /*             printf ("[There were no real changes in this changeset]\n"); */
 
     for (const version_t * i = v; i; i = i->cs_sibling)
-        printf ("\t%s %s\n", i->file->rcs_path, i->version);
-
-    printf ("\n");
-}
-
-
-static void print_implicit_merge (const changeset_t * cs)
-{
-    const version_t * v = cs->parent->versions;
-    printf ("%s %s %s %s\n%s\n",
-            format_date (&cs->time),
-            v->branch->tag->tag, v->author, v->commitid, v->log);
-
-    // FIXME - replace this.
-/*         if (changeset_update_branch_hash (&db, changeset) == 0) */
-/*             printf ("[There were no real changes in this changeset]\n"); */
-
-    for (const version_t * i = v; i; i = i->cs_sibling)
-        if (v->implicit_merge)
+        if (i->used)
             printf ("\t%s %s\n", i->file->rcs_path, i->version);
 
     printf ("\n");
-    
-
+    fflush (stdout);
 }
 
 
@@ -96,8 +77,6 @@ static void print_tag (const database_t * db, const tag_t * tag)
     // FIXME - how many places do we have this kind of logic?
     if (tag->changeset.parent->type == ct_commit)
         branch = tag->changeset.parent->versions->branch->tag;
-    else if (tag->changeset.parent->type == ct_implicit_merge)
-        branch = &db->tags[0];
     else if (tag->changeset.parent->type == ct_tag)
         branch = as_tag (tag->changeset.parent);
     else
@@ -114,11 +93,15 @@ static void print_tag (const database_t * db, const tag_t * tag)
         version_t * bv = branch->branch_versions[i - db->files];
         if (bv != NULL && bv->dead)
             bv = NULL;
+        if (bv != NULL && bv->implicit_merge)
+            --bv;
         version_t * tv = NULL;
         if (tf != tag->tag_files_end && (*tf)->file == i)
             tv = (*tf++)->version;
         if (tv != NULL && tv->dead)
             tv = NULL;
+        if (tv != NULL && tv->implicit_merge)
+            --tv;
 
         if (bv != tv) {
             ++fixups;
@@ -181,7 +164,6 @@ int main()
 
     // Emit the changesets for real.
     size_t emitted_commits = 0;
-    size_t emitted_implicit_merges = 0;
     changeset_t * changeset;
     while ((changeset = next_changeset (&db))) {
         switch (changeset->type) {
@@ -190,11 +172,6 @@ int main()
             tag_t * tag = as_tag (changeset);
             tag->is_released = true;
             print_tag (&db, tag);
-            break;
-        case ct_implicit_merge:
-            ++emitted_implicit_merges;
-            changeset_update_branch_versions (&db, changeset);
-            print_implicit_merge (changeset);
             break;
         case ct_commit:
             ++emitted_commits;
@@ -211,10 +188,9 @@ int main()
 
     fflush (NULL);
     fprintf (stderr,
-             "Emitted %u commits and %u implicit merges (total %s %u).\n",
-             emitted_commits, emitted_implicit_merges,
-             emitted_commits + emitted_implicit_merges
-             == db.changesets_end - db.changesets ? "=" : "!=",
+             "Emitted %u commits (%s total %u).\n",
+             emitted_commits,
+             emitted_commits == db.changesets_end - db.changesets ? "=" : "!=",
              db.changesets_end - db.changesets);
 
     size_t matched_branches = 0;
