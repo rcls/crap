@@ -103,14 +103,12 @@ static void cycle_split (database_t * db, changeset_t * cs)
     // We split the changeset into to.  We leave all the blocked versions
     // in cs, and put the ready-to-emit into nw.
 
-    // FIXME - we should split implicit merges also.
     changeset_t * new = database_new_changeset (db);
     new->type = ct_commit;
     new->time = cs->time;
     version_t ** cs_v = &cs->versions;
     version_t ** new_v = &new->versions;
     for (version_t * v = cs->versions; v; v = v->cs_sibling) {
-        assert (!v->implicit_merge);    // Not yet handled.
         if (v->ready_index == SIZE_MAX) {
             // Blocked; stays in cs.
             *cs_v = v;

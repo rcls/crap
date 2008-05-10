@@ -522,9 +522,8 @@ static void read_file_versions (database_t * db,
     dummy_tag->vers = empty_string;
     dummy_tag->is_branch = 1;
 
-    do {
+    do
         len = next_line (l, buffer_len, f);
-    }
     while (starts_with (*l, "M head:") ||
            starts_with (*l, "M branch:") ||
            starts_with (*l, "M locks:") ||

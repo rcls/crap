@@ -62,7 +62,7 @@ static void print_tag (const database_t * db, const tag_t * tag)
     if (tag->exact_match)
         printf ("Exact match\n");
 
-    if (tag->changeset.parent == NULL) {
+    if (tag->parent == NULL) {
         // Special case.
         printf ("No parent; create from scratch\n");
         for (file_tag_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
@@ -75,10 +75,10 @@ static void print_tag (const database_t * db, const tag_t * tag)
 
     tag_t * branch;
     // FIXME - how many places do we have this kind of logic?
-    if (tag->changeset.parent->type == ct_commit)
-        branch = tag->changeset.parent->versions->branch->tag;
-    else if (tag->changeset.parent->type == ct_tag)
-        branch = as_tag (tag->changeset.parent);
+    if (tag->parent->type == ct_commit)
+        branch = tag->parent->versions->branch->tag;
+    else if (tag->parent->type == ct_tag)
+        branch = as_tag (tag->parent);
     else
         abort();
 

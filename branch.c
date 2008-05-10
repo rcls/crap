@@ -297,6 +297,7 @@ static void assign_tag_point (database_t * db, tag_t * tag)
     }
 
     // Set the tag as a child of the changeset.
+    tag->parent = best_cs;
     changeset_add_child (best_cs, &tag->changeset);
 }
 
@@ -334,13 +335,14 @@ static void update_branch_hash (struct database * db,
          i = database_tag_hash_next (i)) {
         fprintf (stderr, "*** HIT %s %s%s ***\n",
                  i->branch_versions ? "BRANCH" : "TAG", i->tag,
-                 i->changeset.parent
+                 i->parent
                  ? i->exact_match ? " (DUPLICATE)" : " (ALREADY EMITTED)" : "");
-        if (i->changeset.parent == NULL) {
+        if (i->parent == NULL) {
             // FIXME - we want better logic for exact matches following a
             // generic release.  Ideally an exact match would replace a generic
             // release if this does not risk introducing cycles.
             i->exact_match = true;
+            i->parent = changeset;
             changeset_add_child (changeset, &i->changeset);
         }
         if (!i->is_released) {

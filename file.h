@@ -116,6 +116,8 @@ struct tag {
     /// Have we had an exact match from the tag hash?
     bool exact_match;
 
+    changeset_t * parent;               ///< Changeset we leach off.
+
     changeset_t changeset;              ///< Tag emission changeset.
 
     tag_t * hash_next;                  ///< Next in tag hash table.

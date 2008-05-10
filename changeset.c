@@ -18,7 +18,6 @@ void changeset_init (changeset_t * cs)
 {
     cs->ready_index = SIZE_MAX;
     cs->unready_count = 0;
-    cs->parent = NULL;
     cs->children = NULL;
     cs->children_end = NULL;
 }
@@ -124,8 +123,6 @@ static int cs_compare (const void * AA, const void * BB)
 
 void changeset_add_child (changeset_t * parent, changeset_t * child)
 {
-    assert (child->parent == NULL);
-    child->parent = parent;
     ARRAY_APPEND (parent->children, child);
 }
 
