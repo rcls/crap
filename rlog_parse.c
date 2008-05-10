@@ -90,15 +90,15 @@ static void print_tag (const database_t * db, const tag_t * tag)
         version_t * bv = branch->branch_versions[i - db->files];
         if (bv != NULL && bv->dead)
             bv = NULL;
-        if (bv != NULL && bv->implicit_merge)
-            --bv;
+        if (bv != NULL)
+            bv = version_normalise (bv);
         version_t * tv = NULL;
         if (tf != tag->tag_files_end && (*tf)->file == i)
             tv = (*tf++)->version;
         if (tv != NULL && tv->dead)
             tv = NULL;
-        if (tv != NULL && tv->implicit_merge)
-            --tv;
+        if (tv != NULL)
+            tv = version_normalise (tv);
 
         if (bv != tv) {
             ++fixups;

@@ -2,15 +2,25 @@
 #define UTILS_H
 
 #include <stddef.h>
+#include <stdio.h>
 
+/// Call malloc and die on error.
 void * xmalloc (size_t size)
     __attribute__ ((__malloc__, __warn_unused_result__));
 
+/// Call realloc and die on error.
 void * xrealloc (void * ptr, size_t size)
     __attribute__ ((__warn_unused_result__));
 
+/// Call calloc and die on error.
 void * xcalloc (size_t size)
     __attribute__ ((__malloc__, __warn_unused_result__));
+
+/// Call free.
+void xfree (const void * p);
+
+/// Call getline and do some sanity checking.
+size_t next_line (char ** line, size_t * len, FILE * stream);
 
 #define ARRAY_ALLOC(T,N) ((T *) xmalloc (sizeof (T) * (N)))
 #define ARRAY_CALLOC(T,N) ((T *) xcalloc (sizeof (T) * (N)))

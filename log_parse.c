@@ -42,24 +42,6 @@ static file_tag_t * file_add_tag (string_hash_t * tags,
 }
 
 
-static size_t next_line (char ** line, size_t * len, FILE * stream)
-{
-    ssize_t s = getline (line, len, stream);
-    if (s < 0)
-        fatal ("Unexpected EOF from server.\n");
-
-    if (strlen (*line) < s)
-        fatal ("Got line containing ASCII NUL from server.\n");
-
-    if (s > 0 && (*line)[s - 1] == '\n') {
-        --s;
-        (*line)[s] = 0;
-    }
-
-    return s;
-}
-
-
 static inline bool starts_with (const char * haystack, const char * needle)
 {
     return strncmp (haystack, needle, strlen (needle)) == 0;
