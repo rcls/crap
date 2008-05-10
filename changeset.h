@@ -39,9 +39,6 @@ struct changeset {
 };
 
 
-/// Give @c parent a @c child.
-void changeset_add_child (changeset_t * parent, changeset_t * child);
-
 /// Initialise changeset members.
 void changeset_init (changeset_t * changeset);
 

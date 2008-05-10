@@ -121,12 +121,6 @@ static int cs_compare (const void * AA, const void * BB)
 }
 
 
-void changeset_add_child (changeset_t * parent, changeset_t * child)
-{
-    ARRAY_APPEND (parent->children, child);
-}
-
-
 void create_changesets (database_t * db)
 {
     size_t total_versions = 0;

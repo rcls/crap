@@ -30,8 +30,6 @@ struct file {
 
 version_t * file_new_version (file_t * f);
 
-void file_new_branch (file_t *f, file_tag_t * tag);
-
 /// Find a file version object by the version string.  The version string @c s
 /// need not be cached.
 version_t * file_find_version (const file_t * f, const char * s);
@@ -130,9 +128,6 @@ struct tag {
 
 /// Initialise a @c tag with @c name.
 void tag_init (tag_t * tag, const char * name);
-
-/// Add a new @c file_tag to a @c tag.
-void tag_new_tag_file (tag_t * tag, file_tag_t * file_tag);
 
 /// Find a @c file_tag for the given @c file and @c tag.
 file_tag_t * find_file_tag (file_t * file, tag_t * tag);

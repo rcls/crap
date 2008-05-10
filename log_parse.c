@@ -366,7 +366,7 @@ static void fill_in_versions_and_parents (file_t * file)
             // on dead versions, we keep the file_tag.
             ft->version = NULL;
 
-        file_new_branch (file, ft);
+        ARRAY_APPEND (file->branches, ft);
         ++ft;
     }
     file->file_tags_end = ft;
@@ -633,7 +633,7 @@ void read_files_versions (database_t * db,
 
         for (file_tag_t * j = f->file_tags; j != f->file_tags_end; ++j) {
             j->file = f;
-            tag_new_tag_file (j->tag, j);
+            ARRAY_APPEND (j->tag->tag_files, j);
         }
     }
 

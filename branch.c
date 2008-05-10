@@ -298,7 +298,7 @@ static void assign_tag_point (database_t * db, tag_t * tag)
 
     // Set the tag as a child of the changeset.
     tag->parent = best_cs;
-    changeset_add_child (best_cs, &tag->changeset);
+    ARRAY_APPEND (best_cs->children, &tag->changeset);
 }
 
 
@@ -343,7 +343,7 @@ static void update_branch_hash (struct database * db,
             // release if this does not risk introducing cycles.
             i->exact_match = true;
             i->parent = changeset;
-            changeset_add_child (changeset, &i->changeset);
+            ARRAY_APPEND (changeset->children, &i->changeset);
         }
         if (!i->is_released) {
             i->is_released = true;

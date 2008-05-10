@@ -17,12 +17,6 @@ version_t * file_new_version (file_t * f)
 }
 
 
-void file_new_branch (file_t * f, file_tag_t * tag)
-{
-    ARRAY_APPEND (f->branches, tag);
-}
-
-
 version_t * file_find_version (const file_t * f, const char * s)
 {
     version_t * base = f->versions;
@@ -102,12 +96,6 @@ void tag_init (tag_t * tag, const char * name)
     tag->tags = NULL;
     tag->tags_end = NULL;
     tag->parent = NULL;
-}
-
-
-void tag_new_tag_file (tag_t * t, file_tag_t * ft)
-{
-    ARRAY_APPEND (t->tag_files, ft);
 }
 
 
