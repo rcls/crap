@@ -23,9 +23,6 @@ struct file {
 
     file_tag_t * file_tags;
     file_tag_t * file_tags_end;
-
-    file_tag_t ** branches;             // FIXME - do we need this?
-    file_tag_t ** branches_end;
 };
 
 version_t * file_new_version (file_t * f);
@@ -35,7 +32,10 @@ version_t * file_new_version (file_t * f);
 version_t * file_find_version (const file_t * f, const char * s);
 
 /// Find a branch on which version @c s of file @c lies.
-file_tag_t * file_find_branch (const file_t * f, const char * s);
+file_tag_t * file_find_branch (const file_t * f,
+                               file_tag_t * const * branches,
+                               file_tag_t * const * branches_end,
+                               const char * s);
 
 struct version {
     file_t * file;

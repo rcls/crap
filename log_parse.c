@@ -326,6 +326,9 @@ static void fill_in_versions_and_parents (file_t * file)
         }
     }
 
+    file_tag_t ** branches = NULL;
+    file_tag_t ** branches_end = NULL;
+
     // Fill in the tag version links, and remove tags to dead versions.
     file_tag_t * ft = file->file_tags;
     for (file_tag_t * i = file->file_tags; i != file->file_tags_end; ++i) {
@@ -366,34 +369,35 @@ static void fill_in_versions_and_parents (file_t * file)
             // on dead versions, we keep the file_tag.
             ft->version = NULL;
 
-        ARRAY_APPEND (file->branches, ft);
+        ARRAY_APPEND (branches, ft);
         ++ft;
     }
     file->file_tags_end = ft;
 
     // Sort the branches by version.
-    qsort (file->branches, file->branches_end - file->branches,
+    qsort (branches, branches_end - branches,
            sizeof (file_tag_t *), branch_compare);
 
     // Check for duplicate branches.
-    file_tag_t ** bb = file->branches;
-    for (file_tag_t ** i = file->branches; i != file->branches_end; ++i) {
-        if (i == file->branches || bb[-1] != *i)
+    file_tag_t ** bb = branches;
+    for (file_tag_t ** i = branches; i != branches_end; ++i)
+        if (i == branches || bb[-1] != *i)
             *bb++ = *i;
         else
             fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
                      file->rcs_path, i[0]->tag->tag, i[-1]->tag->tag,
                      i[0]->version->version);
-    }
 
     // Fill in the branch pointers on the versions.
     for (version_t * i = file->versions; i != file->versions_end; ++i)
-        if (i->implicit_merge) {
-            i->branch = file_find_branch (file, "1.1"); // FIXME.
-            assert (i->branch);
-        }
+        if (i->implicit_merge)
+            i->branch = file_find_branch (
+                file, branches, branches_end, "1.1"); // FIXME.
         else
-            i->branch = file_find_branch (file, i->version);
+            i->branch = file_find_branch (
+                file, branches, branches_end, i->version);
+
+    free (branches);
 }
 
 

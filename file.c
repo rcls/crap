@@ -40,7 +40,10 @@ version_t * file_find_version (const file_t * f, const char * s)
 }
 
 
-file_tag_t * file_find_branch (const file_t * f, const char * s)
+file_tag_t * file_find_branch (const file_t * f,
+                               file_tag_t * const * branches,
+                               file_tag_t * const * branches_end,
+                               const char * s)
 {
     char vers[strlen (s) + 1];
     strcpy (vers, s);
@@ -53,8 +56,8 @@ file_tag_t * file_find_branch (const file_t * f, const char * s)
     *dot = 0;
 
     // Now bsearch for the branch.
-    file_tag_t ** base = f->branches;
-    ssize_t count = f->branches_end - f->branches;
+    file_tag_t * const * base = branches;
+    ssize_t count = branches_end - branches;
 
     while (count > 0) {
         size_t mid = count >> 1;

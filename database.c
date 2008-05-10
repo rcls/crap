@@ -79,7 +79,6 @@ void database_destroy (database_t * db)
     for (file_t * i = db->files; i != db->files_end; ++i) {
         free (i->versions);
         free (i->file_tags);
-        free (i->branches);
     }
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
@@ -111,8 +110,6 @@ file_t * database_new_file (database_t * db)
     result->versions_end = NULL;
     result->file_tags = NULL;
     result->file_tags_end = NULL;
-    result->branches = NULL;
-    result->branches_end = NULL;
     return result;
 }
 
