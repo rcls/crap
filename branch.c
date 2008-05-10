@@ -312,11 +312,8 @@ static void update_branch_hash (struct database * db,
     if (changeset_update_branch_versions (db, changeset) == 0)
         return;
 
-    version_t ** branch;
-    if (changeset->type == ct_commit)
-        branch = changeset->versions->branch->tag->branch_versions;
-    else
-        abort();        
+    assert (changeset->type == ct_commit);
+    version_t ** branch = changeset->versions->branch->tag->branch_versions;
 
     // Compute the SHA1 hash of the current branch state.
     SHA_CTX sha;

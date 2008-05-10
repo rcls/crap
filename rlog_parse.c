@@ -74,13 +74,10 @@ static void print_tag (const database_t * db, const tag_t * tag)
     }
 
     tag_t * branch;
-    // FIXME - how many places do we have this kind of logic?
     if (tag->parent->type == ct_commit)
         branch = tag->parent->versions->branch->tag;
-    else if (tag->parent->type == ct_tag)
-        branch = as_tag (tag->parent);
     else
-        abort();
+        branch = as_tag (tag->parent);
 
     printf ("Parent branch is '%s'\n", branch->tag);
 
@@ -166,21 +163,15 @@ int main()
     size_t emitted_commits = 0;
     changeset_t * changeset;
     while ((changeset = next_changeset (&db))) {
-        switch (changeset->type) {
-        case ct_tag:
-            ;
-            tag_t * tag = as_tag (changeset);
-            tag->is_released = true;
-            print_tag (&db, tag);
-            break;
-        case ct_commit:
+        if (changeset->type == ct_commit) {
             ++emitted_commits;
             changeset_update_branch_versions (&db, changeset);
             print_commit (changeset);
-            break;
-
-        default:
-            assert ("Unknown changeset type" == 0);
+        }
+        else {
+            tag_t * tag = as_tag (changeset);
+            tag->is_released = true;
+            print_tag (&db, tag);
         }
 
         changeset_emitted (&db, NULL, changeset);

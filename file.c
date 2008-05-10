@@ -52,8 +52,7 @@ file_tag_t * file_find_branch (const file_t * f,
     if (memchr (vers, '.', dot - vers) == NULL)
         dot = vers;                     // On trunk.
 
-    // Truncate the last component.
-    *dot = 0;
+    *dot = 0;                           // Truncate the last component.
 
     // Now bsearch for the branch.
     file_tag_t * const * base = branches;

@@ -11,7 +11,7 @@
 #include <string.h>
 
 // FIXME - should be configurable.
-#define FUZZ_TIME 3600
+#define FUZZ_TIME 300
 
 
 void changeset_init (changeset_t * cs)
@@ -114,10 +114,9 @@ static int cs_compare (const void * AA, const void * BB)
     if (A->type != B->type)
         return A->type < B->type ? -1 : 1;
 
-    if (A->type == ct_commit)
-        return version_compare (A->versions, B->versions);
+    assert (A->type == ct_commit);
 
-    abort();
+    return version_compare (A->versions, B->versions);
 }
 
 
