@@ -42,12 +42,6 @@ static file_tag_t * file_add_tag (string_hash_t * tags,
 }
 
 
-static inline bool starts_with (const char * haystack, const char * needle)
-{
-    return strncmp (haystack, needle, strlen (needle)) == 0;
-}
-
-
 static inline bool ends_with (const char * haystack, const char * needle)
 {
     size_t h_len = strlen (haystack);

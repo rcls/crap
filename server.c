@@ -5,6 +5,8 @@
 #include <netdb.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+
 
 static const char * pserver_password (const char * root)
 {
@@ -17,7 +19,7 @@ static const char * pserver_password (const char * root)
     if (asprintf (&path, "%s/.cvspass", home) < 0)
         fatal ("Huh? %s\n", strerror (errno));
     FILE * cvspass = fopen (path, "r");
-    free (path);
+    xfree (path);
     if (cvspass == NULL)
         return strdup ("A");
 
@@ -50,7 +52,8 @@ static const char * pserver_password (const char * root)
 }
 
 
-FILE * connect_to_pserver (const char * root, const char * repo)
+static FILE * connect_to_pserver (const char * root,
+                                  const char ** rroot)
 {
     const char * host = root + strlen (":pserver:");
 
@@ -119,6 +122,8 @@ FILE * connect_to_pserver (const char * root, const char * repo)
     freeaddrinfo (ai);
 
     FILE * stream = fdopen (s, "rw+");
+    if (stream == NULL)
+        fatal ("fdopen failed: %s\n", strerror (errno));
 
     const char * password = pserver_password (root);
     fprintf (stderr, "Password '%s'\n", password);
@@ -140,12 +145,103 @@ FILE * connect_to_pserver (const char * root, const char * repo)
     return stream;
 }
 
+
+static FILE * connect_to_program (const char * program,
+                                  const char * const argv[])
+{
+    int sockets[2];
+    if (socketpair (AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
+        fatal ("socketpair failed: %s\n", strerror (errno));
+
+    int pid = fork();
+    if (pid < 0)
+        fatal ("fork() failed: %s\n", strerror (errno));
+
+    if (pid != 0) {
+        // The parent
+        FILE * stream = fdopen (sockets[0], "rw+");
+        if (stream == NULL)
+            fatal ("fdopen failed: %s\n", strerror (errno));
+        close (sockets[1]);
+        return stream;
+    }
+
+    // The child.
+    close (sockets[0]);
+    if (dup2 (sockets[1], 0) < 0)
+        fatal ("dup2 failed: %s\n", strerror (errno));
+    if (dup2 (sockets[1], 1) < 0)
+        fatal ("dup2 failed: %s\n", strerror (errno));
+    if (sockets[1] > 1)
+        close (sockets[1]);
+
+    execvp (program, (char * const *) argv);
+    fatal ("exec failed: %s\n", strerror (errno));
+}
+
+
+static FILE * connect_to_fork (const char * path, const char ** rroot)
+{
+    static const char * const argv[] = { "cvs", "server", NULL };
+    *rroot = path;
+    return connect_to_program ("cvs", argv);
+}
+
+
+static FILE * connect_to_ext (const char * root, const char * path,
+                              const char ** rroot)
+{
+    const char * program = getenv ("CVS_RSH");
+    if (program == NULL)
+        program = "ssh";
+    else
+        program += strlen ("CVS_RSH=");
+
+    *rroot = strchr (path, '/');
+    if (*rroot == NULL)
+        fatal ("Root '%s' has no remote root.\n", root);
+    const char * host = strndup (path, *rroot - path);
+    ++*rroot;
+    const char * const argv[] = { program, host, "cvs", "server", NULL };
+    FILE * stream = connect_to_program (program, argv);
+    xfree (host);
+    return stream;
+}
+
+
+static FILE * connect_to_fake (const char * root, const char ** rroot)
+{
+    const char * program = root + strlen (":fake:");
+    const char * colon = strchr (program, ':');
+    if (colon == NULL)
+        fatal ("Root '%s' has no remote root\n", root);
+
+    *rroot = colon + 1;
+    program = strndup (program, colon - program);
+    const char * const argv[] = { program, colon + 1, NULL };
+    FILE * stream = connect_to_program (program, argv);
+    xfree (program);
+    return stream;
+}
+
+
 int main (int argc, const char * const * argv)
 {
     if (argc != 3)
         fatal ("Usage: %s <root> <repo>\n", argv[0]);
 
-    connect_to_pserver (argv[1], argv[2]);
+    FILE * stream;
+    const char * rroot;
+    if (starts_with (argv[1], ":pserver:"))
+        stream = connect_to_pserver (argv[1], &rroot);
+    else if (starts_with (argv[1], ":fake:"))
+        stream = connect_to_fake (argv[1], &rroot);
+    else if (starts_with (argv[1], ":ext:"))
+        stream = connect_to_ext (argv[1], argv[1] + 5, &rroot);
+    else if (argv[1][0] != '/' && strchr (argv[1], ':') != NULL)
+        stream = connect_to_ext (argv[1], argv[1], &rroot);
+    else
+        stream = connect_to_fork (argv[1], &rroot);
 
     return 0;
 }
