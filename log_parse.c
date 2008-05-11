@@ -55,8 +55,8 @@ static inline bool ends_with (const char * haystack, const char * needle)
 /// the offset and hence is a real Unix time.
 static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 {
-    // We parse (YY|YYYY)-MM-DD HH:MM(:SS)?( (+|-)HH(MM?))?  This is just like
-    // cvsps.  We are a little looser about the digit sequences.
+    // We parse (YY|YYYY)[-/]MM[-/]DD HH:MM(:SS)?( (+|-)HH(MM?))?  This is just
+    // like cvsps.  We are a little looser about the digit sequences.
     if (!isdigit (date[0]) || !isdigit (date[1]))
         return false;
 
@@ -68,15 +68,17 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 
     char * d;
     unsigned long year = strtoul (date, &d, 10);
-    if (year >= 10000 || *d++ != '-')
+    if (year >= 10000 || (*d != '-' && *d != '/'))
         return false;
 
+    ++d;
     dtm.tm_year += year;
 
     dtm.tm_mon = strtoul (d, &d, 10) - 1;
-    if (dtm.tm_mon < 0 || dtm.tm_mon > 11 || *d++ != '-')
+    if (dtm.tm_mon < 0 || dtm.tm_mon > 11 || (*d != '-' && *d != '/'))
         return false;
 
+    ++d;
     dtm.tm_mday = strtoul (d, &d, 10);
     if (dtm.tm_mday < 1 || dtm.tm_mday > 31 || *d++ != ' ')
         return false;
@@ -377,36 +379,19 @@ static void fill_in_versions_and_parents (file_t * file)
 }
 
 
-static void read_file_version (file_t * file,
-                               char ** __restrict__ l, size_t * buffer_len,
-                               FILE * f)
+static size_t read_mt_key_values (file_t * file,
+                                  version_t * version,
+                                  char ** __restrict__ l, size_t * buffer_len,
+                                  FILE * f)
 {
-    if (!starts_with (*l, "M revision "))
-        fatal ("Log (%s) did not have expected 'revision' line: %s\n",
-               file->rcs_path, *l);
-
-    version_t * version = file_new_version (file);
-
-    version->version = cache_string (*l + 11);
-    if (!valid_version (version->version))
-        fatal ("Log (%s) has malformed version %s\n",
-               file->rcs_path, version->version);
-
-    version->author = NULL;
-    version->commitid = cache_string ("");
-//     version->time = 0;
-//     version->offset = 0;
     bool have_date = false;
-    version->dead = false;
-    version->children = NULL;
-    version->sibling = NULL;
 
     bool state_next = false;
     bool author_next = false;
     bool commitid_next = false;
 
-    size_t len = next_line (l, buffer_len, f);
-    while (starts_with (*l, "MT ")) {
+    size_t len;
+    do {
         if (starts_with (*l, "MT date ")) {
             if (!parse_cvs_date (&version->time, &version->offset, *l + 8))
                 fatal ("Log (%s) date line has unknown format: %s\n",
@@ -443,17 +428,96 @@ static void read_file_version (file_t * file,
 
         len = next_line (l, buffer_len, f);
     }
-
-    // We don't care about the 'branches:' annotation; we reconstruct the branch
-    // information ourselves.
-    if (starts_with (*l, "M branches: "))
-        len = next_line (l, buffer_len, f);
+    while (starts_with (*l, "MT "));
 
     if (!have_date)
         fatal ("Log (%s) does not have date.\n", file->rcs_path);
 
     if (version->author == NULL)
         fatal ("Log (%s) does not have author.\n", file->rcs_path);
+
+    return len;
+}
+
+
+static void read_m_key_values (file_t * file, version_t * version,
+                               const char * l, FILE * f)
+{
+    bool have_date = false;
+
+    while (l) {
+        const char * end = strchr (l, ';');
+        while (end != NULL && end[1] && (end[1] != ' ' || end[2] != ' '))
+            end = strchr (end + 1, ';');
+        if (end == NULL)
+            break;
+
+        if (starts_with (l, "date: ")) {
+            l += 6;
+            char date[end - l + 1];
+            memcpy (date, l, end - l);
+            date[end - l] = 0;
+            if (!parse_cvs_date (&version->time, &version->offset, date))
+                fatal ("Log (%s) date has unknown format: %s\n",
+                       file->rcs_path, date);
+            have_date = true;
+        }
+        else if (starts_with (l, "author: "))
+            version->author = cache_string_n (l + 8, end - l - 8);
+        else if (starts_with (l, "state: dead"))
+            version->dead = true;
+        else if (starts_with (l, "commitid: "))
+            version->commitid = cache_string_n (l + 10, end - l - 10);
+
+        l = end + 1;
+        if (l[0] == ' ' && l[1] == ' ')
+            l += 2;
+    }
+
+    if (!have_date)
+        fatal ("Log (%s) does not have date.\n", file->rcs_path);
+
+    if (version->author == NULL)
+        fatal ("Log (%s) does not have author.\n", file->rcs_path);
+}
+
+
+static void read_file_version (file_t * file,
+                               char ** __restrict__ l, size_t * buffer_len,
+                               FILE * f)
+{
+    if (!starts_with (*l, "M revision "))
+        fatal ("Log (%s) did not have expected 'revision' line: %s\n",
+               file->rcs_path, *l);
+
+    version_t * version = file_new_version (file);
+
+    version->version = cache_string (*l + 11);
+    if (!valid_version (version->version))
+        fatal ("Log (%s) has malformed version %s\n",
+               file->rcs_path, version->version);
+
+    version->author = NULL;
+    version->commitid = cache_string ("");
+    version->dead = false;
+    version->children = NULL;
+    version->sibling = NULL;
+
+    size_t len = next_line (l, buffer_len, f);
+    if (starts_with (*l, "MT "))
+        len = read_mt_key_values (file, version, l, buffer_len, f);
+    else if (starts_with (*l, "M date: ")) {
+        read_m_key_values (file, version, *l + 2, f);
+        len = next_line (l, buffer_len, f);
+    }
+    else
+        fatal ("Log (%s) has malformed date/author/state: %s",
+               file->rcs_path, *l);
+
+    // We don't care about the 'branches:' annotation; we reconstruct the branch
+    // information ourselves.
+    if (starts_with (*l, "M branches: "))
+        len = next_line (l, buffer_len, f);
 
     // Snarf the log entry.
     char * log = NULL;
