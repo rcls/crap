@@ -133,12 +133,12 @@ static void cycle_split (database_t * db, changeset_t * cs)
              cs->versions->branch ? cs->versions->branch->tag->tag : "",
              cs->versions->author, cs->versions->log);
     for (const version_t * v = new->versions; v; v = v->cs_sibling)
-        fprintf (stderr, "    %s:%s\n", v->file->rcs_path, v->version);
+        fprintf (stderr, "    %s:%s\n", v->file->path, v->version);
 
     fprintf (stderr, "Deferring:\n");
 
     for (const version_t * v = cs->versions; v; v = v->cs_sibling)
-        fprintf (stderr, "    %s:%s\n", v->file->rcs_path, v->version);
+        fprintf (stderr, "    %s:%s\n", v->file->path, v->version);
 }
 
 

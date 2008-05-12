@@ -317,7 +317,7 @@ static void fill_in_versions_and_parents (file_t * file)
             ft->version = file_find_version (file, ft->vers);
             if (ft->version == NULL) {
                 warning ("%s: Tag %s version %s does not exist.\n",
-                         file->rcs_path, ft->tag->tag, ft->vers);
+                         file->path, ft->tag->tag, ft->vers);
                 continue;
             }
             if (ft->version->time > ft->tag->changeset.time)
@@ -363,7 +363,7 @@ static void fill_in_versions_and_parents (file_t * file)
             *bb++ = *i;
         else
             fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
-                     file->rcs_path, i[0]->tag->tag, i[-1]->tag->tag,
+                     file->path, i[0]->tag->tag, i[-1]->tag->tag,
                      i[0]->version->version);
 
     // Fill in the branch pointers on the versions.
@@ -548,7 +548,7 @@ static void read_file_version (file_t * file,
 static void read_file_versions (database_t * db,
                                 string_hash_t * tags,
                                 char ** restrict l, size_t * buffer_len,
-                                FILE * f)
+                                FILE * f, const char * prefix)
 {
     if (!starts_with (*l, "M RCS file: /"))
         fatal ("Expected RCS file line, not %s\n", *l);
@@ -558,7 +558,21 @@ static void read_file_versions (database_t * db,
         fatal ("RCS file name does not end with ',v': %s\n", *l);
 
     file_t * file = database_new_file (db);
-    file->rcs_path = cache_string_n (*l + 12, len - 14);
+    file->rcs_path = cache_string_n (*l + 12, len - 12);
+
+    if (!starts_with (*l + 12, prefix))
+        fatal ("RCS file name '%s' does not start with prefix '%s'\n",
+               *l + 12, prefix);
+
+    (*l)[len - 2] = 0;                 // Remove the ',v'
+    char * last_slash = strrchr (*l, '/');
+    if (last_slash != NULL && last_slash - *l >= 18 &&
+        memcmp (last_slash - 6, "/Attic", 6) == 0)
+        // Remove that Attic portion.  We can't use strcpy because the strings
+        // may overlap.
+        memmove (last_slash - 6, last_slash, strlen (last_slash + 1));
+
+    file->path = cache_string (*l + 12 + strlen (prefix));
 
     // Add a fake branch for the trunk.
     const char * empty_string = cache_string ("");
@@ -647,7 +661,9 @@ static int tag_compare (const void * AA, const void * BB)
 
 
 void read_files_versions (database_t * db,
-                          char ** __restrict__ l, size_t * buffer_len, FILE * f)
+                          char ** __restrict__ l, size_t * buffer_len,
+                          FILE * f,
+                          const char * prefix)
 {
     database_init (db);
 
@@ -662,7 +678,7 @@ void read_files_versions (database_t * db,
             continue;
         }
 
-        read_file_versions (db, &tags, l, buffer_len, f);
+        read_file_versions (db, &tags, l, buffer_len, f, prefix);
     }
 
     // Sort the list of files.

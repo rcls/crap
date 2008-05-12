@@ -34,44 +34,54 @@ static const char * format_date (const time_t * time)
 static void print_commit (const changeset_t * cs)
 {
     const version_t * v = cs->versions;
-    printf ("%s %s %s %s COMMIT\n%s\n",
-            format_date (&cs->time),
-            v->branch
-            ? *v->branch->tag->tag ? v->branch->tag->tag : "<trunk>"
-            : "<anon>",
-            v->author, v->commitid, v->log);
+    if (!v->branch) {
+        fprintf (stderr, "Skip %s <anon> %s %s COMMIT\n%s\n",
+                 format_date (&cs->time), v->author, v->commitid, v->log);
+        return;
+    }
 
-    // FIXME - replace this.
-/*         if (changeset_update_branch_hash (&db, changeset) == 0) */
-/*             printf ("[There were no real changes in this changeset]\n"); */
+    printf ("commit refs/heads/%s\n",
+            *v->branch->tag->tag ? v->branch->tag->tag : "master");
+    printf ("committer %s <%s> %ld +0000\n", v->author, v->author, v->time);
+    printf ("data %u\n%s\n", strlen (v->log), v->log);
 
-    for (const version_t * i = v; i; i = i->cs_sibling)
-        if (i->used)
-            printf ("\t%s %s\n", i->file->rcs_path, i->version);
+    for (const version_t * i = v; i; i = i->cs_sibling) {
+        if (!i->used)
+            continue;
+        if (i->dead) {
+            printf ("D %s\n", v->file->path);
+            continue;
+        }
 
-    printf ("\n");
-    fflush (stdout);
+        const char * content = xasprintf ("File %s version %s\n",
+                                          v->file->path, v->version);
+
+        printf ("M 644 inline %s\ndata %u\n%s", v->file->path,
+                strlen (content), content);
+
+        xfree (content);
+    }
 }
 
 
 static void print_tag (const database_t * db, const tag_t * tag)
 {
-    printf ("%s %s %s\n",
+    fprintf (stderr, "%s %s %s\n",
             format_date (&tag->changeset.time),
             tag->branch_versions ? "BRANCH" : "TAG",
             tag->tag);
 
     if (tag->exact_match)
-        printf ("Exact match\n");
+        fprintf (stderr, "Exact match\n");
 
     if (tag->parent == NULL) {
         // Special case.
-        printf ("No parent; create from scratch\n");
+        fprintf (stderr, "No parent; create from scratch\n");
         for (file_tag_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
             if ((*i)->version && !(*i)->version->dead)
-                printf ("\t%s %s\n",
-                        (*i)->version->file->rcs_path, (*i)->version->version);
-        printf ("WIERD: exact but create from scratch\n\n");
+                fprintf (stderr, "\t%s %s\n",
+                        (*i)->version->file->path, (*i)->version->version);
+        fprintf (stderr, "WIERD: exact but create from scratch\n\n");
         return;
     }
 
@@ -81,7 +91,7 @@ static void print_tag (const database_t * db, const tag_t * tag)
     else
         branch = as_tag (tag->parent);
 
-    printf ("Parent branch is '%s'\n", branch->tag);
+    fprintf (stderr, "Parent branch is '%s'\n", branch->tag);
 
     file_tag_t ** tf = tag->tag_files;
     // Go through the current versions on the branch and note any version
@@ -104,19 +114,19 @@ static void print_tag (const database_t * db, const tag_t * tag)
 
         if (bv != tv) {
             ++fixups;
-            printf ("\t%s %s (was %s)\n", i->rcs_path,
-                    tv ? tv->version : "dead", bv ? bv->version : "dead");
+            fprintf (stderr, "\t%s %s (was %s)\n", i->path,
+                     tv ? tv->version : "dead", bv ? bv->version : "dead");
         }
         else if (bv != NULL)
             ++keep;
     }
 
     if (fixups == 0 && !tag->exact_match)
-        printf ("WIERD: no fixups but not exact match\n");
+        fprintf (stderr, "WIERD: no fixups but not exact match\n");
     else if (fixups != 0 && tag->exact_match)
-        printf ("WIERD: fixups for exact match\n");
+        fprintf (stderr, "WIERD: fixups for exact match\n");
 
-    printf ("Keep %u live file versions\n\n", keep);
+    fprintf (stderr, "Keep %u live file versions\n\n", keep);
 }
 
 
@@ -125,7 +135,9 @@ int main (int argc, const char * const * argv)
     if (argc != 3)
         fatal ("Usage: %s <root> <repo>\n", argv[0]);
 
-    FILE * stream = connect_to_server (argv[1]);
+    const char * rroot;
+    FILE * stream = connect_to_server (argv[1], &rroot);
+    const char * prefix = xasprintf ("%s/%s/", rroot, argv[2]);
 
     fprintf (stream,
              "Global_option -q\n"
@@ -138,9 +150,10 @@ int main (int argc, const char * const * argv)
 
     database_t db;
 
-    read_files_versions (&db, &line, &len, stream);
+    read_files_versions (&db, &line, &len, stream, prefix);
     free (line);
     fclose (stream);
+    xfree (prefix);
 
     create_changesets (&db);
 
@@ -223,6 +236,8 @@ int main (int argc, const char * const * argv)
              late_branches, late_tags, late_branches + late_tags);
 
     string_cache_stats (stderr);
+
+    printf ("progress done\n");
 
     database_destroy (&db);
     string_cache_destroy();
