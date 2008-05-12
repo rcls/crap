@@ -570,7 +570,7 @@ static void read_file_versions (database_t * db,
         memcmp (last_slash - 6, "/Attic", 6) == 0)
         // Remove that Attic portion.  We can't use strcpy because the strings
         // may overlap.
-        memmove (last_slash - 6, last_slash, strlen (last_slash + 1));
+        memmove (last_slash - 6, last_slash, strlen (last_slash) + 1);
 
     file->path = cache_string (*l + 12 + strlen (prefix));
 

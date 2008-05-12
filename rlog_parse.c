@@ -41,7 +41,7 @@ static void print_commit (const changeset_t * cs)
     }
 
     printf ("commit refs/heads/%s\n",
-            *v->branch->tag->tag ? v->branch->tag->tag : "master");
+            *v->branch->tag->tag ? v->branch->tag->tag : "cvs_master");
     printf ("committer %s <%s> %ld +0000\n", v->author, v->author, v->time);
     printf ("data %u\n%s\n", strlen (v->log), v->log);
 
@@ -49,14 +49,14 @@ static void print_commit (const changeset_t * cs)
         if (!i->used)
             continue;
         if (i->dead) {
-            printf ("D %s\n", v->file->path);
+            printf ("D %s\n", i->file->path);
             continue;
         }
 
         const char * content = xasprintf ("File %s version %s\n",
-                                          v->file->path, v->version);
+                                          i->file->path, i->version);
 
-        printf ("M 644 inline %s\ndata %u\n%s", v->file->path,
+        printf ("M 644 inline %s\ndata %u\n%s", i->file->path,
                 strlen (content), content);
 
         xfree (content);
