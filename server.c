@@ -15,9 +15,8 @@ static const char * pserver_password (const char * root)
     if (home == NULL)
         fatal ("Cannot get home directory");
 
-    char * path;
-    if (asprintf (&path, "%s/.cvspass", home) < 0)
-        fatal ("Huh? %s\n", strerror (errno));
+    const char * path = xasprintf ("%s/.cvspass", home);
+
     FILE * cvspass = fopen (path, "r");
     xfree (path);
     if (cvspass == NULL)
@@ -231,20 +230,19 @@ static FILE * connect_to_fake (const char * root, const char ** rroot)
 }
 
 
-FILE * connect_to_server (const char * root)
+FILE * connect_to_server (const char * root, const char ** rroot)
 {
     FILE * stream;
-    const char * rroot;
     if (starts_with (root, ":pserver:"))
-        stream = connect_to_pserver (root, &rroot);
+        stream = connect_to_pserver (root, rroot);
     else if (starts_with (root, ":fake:"))
-        stream = connect_to_fake (root, &rroot);
+        stream = connect_to_fake (root, rroot);
     else if (starts_with (root, ":ext:"))
-        stream = connect_to_ext (root, root + 5, &rroot);
+        stream = connect_to_ext (root, root + 5, rroot);
     else if (root[0] != '/' && strchr (root, ':') != NULL)
-        stream = connect_to_ext (root, root, &rroot);
+        stream = connect_to_ext (root, root, rroot);
     else
-        stream = connect_to_fork (root, &rroot);
+        stream = connect_to_fork (root, rroot);
 
     fprintf (stream,
              "Root %s\n"
@@ -258,7 +256,7 @@ FILE * connect_to_server (const char * root)
 
              "valid-requests\n"
              "UseUnchanged\n",
-             rroot);
+             *rroot);
 
     size_t len = 0;
     char * line = NULL;

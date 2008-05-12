@@ -73,7 +73,7 @@ file_tag_t * file_find_branch (const file_t * f,
     }
 
     fprintf (stderr, "File %s version %s (%s) has no branch\n",
-             f->rcs_path, s, vers);
+             f->path, s, vers);
 
     return NULL;
 }
