@@ -140,6 +140,7 @@ int main (int argc, const char * const * argv)
 
     read_files_versions (&db, &line, &len, stream);
     free (line);
+    fclose (stream);
 
     create_changesets (&db);
 
