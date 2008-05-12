@@ -132,7 +132,7 @@ static void print_tag (const database_t * db, tag_t * tag)
             tag->changeset.mark = ++mark_counter;
             printf ("commit refs/%s/%s\n",
                     tag->branch_versions ? "heads" : "tags",
-                    *tag->tag ? "cvs_master" : tag->tag);
+                    *tag->tag ? tag->tag : "cvs_master");
             printf ("mark :%lu\n", tag->changeset.mark);
             printf ("committer crap <crap> %ld +0000\n",
                     tag->changeset.time);
