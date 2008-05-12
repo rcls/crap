@@ -567,11 +567,10 @@ static void read_file_versions (database_t * db,
     (*l)[len - 2] = 0;                 // Remove the ',v'
     char * last_slash = strrchr (*l, '/');
     if (last_slash != NULL && last_slash - *l >= 18 &&
-        memcmp (last_slash - 6, "/Attic", 6) == 0) {
+        memcmp (last_slash - 6, "/Attic", 6) == 0)
         // Remove that Attic portion.  We can't use strcpy because the strings
         // may overlap.
         memmove (last_slash - 6, last_slash, strlen (last_slash + 1));
-    }
 
     file->path = cache_string (*l + 12 + strlen (prefix));
 
