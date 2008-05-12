@@ -15,6 +15,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+static long mark_counter;
+
 static const char * format_date (const time_t * time)
 {
     struct tm dtm;
@@ -31,7 +33,7 @@ static const char * format_date (const time_t * time)
 }
 
 
-static void print_commit (const changeset_t * cs)
+static void print_commit (changeset_t * cs)
 {
     const version_t * v = cs->versions;
     if (!v->branch) {
@@ -40,9 +42,12 @@ static void print_commit (const changeset_t * cs)
         return;
     }
 
+    cs->mark = ++mark_counter;
+
     printf ("commit refs/heads/%s\n",
             *v->branch->tag->tag ? v->branch->tag->tag : "cvs_master");
-    printf ("committer %s <%s> %ld +0000\n", v->author, v->author, v->time);
+    printf ("mark :%lu\n", cs->mark);
+    printf ("committer %s <%s> %ld +0000\n", v->author, v->author, cs->time);
     printf ("data %u\n%s\n", strlen (v->log), v->log);
 
     for (const version_t * i = v; i; i = i->cs_sibling) {
@@ -64,7 +69,7 @@ static void print_commit (const changeset_t * cs)
 }
 
 
-static void print_tag (const database_t * db, const tag_t * tag)
+static void print_tag (const database_t * db, tag_t * tag)
 {
     fprintf (stderr, "%s %s %s\n",
             format_date (&tag->changeset.time),
@@ -73,6 +78,10 @@ static void print_tag (const database_t * db, const tag_t * tag)
 
     if (tag->exact_match)
         fprintf (stderr, "Exact match\n");
+
+    printf ("reset refs/%s/%s\n",
+            tag->branch_versions ? "heads" : "tags",
+            *tag->tag ? tag->tag : "cvs_master");
 
     if (tag->parent == NULL) {
         // Special case.
@@ -91,7 +100,8 @@ static void print_tag (const database_t * db, const tag_t * tag)
     else
         branch = as_tag (tag->parent);
 
-    fprintf (stderr, "Parent branch is '%s'\n", branch->tag);
+    printf ("from :%lu\n\n", tag->parent->mark);
+    tag->changeset.mark = tag->parent->mark;
 
     file_tag_t ** tf = tag->tag_files;
     // Go through the current versions on the branch and note any version
@@ -112,13 +122,38 @@ static void print_tag (const database_t * db, const tag_t * tag)
         if (tv != NULL)
             tv = version_normalise (tv);
 
-        if (bv != tv) {
-            ++fixups;
-            fprintf (stderr, "\t%s %s (was %s)\n", i->path,
-                     tv ? tv->version : "dead", bv ? bv->version : "dead");
+        if (bv == tv) {
+            if (bv != NULL)
+                ++keep;
+            continue;
         }
-        else if (bv != NULL)
-            ++keep;
+
+        if (fixups++ == 0) {
+            tag->changeset.mark = ++mark_counter;
+            printf ("commit refs/%s/%s\n",
+                    tag->branch_versions ? "heads" : "tags",
+                    *tag->tag ? "cvs_master" : tag->tag);
+            printf ("mark :%lu\n", tag->changeset.mark);
+            printf ("committer crap <crap> %ld +0000\n",
+                    tag->changeset.time);
+            static const char log[] = "Fix-up commit for ";
+            printf ("data %u\n%s%s\n",
+                    strlen (log) + strlen (tag->tag) + 1,
+                    log, tag->tag);
+        }
+
+        if (tv == NULL) {
+            printf ("D %s\n", i->path);
+            continue;
+        }
+
+        const char * content = xasprintf ("File %s version %s\n",
+                                          i->path, tv->version);
+
+        printf ("M 644 inline %s\ndata %u\n%s", i->path,
+                strlen (content), content);
+
+        xfree (content);
     }
 
     if (fixups == 0 && !tag->exact_match)

@@ -38,8 +38,8 @@ file_tag_t * file_find_branch (const file_t * f,
                                const char * s);
 
 struct version {
-    file_t * file;
-    const char * version;
+    file_t * file;                      ///< File this is a version of.
+    const char * version;               ///< Version string.
     bool dead;                          ///< A dead revision marking a delete.
 
     /// Indicate that this revision is the implicit merge of a vendor branch
@@ -50,7 +50,7 @@ struct version {
     /// indicate if the revision was actually used.
     bool used;
 
-    version_t * parent;
+    version_t * parent;                 ///< Previous version.
     version_t * children;               ///< A child, or NULL.
     version_t * sibling;                ///< A sibling, or NULL.
 

@@ -26,6 +26,7 @@ struct changeset {
     size_t unready_count;
 
     size_t ready_index;                 ///< Index into emission heap.
+    long mark;                          ///< Mark number for fast-import.
 
     struct version * versions;          ///< List of versions for a commit.
 

@@ -9,5 +9,4 @@ mkdir t
 cd t
 
 git init
-../crap-clone "$@" | git-fast-import
-
+../crap-clone "$@" | git-fast-import --export-marks=marks.txt
