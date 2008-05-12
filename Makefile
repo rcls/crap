@@ -1,10 +1,13 @@
 
 LD=gcc
 
-all: crap-clone
+all: crap-clone rlog_parse
 
-crap-clone: crap-clone.o libcrap.a -lssl -lm
+%: %.o
 	$(LD) $(LDFLAGS) -o $@ $+
+
+crap-clone: libcrap.a -lssl -lm
+rlog_parse: libcrap.a -lssl -lm
 
 libcrap.a: branch.o changeset.o database.o emission.o file.o heap.o log.o \
 	log_parse.o server.o string_cache.o utils.o
