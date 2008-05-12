@@ -564,8 +564,16 @@ static void read_file_versions (database_t * db,
         fatal ("RCS file name '%s' does not start with prefix '%s'\n",
                *l + 12, prefix);
 
-    file->path = cache_string_n (*l + 12 + strlen (prefix),
-                                 len - 14 - strlen (prefix));
+    (*l)[len - 2] = 0;                 // Remove the ',v'
+    char * last_slash = strrchr (*l, '/');
+    if (last_slash != NULL && last_slash - *l >= 18 &&
+        memcmp (last_slash - 6, "/Attic", 6) == 0) {
+        // Remove that Attic portion.  We can't use strcpy because the strings
+        // may overlap.
+        memmove (last_slash - 6, last_slash, strlen (last_slash + 1));
+    }
+
+    file->path = cache_string (*l + 12 + strlen (prefix));
 
     // Add a fake branch for the trunk.
     const char * empty_string = cache_string ("");
