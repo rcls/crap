@@ -9,5 +9,5 @@ mkdir t
 cd t
 
 git init
-../rlog_parse "$@" | git-fast-import
+../crap-clone "$@" | git-fast-import
 
