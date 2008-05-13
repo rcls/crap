@@ -72,9 +72,9 @@ static void print_commit (changeset_t * cs)
 static void print_tag (const database_t * db, tag_t * tag)
 {
     fprintf (stderr, "%s %s %s\n",
-            format_date (&tag->changeset.time),
-            tag->branch_versions ? "BRANCH" : "TAG",
-            tag->tag);
+             format_date (&tag->changeset.time),
+             tag->branch_versions ? "BRANCH" : "TAG",
+             tag->tag);
 
     if (tag->exact_match)
         fprintf (stderr, "Exact match\n");

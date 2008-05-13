@@ -274,14 +274,9 @@ static int branch_compare (const void * AA, const void * BB)
 }
 
 
-static void fill_in_versions_and_parents (file_t * file)
+/// Fill in the parent, sibling and children links.
+static void fill_in_parents (file_t * file)
 {
-    qsort (file->versions, file->versions_end - file->versions,
-           sizeof (version_t), version_compare);
-    qsort (file->file_tags, file->file_tags_end - file->file_tags,
-           sizeof (file_tag_t), file_tag_compare);
-
-    // Fill in the parent, sibling and children links.
     for (version_t * v = file->versions_end; v != file->versions;) {
         --v;
         char vers[1 + strlen (v->version)];
@@ -302,6 +297,42 @@ static void fill_in_versions_and_parents (file_t * file)
                 break;
             }
         }
+    }
+}
+
+
+static void fill_in_versions_and_parents (file_t * file)
+{
+    qsort (file->versions, file->versions_end - file->versions,
+           sizeof (version_t), version_compare);
+
+    qsort (file->file_tags, file->file_tags_end - file->file_tags,
+           sizeof (file_tag_t), file_tag_compare);
+
+    fill_in_parents (file);
+
+    // Find any dead versions with dead parents and remove them.
+    bool removed = false;
+    for (version_t * i = file->versions; i != file->versions_end; ++i)
+        // FIXME - what say the following commit is an implicit merge of this
+        // one!  Hopefully, that will get removed too.
+        if (i->dead && (i->parent == NULL || i->parent->dead)) {
+            i->used = false;
+            removed = true;
+        }
+
+    if (removed) {
+        version_t * ii = file->versions;
+        for (version_t * i = file->versions; i != file->versions_end; ++i)
+            if (i->used) {
+                if (i != ii)
+                    *ii = *i;
+                ii->sibling = NULL;
+                ii->children = NULL;
+                ++ii;
+            }
+        file->versions_end = ii;
+        fill_in_parents (file);
     }
 
     file_tag_t ** branches = NULL;
@@ -529,6 +560,16 @@ static void read_file_version (file_t * file,
         log[log_len - 1] = '\n';
 
         len = next_line (l, buffer_len, f);
+    }
+
+    // As a special case, if this is version 1.1 and is dead, then drop it.
+    // This would actually get caught by the remove-dead-children-of-dead-
+    // versions logic, but we may as well catch it right now.
+    if (version->dead && strcmp (version->version, "1.1") == 0) {
+        free (log);
+        --file->versions_end;
+        assert (file->versions_end == version);
+        return;
     }
 
     version->log = cache_string_n (log, log_len);
