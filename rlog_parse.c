@@ -47,7 +47,7 @@ static void print_commit (const changeset_t * cs)
 
     for (const version_t * i = v; i; i = i->cs_sibling)
         if (i->used)
-            printf ("\t%s %s\n", i->file->rcs_path, i->version);
+            printf ("\t%s %s\n", i->file->path, i->version);
 
     printf ("\n");
     fflush (stdout);
@@ -70,7 +70,7 @@ static void print_tag (const database_t * db, const tag_t * tag)
         for (file_tag_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
             if ((*i)->version && !(*i)->version->dead)
                 printf ("\t%s %s\n",
-                        (*i)->version->file->rcs_path, (*i)->version->version);
+                        (*i)->version->file->path, (*i)->version->version);
         printf ("WIERD: exact but create from scratch\n\n");
         return;
     }
@@ -104,7 +104,7 @@ static void print_tag (const database_t * db, const tag_t * tag)
 
         if (bv != tv) {
             ++fixups;
-            printf ("\t%s %s (was %s)\n", i->rcs_path,
+            printf ("\t%s %s (was %s)\n", i->path,
                     tv ? tv->version : "dead", bv ? bv->version : "dead");
         }
         else if (bv != NULL)

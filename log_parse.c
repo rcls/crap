@@ -315,7 +315,7 @@ static void fill_in_versions_and_parents (file_t * file)
     bool removed = false;
     for (version_t * i = file->versions; i != file->versions_end; ++i)
         // FIXME - what say the following commit is an implicit merge of this
-        // one!  Hopefully, that will get removed too.
+        // one!
         if (i->dead && (i->parent == NULL || i->parent->dead)) {
             i->used = false;
             removed = true;
@@ -330,6 +330,9 @@ static void fill_in_versions_and_parents (file_t * file)
                 ii->sibling = NULL;
                 ii->children = NULL;
                 ++ii;
+            }
+            else if (i + 1 != file->versions_end && i[1].implicit_merge) {
+                assert (!i[1].used);
             }
         file->versions_end = ii;
         fill_in_parents (file);
@@ -613,7 +616,7 @@ static void read_file_versions (database_t * db,
         // may overlap.
         memmove (last_slash - 6, last_slash, strlen (last_slash) + 1);
 
-    file->path = cache_string (*l + 12 + strlen (prefix));
+    file->path = cache_string (*l + 13 + strlen (prefix));
 
     // Add a fake branch for the trunk.
     const char * empty_string = cache_string ("");
