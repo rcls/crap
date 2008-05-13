@@ -1,8 +1,8 @@
+#include "cvs_connection.h"
 #include "database.h"
 #include "file.h"
 #include "log.h"
 #include "log_parse.h"
-#include "server.h"
 #include "string_cache.h"
 #include "utils.h"
 
@@ -416,7 +416,7 @@ static void fill_in_versions_and_parents (file_t * file)
 
 static size_t read_mt_key_values (file_t * file,
                                   version_t * version,
-                                  server_connection_t * s)
+                                  cvs_connection_t * s)
 {
     bool have_date = false;
 
@@ -516,7 +516,7 @@ static void read_m_key_values (file_t * file, version_t * version,
 }
 
 
-static void read_file_version (file_t * file, server_connection_t * s)
+static void read_file_version (file_t * file, cvs_connection_t * s)
 {
     if (!starts_with (s->line, "M revision "))
         fatal ("Log (%s) did not have expected 'revision' line: %s\n",
@@ -590,7 +590,7 @@ static void read_file_version (file_t * file, server_connection_t * s)
 
 static void read_file_versions (database_t * db,
                                 string_hash_t * tags,
-                                server_connection_t * s, const char * prefix)
+                                cvs_connection_t * s, const char * prefix)
 {
     if (!starts_with (s->line, "M RCS file: /"))
         fatal ("Expected RCS file line, not %s\n", s->line);
@@ -703,7 +703,7 @@ static int tag_compare (const void * AA, const void * BB)
 
 
 void read_files_versions (database_t * db,
-                          server_connection_t * s,
+                          cvs_connection_t * s,
                           const char * prefix)
 {
     database_init (db);

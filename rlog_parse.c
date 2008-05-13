@@ -1,11 +1,11 @@
 #include "branch.h"
 #include "changeset.h"
+#include "cvs_connection.h"
 #include "database.h"
 #include "emission.h"
 #include "file.h"
 #include "log.h"
 #include "log_parse.h"
-#include "server.h"
 #include "string_cache.h"
 #include "utils.h"
 
@@ -125,8 +125,8 @@ int main (int argc, const char * const * argv)
     if (argc != 3)
         fatal ("Usage: %s <root> <repo>\n", argv[0]);
 
-    server_connection_t conn;
-    connect_to_server (&conn, argv[1]);
+    cvs_connection_t conn;
+    connect_to_cvs (&conn, argv[1]);
 
     fprintf (conn.stream,
              "Global_option -q\n"
@@ -137,7 +137,7 @@ int main (int argc, const char * const * argv)
     database_t db;
 
     read_files_versions (&db, &conn, conn.remote_root);
-    server_connection_destroy (&conn);
+    cvs_connection_destroy (&conn);
 
     create_changesets (&db);
 

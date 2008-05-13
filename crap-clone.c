@@ -1,3 +1,4 @@
+#include "cvs_connection.h"
 #include "branch.h"
 #include "changeset.h"
 #include "database.h"
@@ -5,7 +6,6 @@
 #include "file.h"
 #include "log.h"
 #include "log_parse.h"
-#include "server.h"
 #include "string_cache.h"
 #include "utils.h"
 
@@ -170,8 +170,8 @@ int main (int argc, const char * const * argv)
     if (argc != 3)
         fatal ("Usage: %s <root> <repo>\n", argv[0]);
 
-    server_connection_t stream;
-    connect_to_server ( &stream, argv[1]);
+    cvs_connection_t stream;
+    connect_to_cvs (&stream, argv[1]);
     const char * prefix = xasprintf ("%s/%s/", stream.remote_root, argv[2]);
 
     fprintf (stream.stream,
@@ -183,7 +183,7 @@ int main (int argc, const char * const * argv)
     database_t db;
 
     read_files_versions (&db, &stream, prefix);
-    server_connection_destroy (&stream);
+    cvs_connection_destroy (&stream);
     xfree (prefix);
 
     create_changesets (&db);

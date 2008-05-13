@@ -1,5 +1,5 @@
+#include "cvs_connection.h"
 #include "log.h"
-#include "server.h"
 #include "utils.h"
 
 #include <errno.h>
@@ -52,8 +52,7 @@ static const char * pserver_password (const char * root)
 }
 
 
-static void connect_to_pserver (server_connection_t * conn,
-                                const char * root)
+static void connect_to_pserver (cvs_connection_t * conn, const char * root)
 {
     const char * host = root + strlen (":pserver:");
 
@@ -176,8 +175,7 @@ static FILE * connect_to_program (const char * program,
 }
 
 
-static void connect_to_fork (server_connection_t * conn,
-                             const char * path)
+static void connect_to_fork (cvs_connection_t * conn, const char * path)
 {
     static const char * const argv[] = { "cvs", "server", NULL };
     conn->remote_root = path;
@@ -185,7 +183,7 @@ static void connect_to_fork (server_connection_t * conn,
 }
 
 
-void connect_to_ext (server_connection_t * conn,
+void connect_to_ext (cvs_connection_t * conn,
                      const char * root, const char * path)
 {
     const char * program = getenv ("CVS_RSH");
@@ -205,8 +203,7 @@ void connect_to_ext (server_connection_t * conn,
 }
 
 
-static void connect_to_fake (server_connection_t * conn,
-                             const char * root)
+static void connect_to_fake (cvs_connection_t * conn, const char * root)
 {
     const char * program = root + strlen (":fake:");
     const char * colon1 = strchr (program, ':');
@@ -226,7 +223,7 @@ static void connect_to_fake (server_connection_t * conn,
 }
 
 
-void connect_to_server (server_connection_t * conn, const char * root)
+void connect_to_cvs (cvs_connection_t * conn, const char * root)
 {
     conn->line = NULL;
     conn->line_len = 0;
@@ -268,7 +265,7 @@ void connect_to_server (server_connection_t * conn, const char * root)
 }
 
 
-size_t next_line (server_connection_t * conn)
+size_t next_line (cvs_connection_t * conn)
 {
     ssize_t s = getline (&conn->line, &conn->line_len, conn->stream);
     if (s < 0)
@@ -284,7 +281,7 @@ size_t next_line (server_connection_t * conn)
 }
 
 
-void server_connection_destroy (server_connection_t * conn)
+void cvs_connection_destroy (cvs_connection_t * conn)
 {
     xfree (conn->line);
     fclose (conn->stream);
