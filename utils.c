@@ -42,24 +42,6 @@ void xfree (const void * p)
 }
 
 
-size_t next_line (char ** line, size_t * len, FILE * stream)
-{
-    ssize_t s = getline (line, len, stream);
-    if (s < 0)
-        fatal ("Unexpected EOF from server.\n");
-
-    if (strlen (*line) < s)
-        fatal ("Got line containing ASCII NUL from server.\n");
-
-    if (s > 0 && (*line)[s - 1] == '\n') {
-        --s;
-        (*line)[s] = 0;
-    }
-
-    return s;
-}
-
-
 char * xasprintf (const char * format, ...)
 {
     va_list args;

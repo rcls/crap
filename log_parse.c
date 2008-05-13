@@ -2,6 +2,7 @@
 #include "file.h"
 #include "log.h"
 #include "log_parse.h"
+#include "server.h"
 #include "string_cache.h"
 #include "utils.h"
 
@@ -415,8 +416,7 @@ static void fill_in_versions_and_parents (file_t * file)
 
 static size_t read_mt_key_values (file_t * file,
                                   version_t * version,
-                                  char ** __restrict__ l, size_t * buffer_len,
-                                  FILE * f)
+                                  server_connection_t * s)
 {
     bool have_date = false;
 
@@ -426,43 +426,43 @@ static size_t read_mt_key_values (file_t * file,
 
     size_t len;
     do {
-        if (starts_with (*l, "MT date ")) {
-            if (!parse_cvs_date (&version->time, &version->offset, *l + 8))
+        if (starts_with (s->line, "MT date ")) {
+            if (!parse_cvs_date (&version->time, &version->offset, s->line + 8))
                 fatal ("Log (%s) date line has unknown format: %s\n",
-                       file->rcs_path, *l);
+                       file->rcs_path, s->line);
             have_date = true;
         }
         if (author_next) {
-            if (!starts_with (*l, "MT text "))
+            if (!starts_with (s->line, "MT text "))
                 fatal ("Log (%s) author line is not text: %s\n",
-                       file->rcs_path, *l);
-            version->author = cache_string (*l + 8);
+                       file->rcs_path, s->line);
+            version->author = cache_string (s->line + 8);
             author_next = false;
         }
         if (state_next) {
-            if (!starts_with (*l, "MT text "))
+            if (!starts_with (s->line, "MT text "))
                 fatal ("Log (%s) state line is not text: %s\n",
-                       file->rcs_path, *l);
-            version->dead = starts_with (*l, "MT text dead");
+                       file->rcs_path, s->line);
+            version->dead = starts_with (s->line, "MT text dead");
             state_next = false;
         }
         if (commitid_next) {
-            if (!starts_with (*l, "MT text "))
+            if (!starts_with (s->line, "MT text "))
                 fatal ("Log (%s) commitid line is not text: %s\n",
-                       file->rcs_path, *l);
-            version->commitid = cache_string (*l + 8);
+                       file->rcs_path, s->line);
+            version->commitid = cache_string (s->line + 8);
             commitid_next = false;
         }
-        if (ends_with (*l, " author: "))
+        if (ends_with (s->line, " author: "))
             author_next = true;
-        if (ends_with (*l, " state: "))
+        if (ends_with (s->line, " state: "))
             state_next = true;
-        if (ends_with (*l, " commitid: "))
+        if (ends_with (s->line, " commitid: "))
             commitid_next = true;
 
-        len = next_line (l, buffer_len, f);
+        len = next_line (s);
     }
-    while (starts_with (*l, "MT "));
+    while (starts_with (s->line, "MT "));
 
     if (!have_date)
         fatal ("Log (%s) does not have date.\n", file->rcs_path);
@@ -475,7 +475,7 @@ static size_t read_mt_key_values (file_t * file,
 
 
 static void read_m_key_values (file_t * file, version_t * version,
-                               const char * l, FILE * f)
+                               const char * l)
 {
     bool have_date = false;
 
@@ -516,17 +516,15 @@ static void read_m_key_values (file_t * file, version_t * version,
 }
 
 
-static void read_file_version (file_t * file,
-                               char ** __restrict__ l, size_t * buffer_len,
-                               FILE * f)
+static void read_file_version (file_t * file, server_connection_t * s)
 {
-    if (!starts_with (*l, "M revision "))
+    if (!starts_with (s->line, "M revision "))
         fatal ("Log (%s) did not have expected 'revision' line: %s\n",
-               file->rcs_path, *l);
+               file->rcs_path, s->line);
 
     version_t * version = file_new_version (file);
 
-    version->version = cache_string (*l + 11);
+    version->version = cache_string (s->line + 11);
     if (!valid_version (version->version))
         fatal ("Log (%s) has malformed version %s\n",
                file->rcs_path, version->version);
@@ -537,32 +535,33 @@ static void read_file_version (file_t * file,
     version->children = NULL;
     version->sibling = NULL;
 
-    size_t len = next_line (l, buffer_len, f);
-    if (starts_with (*l, "MT "))
-        len = read_mt_key_values (file, version, l, buffer_len, f);
-    else if (starts_with (*l, "M date: ")) {
-        read_m_key_values (file, version, *l + 2, f);
-        len = next_line (l, buffer_len, f);
+    size_t len = next_line (s);
+    if (starts_with (s->line, "MT "))
+        len = read_mt_key_values (file, version, s);
+    else if (starts_with (s->line, "M date: ")) {
+        read_m_key_values (file, version, s->line + 2);
+        len = next_line (s);
     }
     else
         fatal ("Log (%s) has malformed date/author/state: %s",
-               file->rcs_path, *l);
+               file->rcs_path, s->line);
 
     // We don't care about the 'branches:' annotation; we reconstruct the branch
     // information ourselves.
-    if (starts_with (*l, "M branches: "))
-        len = next_line (l, buffer_len, f);
+    if (starts_with (s->line, "M branches: "))
+        len = next_line (s);
 
     // Snarf the log entry.
     char * log = NULL;
     size_t log_len = 0;
-    while (strcmp (*l, REV_BOUNDARY) != 0 && strcmp (*l, FILE_BOUNDARY) != 0) {
+    while (strcmp (s->line, REV_BOUNDARY) != 0
+           && strcmp (s->line, FILE_BOUNDARY) != 0) {
         log = xrealloc (log, log_len + len + 1);
-        memcpy (log + log_len, *l + 2, len - 2);
+        memcpy (log + log_len, s->line + 2, len - 2);
         log_len += len - 1;
         log[log_len - 1] = '\n';
 
-        len = next_line (l, buffer_len, f);
+        len = next_line (s);
     }
 
     // As a special case, if this is version 1.1 and is dead, then drop it.
@@ -591,32 +590,31 @@ static void read_file_version (file_t * file,
 
 static void read_file_versions (database_t * db,
                                 string_hash_t * tags,
-                                char ** restrict l, size_t * buffer_len,
-                                FILE * f, const char * prefix)
+                                server_connection_t * s, const char * prefix)
 {
-    if (!starts_with (*l, "M RCS file: /"))
-        fatal ("Expected RCS file line, not %s\n", *l);
+    if (!starts_with (s->line, "M RCS file: /"))
+        fatal ("Expected RCS file line, not %s\n", s->line);
 
-    size_t len = strlen (*l);
-    if ((*l)[len - 1] != 'v' || (*l)[len - 2] != ',')
-        fatal ("RCS file name does not end with ',v': %s\n", *l);
+    size_t len = strlen (s->line);
+    if ((s->line)[len - 1] != 'v' || (s->line)[len - 2] != ',')
+        fatal ("RCS file name does not end with ',v': %s\n", s->line);
 
     file_t * file = database_new_file (db);
-    file->rcs_path = cache_string_n (*l + 12, len - 12);
+    file->rcs_path = cache_string_n (s->line + 12, len - 12);
 
-    if (!starts_with (*l + 12, prefix))
+    if (!starts_with (s->line + 12, prefix))
         fatal ("RCS file name '%s' does not start with prefix '%s'\n",
-               *l + 12, prefix);
+               s->line + 12, prefix);
 
-    (*l)[len - 2] = 0;                 // Remove the ',v'
-    char * last_slash = strrchr (*l, '/');
-    if (last_slash != NULL && last_slash - *l >= 18 &&
+    (s->line)[len - 2] = 0;                 // Remove the ',v'
+    char * last_slash = strrchr (s->line, '/');
+    if (last_slash != NULL && last_slash - s->line >= 18 &&
         memcmp (last_slash - 6, "/Attic", 6) == 0)
         // Remove that Attic portion.  We can't use strcpy because the strings
         // may overlap.
         memmove (last_slash - 6, last_slash, strlen (last_slash) + 1);
 
-    file->path = cache_string (*l + 13 + strlen (prefix));
+    file->path = cache_string (s->line + 13 + strlen (prefix));
 
     // Add a fake branch for the trunk.
     const char * empty_string = cache_string ("");
@@ -625,24 +623,24 @@ static void read_file_versions (database_t * db,
     dummy_tag->is_branch = 1;
 
     do
-        len = next_line (l, buffer_len, f);
-    while (starts_with (*l, "M head:") ||
-           starts_with (*l, "M branch:") ||
-           starts_with (*l, "M locks:") ||
-           starts_with (*l, "M access list:"));
+        len = next_line (s);
+    while (starts_with (s->line, "M head:") ||
+           starts_with (s->line, "M branch:") ||
+           starts_with (s->line, "M locks:") ||
+           starts_with (s->line, "M access list:"));
 
-    if (!starts_with (*l, "M symbolic names:"))
+    if (!starts_with (s->line, "M symbolic names:"))
         fatal ("Log (%s) did not have expected tag list: %s\n",
-               file->rcs_path, *l);
+               file->rcs_path, s->line);
 
-    len = next_line (l, buffer_len, f);
-    while (starts_with (*l, "M \t")) {
-        char * colon = strrchr (*l, ':');
+    len = next_line (s);
+    while (starts_with (s->line, "M \t")) {
+        char * colon = strrchr (s->line, ':');
         if (colon == NULL)
             fatal ("Tag on (%s) did not have version: %s\n",
-                   file->rcs_path, *l);
+                   file->rcs_path, s->line);
 
-        const char * tag_name = cache_string_n (*l + 3, colon - *l - 3);
+        const char * tag_name = cache_string_n (s->line + 3, colon - s->line - 3);
         file_tag_t * file_tag = file_add_tag (tags, file, tag_name);
 
         ++colon;
@@ -657,32 +655,32 @@ static void read_file_versions (database_t * db,
         file_tag->vers = cache_string (colon);
         file_tag->is_branch = type;
 
-        len = next_line (l, buffer_len, f);
+        len = next_line (s);
     };
 
-    while (starts_with (*l, "M keyword substitution:") ||
-           starts_with (*l, "M total revisions:"))
-        len = next_line (l, buffer_len, f);
+    while (starts_with (s->line, "M keyword substitution:") ||
+           starts_with (s->line, "M total revisions:"))
+        len = next_line (s);
 
-    if (!starts_with (*l, "M description:"))
+    if (!starts_with (s->line, "M description:"))
         fatal ("Log (%s) did not have expected 'description' item: %s\n",
-               file->rcs_path, *l);
+               file->rcs_path, s->line);
 
     // Just skip until a boundary.  Too bad if a log entry contains one of
     // the boundary strings.
-    while (strcmp (*l, REV_BOUNDARY) != 0 && strcmp (*l, FILE_BOUNDARY) != 0) {
-        if (!starts_with (*l, "M "))
+    while (strcmp (s->line, REV_BOUNDARY) != 0 && strcmp (s->line, FILE_BOUNDARY) != 0) {
+        if (!starts_with (s->line, "M "))
             fatal ("Log (%s) description incorrectly terminated\n",
                    file->rcs_path);
-        len = next_line (l, buffer_len, f);
+        len = next_line (s);
     }
 
-    while (strcmp (*l, FILE_BOUNDARY) != 0) {
-        len = next_line (l, buffer_len, f);
-        read_file_version (file, l, buffer_len, f);
+    while (strcmp (s->line, FILE_BOUNDARY) != 0) {
+        len = next_line (s);
+        read_file_version (file, s);
     }
 
-    next_line (l, buffer_len, f);
+    next_line (s);
 
     fill_in_versions_and_parents (file);
 }
@@ -705,8 +703,7 @@ static int tag_compare (const void * AA, const void * BB)
 
 
 void read_files_versions (database_t * db,
-                          char ** __restrict__ l, size_t * buffer_len,
-                          FILE * f,
+                          server_connection_t * s,
                           const char * prefix)
 {
     database_init (db);
@@ -714,15 +711,15 @@ void read_files_versions (database_t * db,
     string_hash_t tags;
     string_hash_init (&tags);
 
-    next_line (l, buffer_len, f);
+    next_line (s);
 
-    while (strcmp (*l, "ok") != 0) {
-        if (strcmp (*l, "M ") == 0) {
-            next_line (l, buffer_len, f);
+    while (strcmp (s->line, "ok") != 0) {
+        if (strcmp (s->line, "M ") == 0) {
+            next_line (s);
             continue;
         }
 
-        read_file_versions (db, &tags, l, buffer_len, f, prefix);
+        read_file_versions (db, &tags, s, prefix);
     }
 
     // Sort the list of files.

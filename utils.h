@@ -21,9 +21,6 @@ void * xcalloc (size_t size)
 /// Call free.
 void xfree (const void * p);
 
-/// Call getline and do some sanity checking.
-size_t next_line (char ** line, size_t * len, FILE * stream);
-
 /// Format a string into a malloc'd buffer.
 char * xasprintf (const char * format, ...)
     __attribute__ ((malloc, warn_unused_result, format (printf, 1, 2)));

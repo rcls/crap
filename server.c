@@ -1,4 +1,5 @@
 #include "log.h"
+#include "server.h"
 #include "utils.h"
 
 #include <errno.h>
@@ -51,15 +52,15 @@ static const char * pserver_password (const char * root)
 }
 
 
-static FILE * connect_to_pserver (const char * root,
-                                  const char ** rroot)
+static void connect_to_pserver (server_connection_t * conn,
+                                const char * root)
 {
     const char * host = root + strlen (":pserver:");
 
     const char * path = strchr (host, '/');
     if (path == NULL)
         fatal ("No path in CVS root '%s'\n", root);
-    *rroot = path;
+    conn->remote_root = path;
 
     size_t host_len = path - host;
 
@@ -121,28 +122,23 @@ static FILE * connect_to_pserver (const char * root,
     xfree (port);
     freeaddrinfo (ai);
 
-    FILE * stream = fdopen (s, "rw+");
-    if (stream == NULL)
+    conn->stream = fdopen (s, "rw+");
+    if (conn->stream == NULL)
         fatal ("fdopen failed: %s\n", strerror (errno));
 
     const char * password = pserver_password (root);
     fprintf (stderr, "Password '%s'\n", password);
-    if (fprintf (stream, "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
+    if (fprintf (conn->stream,
+                 "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
                  path, user_len, user, password) < 0)
         fatal ("Writing to socket: %s\n", strerror (errno));
     xfree (password);
 
-    size_t n = 0;
-    char * lineptr = NULL;
-    next_line (&lineptr, &n, stream);
-    if (strcmp (lineptr, "I LOVE YOU") != 0)
-        fatal ("Failed to login: '%s'\n", lineptr);
+    next_line (conn);
+    if (strcmp (conn->line, "I LOVE YOU") != 0)
+        fatal ("Failed to login: '%s'\n", conn->line);
 
     fprintf (stderr, "Logged in successfully\n");
-
-    xfree (lineptr);
-
-    return stream;
 }
 
 
@@ -180,16 +176,17 @@ static FILE * connect_to_program (const char * program,
 }
 
 
-static FILE * connect_to_fork (const char * path, const char ** rroot)
+static void connect_to_fork (server_connection_t * conn,
+                             const char * path)
 {
     static const char * const argv[] = { "cvs", "server", NULL };
-    *rroot = path;
-    return connect_to_program ("cvs", argv);
+    conn->remote_root = path;
+    conn->stream = connect_to_program ("cvs", argv);
 }
 
 
-static FILE * connect_to_ext (const char * root, const char * path,
-                              const char ** rroot)
+void connect_to_ext (server_connection_t * conn,
+                     const char * root, const char * path)
 {
     const char * program = getenv ("CVS_RSH");
     if (program == NULL)
@@ -197,19 +194,19 @@ static FILE * connect_to_ext (const char * root, const char * path,
     else
         program += strlen ("CVS_RSH=");
 
-    *rroot = strchr (path, '/');
-    if (*rroot == NULL)
+    conn->remote_root = strchr (path, '/');
+    if (conn->remote_root == NULL)
         fatal ("Root '%s' has no remote root.\n", root);
-    const char * host = strndup (path, *rroot - path);
-    ++*rroot;
+    const char * host = strndup (path, conn->remote_root - path);
+    ++conn->remote_root;
     const char * const argv[] = { program, host, "cvs", "server", NULL };
-    FILE * stream = connect_to_program (program, argv);
+    conn->stream = connect_to_program (program, argv);
     xfree (host);
-    return stream;
 }
 
 
-static FILE * connect_to_fake (const char * root, const char ** rroot)
+static void connect_to_fake (server_connection_t * conn,
+                             const char * root)
 {
     const char * program = root + strlen (":fake:");
     const char * colon1 = strchr (program, ':');
@@ -219,32 +216,33 @@ static FILE * connect_to_fake (const char * root, const char ** rroot)
     if (colon2 == NULL)
         fatal ("Root '%s' has no remote root\n", root);
 
-    *rroot = colon2 + 1;
+    conn->remote_root = colon2 + 1;
     program = strndup (program, colon1 - program);
     const char * argument = strndup (colon1 + 1, colon2 - colon1 - 1);
     const char * const argv[] = { program, argument, NULL };
-    FILE * stream = connect_to_program (program, argv);
+    conn->stream = connect_to_program (program, argv);
     xfree (program);
     xfree (argument);
-    return stream;
 }
 
 
-FILE * connect_to_server (const char * root, const char ** rroot)
+void connect_to_server (server_connection_t * conn, const char * root)
 {
-    FILE * stream;
-    if (starts_with (root, ":pserver:"))
-        stream = connect_to_pserver (root, rroot);
-    else if (starts_with (root, ":fake:"))
-        stream = connect_to_fake (root, rroot);
-    else if (starts_with (root, ":ext:"))
-        stream = connect_to_ext (root, root + 5, rroot);
-    else if (root[0] != '/' && strchr (root, ':') != NULL)
-        stream = connect_to_ext (root, root, rroot);
-    else
-        stream = connect_to_fork (root, rroot);
+    conn->line = NULL;
+    conn->line_len = 0;
 
-    fprintf (stream,
+    if (starts_with (root, ":pserver:"))
+        connect_to_pserver (conn, root);
+    else if (starts_with (root, ":fake:"))
+        connect_to_fake (conn, root);
+    else if (starts_with (root, ":ext:"))
+        connect_to_ext (conn, root, root + 5);
+    else if (root[0] != '/' && strchr (root, ':') != NULL)
+        connect_to_ext (conn, root, root);
+    else
+        connect_to_fork (conn, root);
+
+    fprintf (conn->stream,
              "Root %s\n"
 
              "Valid-responses ok error Valid-requests Checked-in New-entry "
@@ -256,21 +254,39 @@ FILE * connect_to_server (const char * root, const char ** rroot)
 
              "valid-requests\n"
              "UseUnchanged\n",
-             *rroot);
+             conn->remote_root);
 
-    size_t len = 0;
-    char * line = NULL;
-    next_line (&line, &len, stream);
-    if (!starts_with (line, "Valid-requests "))
-        fatal ("Did not get valid requests ('%s')\n", line);
+    next_line (conn);
+    if (!starts_with (conn->line, "Valid-requests "))
+        fatal ("Did not get valid requests ('%s')\n", conn->line);
 
-    fprintf (stderr, "%s\n", line);
+    fprintf (stderr, "%s\n", conn->line);
 
-    next_line (&line, &len, stream);
-    if (strcmp (line, "ok") != 0)
+    next_line (conn);
+    if (strcmp (conn->line, "ok") != 0)
         fatal ("Did not get 'ok'!\n");
-
-    xfree (line);
-
-    return stream;
 }
+
+
+size_t next_line (server_connection_t * conn)
+{
+    ssize_t s = getline (&conn->line, &conn->line_len, conn->stream);
+    if (s < 0)
+        fatal ("Unexpected EOF from server.\n");
+
+    if (strlen (conn->line) < s)
+        fatal ("Got line containing ASCII NUL from server.\n");
+
+    if (s > 0 && conn->line[s - 1] == '\n')
+        conn->line[--s] = 0;
+
+    return s;
+}
+
+
+void server_connection_destroy (server_connection_t * conn)
+{
+    xfree (conn->line);
+    fclose (conn->stream);
+}
+

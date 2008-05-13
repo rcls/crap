@@ -125,23 +125,19 @@ int main (int argc, const char * const * argv)
     if (argc != 3)
         fatal ("Usage: %s <root> <repo>\n", argv[0]);
 
-    const char * rroot;
-    FILE * stream = connect_to_server (argv[1], &rroot);
+    server_connection_t conn;
+    connect_to_server (&conn, argv[1]);
 
-    fprintf (stream,
+    fprintf (conn.stream,
              "Global_option -q\n"
              "Argument --\n"
              "Argument %s\n"
              "rlog\n", argv[2]);
     
-    char * line = NULL;
-    size_t len = 0;
-
     database_t db;
 
-    read_files_versions (&db, &line, &len, stream, rroot);
-    free (line);
-    fclose (stream);
+    read_files_versions (&db, &conn, conn.remote_root);
+    server_connection_destroy (&conn);
 
     create_changesets (&db);
 
