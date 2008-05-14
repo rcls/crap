@@ -7,6 +7,9 @@
 typedef struct cvs_connection {
     FILE * stream;
     const char * remote_root;
+    const char * module;
+    const char * prefix;
+
     char * line;
     size_t line_len;
 } cvs_connection_t;

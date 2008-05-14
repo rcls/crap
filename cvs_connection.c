@@ -21,7 +21,7 @@ static const char * pserver_password (const char * root)
     FILE * cvspass = fopen (path, "r");
     xfree (path);
     if (cvspass == NULL)
-        return strdup ("A");
+        return xstrdup ("A");
 
     char * lineptr = NULL;
     size_t n = 0;
@@ -48,7 +48,7 @@ static const char * pserver_password (const char * root)
     }
 
     fclose (cvspass);
-    return strdup ("A");
+    return xstrdup ("A");
 }
 
 
@@ -228,6 +228,9 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
     conn->line = NULL;
     conn->line_len = 0;
 
+    conn->module = NULL;
+    conn->prefix = NULL;
+
     if (starts_with (root, ":pserver:"))
         connect_to_pserver (conn, root);
     else if (starts_with (root, ":fake:"))
@@ -244,9 +247,11 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 
              "Valid-responses ok error Valid-requests Checked-in New-entry "
              "Checksum Copy-file Updated Created Update-existing Merged "
-             "Patched Rcs-diff Mode Mod-time Removed Remove-entry "
-             "Set-static-directory Clear-static-directory Set-sticky "
-             "Clear-sticky Template Notified Module-expansion "
+             "Patched Rcs-diff Mode Removed Remove-entry "
+             // We don't actually want these:             
+             // "Set-static-directory Clear-static-directory Set-sticky "
+             // "Clear-sticky Mod-time "
+             "Template Notified Module-expansion "
              "Wrapper-rcsOption M Mbinary E F MT\n"
 
              "valid-requests\n"
@@ -284,5 +289,8 @@ size_t next_line (cvs_connection_t * conn)
 void cvs_connection_destroy (cvs_connection_t * conn)
 {
     xfree (conn->line);
+    xfree (conn->module);
+    xfree (conn->prefix);
+
     fclose (conn->stream);
 }

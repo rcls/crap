@@ -42,6 +42,16 @@ void xfree (const void * p)
 }
 
 
+char * xstrdup (const char * s)
+{
+    char * r = strdup (s);
+    if (r == NULL)
+        fatal ("Failed to strdup %zu bytes.\n", strlen (s));
+
+    return r;
+}
+
+
 char * xasprintf (const char * format, ...)
 {
     va_list args;

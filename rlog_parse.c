@@ -125,10 +125,12 @@ int main (int argc, const char * const * argv)
     if (argc != 3)
         fatal ("Usage: %s <root> <repo>\n", argv[0]);
 
-    cvs_connection_t conn;
-    connect_to_cvs (&conn, argv[1]);
+    cvs_connection_t stream;
+    connect_to_cvs (&stream, argv[1]);
+    stream.prefix = xasprintf ("%s/%s/", stream.remote_root, argv[2]);
+    stream.module = xstrdup (argv[2]);
 
-    fprintf (conn.stream,
+    fprintf (stream.stream,
              "Global_option -q\n"
              "Argument --\n"
              "Argument %s\n"
@@ -136,8 +138,8 @@ int main (int argc, const char * const * argv)
 
     database_t db;
 
-    read_files_versions (&db, &conn, conn.remote_root);
-    cvs_connection_destroy (&conn);
+    read_files_versions (&db, &stream);
+    cvs_connection_destroy (&stream);
 
     create_changesets (&db);
 

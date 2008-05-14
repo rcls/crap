@@ -21,6 +21,10 @@ void * xcalloc (size_t size)
 /// Call free.
 void xfree (const void * p);
 
+/// Call strdup and die on error.
+char * xstrdup (const char * s)
+    __attribute__ ((__malloc__, __warn_unused_result__));
+
 /// Format a string into a malloc'd buffer.
 char * xasprintf (const char * format, ...)
     __attribute__ ((malloc, warn_unused_result, format (printf, 1, 2)));

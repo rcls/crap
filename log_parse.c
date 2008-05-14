@@ -590,7 +590,7 @@ static void read_file_version (file_t * file, cvs_connection_t * s)
 
 static void read_file_versions (database_t * db,
                                 string_hash_t * tags,
-                                cvs_connection_t * s, const char * prefix)
+                                cvs_connection_t * s)
 {
     if (!starts_with (s->line, "M RCS file: /"))
         fatal ("Expected RCS file line, not %s\n", s->line);
@@ -602,9 +602,9 @@ static void read_file_versions (database_t * db,
     file_t * file = database_new_file (db);
     file->rcs_path = cache_string_n (s->line + 12, len - 12);
 
-    if (!starts_with (s->line + 12, prefix))
+    if (!starts_with (s->line + 12, s->prefix))
         fatal ("RCS file name '%s' does not start with prefix '%s'\n",
-               s->line + 12, prefix);
+               s->line + 12, s->prefix);
 
     (s->line)[len - 2] = 0;                 // Remove the ',v'
     char * last_slash = strrchr (s->line, '/');
@@ -614,7 +614,7 @@ static void read_file_versions (database_t * db,
         // may overlap.
         memmove (last_slash - 6, last_slash, strlen (last_slash) + 1);
 
-    file->path = cache_string (s->line + 13 + strlen (prefix));
+    file->path = cache_string (s->line + 12 + strlen (s->prefix));
 
     // Add a fake branch for the trunk.
     const char * empty_string = cache_string ("");
@@ -702,9 +702,7 @@ static int tag_compare (const void * AA, const void * BB)
 }
 
 
-void read_files_versions (database_t * db,
-                          cvs_connection_t * s,
-                          const char * prefix)
+void read_files_versions (database_t * db, cvs_connection_t * s)
 {
     database_init (db);
 
@@ -713,14 +711,11 @@ void read_files_versions (database_t * db,
 
     next_line (s);
 
-    while (strcmp (s->line, "ok") != 0) {
-        if (strcmp (s->line, "M ") == 0) {
+    while (strcmp (s->line, "ok") != 0)
+        if (strcmp (s->line, "M ") == 0)
             next_line (s);
-            continue;
-        }
-
-        read_file_versions (db, &tags, s, prefix);
-    }
+        else
+            read_file_versions (db, &tags, s);
 
     // Sort the list of files.
     qsort (db->files, db->files_end - db->files, sizeof (file_t), file_compare);
