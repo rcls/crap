@@ -286,4 +286,3 @@ void cvs_connection_destroy (cvs_connection_t * conn)
     xfree (conn->line);
     fclose (conn->stream);
 }
-

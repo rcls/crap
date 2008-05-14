@@ -179,7 +179,7 @@ int main (int argc, const char * const * argv)
              "Argument --\n"
              "Argument %s\n"
              "rlog\n", argv[2]);
-    
+
     database_t db;
 
     read_files_versions (&db, &stream, prefix);
