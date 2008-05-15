@@ -599,11 +599,14 @@ static void read_file_versions (database_t * db,
 
     (s->line)[len - 2] = 0;                 // Remove the ',v'
     char * last_slash = strrchr (s->line, '/');
+    bool attic = false;
     if (last_slash != NULL && last_slash - s->line >= 18 &&
-        memcmp (last_slash - 6, "/Attic", 6) == 0)
+        memcmp (last_slash - 6, "/Attic", 6) == 0) {
         // Remove that Attic portion.  We can't use strcpy because the strings
         // may overlap.
+        attic = true;
         memmove (last_slash - 6, last_slash, strlen (last_slash) + 1);
+    }
 
     file->path = cache_string (s->line + 12 + strlen (s->prefix));
 
@@ -659,7 +662,8 @@ static void read_file_versions (database_t * db,
 
     // Just skip until a boundary.  Too bad if a log entry contains one of
     // the boundary strings.
-    while (strcmp (s->line, REV_BOUNDARY) != 0 && strcmp (s->line, FILE_BOUNDARY) != 0) {
+    while (strcmp (s->line, REV_BOUNDARY) != 0
+           && strcmp (s->line, FILE_BOUNDARY) != 0) {
         if (!starts_with (s->line, "M "))
             fatal ("Log (%s) description incorrectly terminated\n",
                    file->rcs_path);
@@ -674,6 +678,27 @@ static void read_file_versions (database_t * db,
     next_line (s);
 
     fill_in_versions_and_parents (file);
+
+    // If the file is in the Attic, make sure any last version on the trunk is
+    // dead.
+    if (attic) {
+        unsigned long max = 0;
+        version_t * last = NULL;
+        for (version_t * i = file->versions; i != file->versions_end; ++i)
+            if (i->version[0] == '1' && i->version[1] == '.') {
+                char * tail = NULL;
+                unsigned long ver = strtoul (i->version + 2, &tail, 10);
+                if (tail != NULL && *tail == 0 && ver >= max) {
+                    last = i;
+                    max = ver;
+                }
+            }
+        if (last != NULL && !last->dead) {
+            last->dead = true;
+            fprintf (stderr, "Killing zombie version %s %s\n",
+                     file->path, last->version);
+        }
+    }
 }
 
 
