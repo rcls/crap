@@ -80,8 +80,9 @@ static void grab_version (cvs_connection_t * s, const version_t * version)
                version->version, version->file->path, s->line);
 
     next_line (s);
-    if (!starts_with (s->line, s->prefix)
-        || strcmp (s->line + strlen (s->prefix), version->file->path) != 0)
+    // It looks like some CVS servers give us absolute paths; others give us
+    // relative.  So just check the end of the path.
+    if (!ends_with (s->line, version->file->path))
         fatal ("cvs checkout %s %s - got unexpected file '%s'\n",
                version->version, version->file->path, s->line);
 
@@ -144,6 +145,11 @@ static void print_commit (changeset_t * cs, cvs_connection_t * s)
     }
 
     cs->mark = ++mark_counter;
+
+    // Give CVS a unique directory for the changeset in case we have repeated
+    // checkouts of the same file.
+    fprintf (s->stream, "Directory %lu\n%s\n",
+             cs->mark, s->remote_root);
 
     printf ("commit refs/heads/%s\n",
             *v->branch->tag->tag ? v->branch->tag->tag : "cvs_master");
@@ -212,6 +218,12 @@ static void print_tag (const database_t * db, tag_t * tag,
 
         if (fixups++ == 0) {
             tag->changeset.mark = ++mark_counter;
+
+            // Give CVS a unique directory for the changeset in case we have
+            // repeated checkouts of the same file.
+            fprintf (s->stream, "Directory %lu\n%s\n",
+                     tag->changeset.mark, s->remote_root);
+
             printf ("commit refs/%s/%s\n",
                     tag->branch_versions ? "heads" : "tags",
                     *tag->tag ? tag->tag : "cvs_master");

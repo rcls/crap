@@ -36,6 +36,15 @@ static inline bool starts_with (const char * haystack, const char * needle)
 }
 
 
+static inline bool ends_with (const char * haystack, const char * needle)
+{
+    size_t h_len = strlen (haystack);
+    size_t n_len = strlen (needle);
+    return h_len >= n_len
+        && memcmp (haystack + h_len - n_len, needle, n_len) == 0;
+}
+
+
 /// Allocate an array with malloc().
 #define ARRAY_ALLOC(T,N) ((T *) xmalloc (sizeof (T) * (N)))
 

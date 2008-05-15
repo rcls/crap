@@ -43,15 +43,6 @@ static file_tag_t * file_add_tag (string_hash_t * tags,
 }
 
 
-static inline bool ends_with (const char * haystack, const char * needle)
-{
-    size_t h_len = strlen (haystack);
-    size_t n_len = strlen (needle);
-    return h_len >= n_len
-        && memcmp (haystack + h_len - n_len, needle, n_len) == 0;
-}
-
-
 /// Parse a date string into a time_t and an offset; the filled in time includes
 /// the offset and hence is a real Unix time.
 static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
