@@ -135,12 +135,35 @@ static void grab_version (cvs_connection_t * s, const version_t * version)
 }
 
 
-static void print_commit (changeset_t * cs, cvs_connection_t * s)
+static void print_commit (const database_t * db, changeset_t * cs,
+                          cvs_connection_t * s)
 {
     const version_t * v = cs->versions;
     if (!v->branch) {
-        fprintf (stderr, "Skip %s <anon> %s %s COMMIT\n%s\n",
+        fprintf (stderr, "%s <anon> %s %s COMMIT - skip\n%s\n",
                  format_date (&cs->time), v->author, v->commitid, v->log);
+        return;
+    }
+
+    // Check to see if this commit actually does anything...
+    bool nil = true;
+    for (const version_t * i = v; i; i = i->cs_sibling)
+        if (i->used) {
+            const version_t * bv
+                = v->branch->tag->branch_versions[i->file - db->files];
+            if (bv != NULL && bv->dead)
+                bv = NULL;
+            const version_t * cv = i->dead ? NULL : i;
+            if (bv != cv) {
+                nil = false;
+                break;
+            }
+        }
+
+    if (nil) {
+        fprintf (stderr, "%s %s %s %s COMMIT - does nothing\n",
+                 format_date (&cs->time), v->branch->tag->tag,
+                 v->author, v->commitid);
         return;
     }
 
@@ -366,7 +389,7 @@ int main (int argc, const char * const * argv)
         if (changeset->type == ct_commit) {
             ++emitted_commits;
             changeset_update_branch_versions (&db, changeset);
-            print_commit (changeset, &stream);
+            print_commit (&db, changeset, &stream);
         }
         else {
             tag_t * tag = as_tag (changeset);

@@ -304,7 +304,8 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
     fill_in_parents (file);
 
     // If the file is in the Attic, make sure any last version on the trunk is
-    // dead.
+    // dead.  FIXME - maybe should insert a dead version instead of munging
+    // the dead flag?
     if (attic) {
         unsigned long max = 0;
         version_t * last = NULL;
@@ -322,33 +323,6 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
             fprintf (stderr, "Killing zombie version %s %s\n",
                      file->path, last->version);
         }
-    }
-
-    // Find any dead versions with dead parents and remove them.
-    bool removed = false;
-    for (version_t * i = file->versions; i != file->versions_end; ++i)
-        // FIXME - what say the following commit is an implicit merge of this
-        // one!
-        if (i->dead && (i->parent == NULL || i->parent->dead)) {
-            i->used = false;
-            removed = true;
-        }
-
-    if (removed) {
-        version_t * ii = file->versions;
-        for (version_t * i = file->versions; i != file->versions_end; ++i)
-            if (i->used) {
-                if (i != ii)
-                    *ii = *i;
-                ii->sibling = NULL;
-                ii->children = NULL;
-                ++ii;
-            }
-            else if (i + 1 != file->versions_end && i[1].implicit_merge) {
-                assert (!i[1].used);
-            }
-        file->versions_end = ii;
-        fill_in_parents (file);
     }
 
     file_tag_t ** branches = NULL;
@@ -574,16 +548,6 @@ static void read_file_version (file_t * file, cvs_connection_t * s)
         log[log_len - 1] = '\n';
 
         len = next_line (s);
-    }
-
-    // As a special case, if this is version 1.1 and is dead, then drop it.
-    // This would actually get caught by the remove-dead-children-of-dead-
-    // versions logic, but we may as well catch it right now.
-    if (version->dead && strcmp (version->version, "1.1") == 0) {
-        free (log);
-        --file->versions_end;
-        assert (file->versions_end == version);
-        return;
     }
 
     version->log = cache_string_n (log, log_len);

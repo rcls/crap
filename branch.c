@@ -320,8 +320,10 @@ static void update_branch_hash (struct database * db,
     SHA1_Init (&sha);
     version_t ** branch_end = branch + (db->files_end - db->files);
     for (version_t ** i = branch; i != branch_end; ++i)
-        if (*i != NULL && !(*i)->dead)
-            SHA1_Update (&sha, i, sizeof (version_t *));
+        if (*i != NULL && !(*i)->dead) {
+            const version_t * v = version_normalise (*i);
+            SHA1_Update (&sha, &v, sizeof (v));
+        }
 
     uint32_t hash[5];
     SHA1_Final ((unsigned char *) hash, &sha);

@@ -46,6 +46,16 @@ void changeset_emitted (database_t * db, heap_t * ready_versions,
 }
 
 
+static bool can_replace_with_implicit_merge (const version_t * v)
+{
+    if (v == NULL || v->implicit_merge)
+        return true;
+
+    return strcmp (v->version, "1.1") == 0 && !v->dead
+        && strcmp (v->log, "Initial revision\n") == 0;
+}
+
+
 size_t changeset_update_branch_versions (struct database * db,
                                          struct changeset * changeset)
 {
@@ -62,14 +72,12 @@ size_t changeset_update_branch_versions (struct database * db,
 
     for (version_t * i = versions; i; i = i->cs_sibling) {
         version_t ** bv = &branch[i->file - db->files];
-        i->used = !i->implicit_merge || *bv == NULL || (*bv)->implicit_merge
-            || strcmp ((*bv)->version, "1.1") == 0;
-        if (!i->used)
-            continue;
+        i->used = !i->implicit_merge || can_replace_with_implicit_merge (*bv);
 
-        version_t * v = i->dead ? NULL : i;
-        if (*bv != v) {
-            *bv = v;
+        if (i->used && *bv != i) {
+            // We need to keep dead versions here, because dead versions block
+            // implicit merges of vendor imports.
+            *bv = i;
             ++changes;
         }
     }
