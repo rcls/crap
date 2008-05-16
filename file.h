@@ -120,6 +120,9 @@ struct tag {
 
     tag_t * hash_next;                  ///< Next in tag hash table.
 
+    /// The last changeset committed on this branch.
+    changeset_t * last;
+
     /// A sha-1 hash of the version information; this is used to identify when
     /// a set of versions exactly matching this tag has been emitted.
     uint32_t hash[5];

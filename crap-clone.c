@@ -164,9 +164,12 @@ static void print_commit (const database_t * db, changeset_t * cs,
         fprintf (stderr, "%s %s %s %s COMMIT - does nothing\n",
                  format_date (&cs->time), v->branch->tag->tag,
                  v->author, v->commitid);
+        cs->mark = v->branch->tag->last->mark;
+        v->branch->tag->last = cs;
         return;
     }
 
+    v->branch->tag->last = cs;
     cs->mark = ++mark_counter;
 
     // Give CVS a unique directory for the changeset in case we have repeated
@@ -205,6 +208,8 @@ static void print_tag (const database_t * db, tag_t * tag,
     else
         branch = as_tag (tag->parent);
 
+    assert (tag->parent == NULL || (branch && branch->last == tag->parent));
+
     printf ("reset refs/%s/%s\n",
             tag->branch_versions ? "heads" : "tags",
             *tag->tag ? tag->tag : "cvs_master");
@@ -213,6 +218,8 @@ static void print_tag (const database_t * db, tag_t * tag,
         printf ("from :%lu\n\n", tag->parent->mark);
         tag->changeset.mark = tag->parent->mark;
     }
+
+    tag->last = &tag->changeset;
 
     // Go through the current versions on the branch and note any version
     // fix-ups required.
@@ -388,8 +395,8 @@ int main (int argc, const char * const * argv)
     while ((changeset = next_changeset (&db))) {
         if (changeset->type == ct_commit) {
             ++emitted_commits;
-            changeset_update_branch_versions (&db, changeset);
             print_commit (&db, changeset, &stream);
+            changeset_update_branch_versions (&db, changeset);
         }
         else {
             tag_t * tag = as_tag (changeset);
