@@ -73,13 +73,18 @@ size_t changeset_update_branch_versions (struct database * db,
     for (version_t * i = versions; i; i = i->cs_sibling) {
         version_t ** bv = &branch[i->file - db->files];
         i->used = !i->implicit_merge || can_replace_with_implicit_merge (*bv);
+        if (!i->used)
+            continue;
 
-        if (i->used && *bv != i) {
-            // We need to keep dead versions here, because dead versions block
-            // implicit merges of vendor imports.
-            *bv = i;
+        version_t * bvv = (*bv == NULL || (*bv)->dead)
+            ? NULL : version_normalise (*bv);
+        version_t * ii = i->dead ? NULL : version_normalise (i);
+        if (bvv != ii)
             ++changes;
-        }
+
+        // We need to keep dead versions here, because dead versions block
+        // implicit merges of vendor imports.
+        *bv = i;
     }
 
     return changes;
