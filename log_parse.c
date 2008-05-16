@@ -293,7 +293,7 @@ static void fill_in_parents (file_t * file)
 }
 
 
-static void fill_in_versions_and_parents (file_t * file)
+static void fill_in_versions_and_parents (file_t * file, bool attic)
 {
     qsort (file->versions, file->versions_end - file->versions,
            sizeof (version_t), version_compare);
@@ -302,6 +302,27 @@ static void fill_in_versions_and_parents (file_t * file)
            sizeof (file_tag_t), file_tag_compare);
 
     fill_in_parents (file);
+
+    // If the file is in the Attic, make sure any last version on the trunk is
+    // dead.
+    if (attic) {
+        unsigned long max = 0;
+        version_t * last = NULL;
+        for (version_t * i = file->versions; i != file->versions_end; ++i)
+            if (i->version[0] == '1' && i->version[1] == '.') {
+                char * tail = NULL;
+                unsigned long ver = strtoul (i->version + 2, &tail, 10);
+                if (tail != NULL && *tail == 0 && ver >= max) {
+                    last = i;
+                    max = ver;
+                }
+            }
+        if (last != NULL && !last->dead) {
+            last->dead = true;
+            fprintf (stderr, "Killing zombie version %s %s\n",
+                     file->path, last->version);
+        }
+    }
 
     // Find any dead versions with dead parents and remove them.
     bool removed = false;
@@ -677,28 +698,7 @@ static void read_file_versions (database_t * db,
 
     next_line (s);
 
-    fill_in_versions_and_parents (file);
-
-    // If the file is in the Attic, make sure any last version on the trunk is
-    // dead.
-    if (attic) {
-        unsigned long max = 0;
-        version_t * last = NULL;
-        for (version_t * i = file->versions; i != file->versions_end; ++i)
-            if (i->version[0] == '1' && i->version[1] == '.') {
-                char * tail = NULL;
-                unsigned long ver = strtoul (i->version + 2, &tail, 10);
-                if (tail != NULL && *tail == 0 && ver >= max) {
-                    last = i;
-                    max = ver;
-                }
-            }
-        if (last != NULL && !last->dead) {
-            last->dead = true;
-            fprintf (stderr, "Killing zombie version %s %s\n",
-                     file->path, last->version);
-        }
-    }
+    fill_in_versions_and_parents (file, attic);
 }
 
 
