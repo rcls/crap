@@ -268,7 +268,7 @@ static void assign_tag_point (database_t * db, tag_t * tag)
         // then increment current; if the previous version matches the tag
         // version, then decrement current.  Just to make life fun, the
         // changeset versions are not sorted by file, so we have to search for
-        // them.  FIXME - again, this misses vendor imports.
+        // them.  FIXME - again, this does not get vendor imports correct.
         version_t * v;
         if ((*i)->type != ct_commit)
             continue;                   // Tags play no role here.
@@ -285,9 +285,8 @@ static void assign_tag_point (database_t * db, tag_t * tag)
             assert (!ft->version->implicit_merge);
             if (ft->version == version_normalise (j))
                 ++current;
-            else if (j->parent != NULL
-                     && ft->version == version_normalise (j->parent))
-                --current;
+            else if (ft->version == version_normalise (j->parent))
+                --current;              // FIXME check parent on branch.
         }
 
         if (current > best) {

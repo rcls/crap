@@ -233,18 +233,11 @@ static void print_tag (const database_t * db, tag_t * tag,
 
     file_tag_t ** tf = tag->tag_files;
     for (file_t * i = db->files; i != db->files_end; ++i) {
-        version_t * bv = branch ? branch->branch_versions[i - db->files] : NULL;
-        if (bv == NULL || bv->dead)
-            bv = NULL;
-        else
-            bv = version_normalise (bv);
+        version_t * bv = branch
+            ? version_live (branch->branch_versions[i - db->files]) : NULL;
         version_t * tv = NULL;
         if (tf != tag->tag_files_end && (*tf)->file == i)
-            tv = (*tf++)->version;
-        if (tv == NULL || tv->dead)
-            tv = NULL;
-        else
-            tv = version_normalise (tv);
+            tv = version_live ((*tf++)->version);
 
         if (bv == tv) {
             if (bv != NULL)
@@ -315,18 +308,11 @@ static void print_tag (const database_t * db, tag_t * tag,
 
     tf = tag->tag_files;
     for (file_t * i = db->files; i != db->files_end; ++i) {
-        version_t * bv = branch ? branch->branch_versions[i - db->files] : NULL;
-        if (bv == NULL || bv->dead)
-            bv = NULL;
-        else
-            bv = version_normalise (bv);
+        version_t * bv = branch
+            ? version_live (branch->branch_versions[i - db->files]) : NULL;
         version_t * tv = NULL;
         if (tf != tag->tag_files_end && (*tf)->file == i)
-            tv = (*tf++)->version;
-        if (tv == NULL || tv->dead)
-            tv = NULL;
-        else
-            tv = version_normalise (tv);
+            tv = version_live ((*tf++)->version);
 
         if (tv != bv) {
             if (tv == NULL)

@@ -76,10 +76,7 @@ size_t changeset_update_branch_versions (struct database * db,
         if (!i->used)
             continue;
 
-        version_t * bvv = (*bv == NULL || (*bv)->dead)
-            ? NULL : version_normalise (*bv);
-        version_t * ii = i->dead ? NULL : version_normalise (i);
-        if (bvv != ii)
+        if (version_live (*bv) != version_live (i))
             ++changes;
 
         // We need to keep dead versions here, because dead versions block

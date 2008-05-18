@@ -89,18 +89,10 @@ static void print_tag (const database_t * db, const tag_t * tag)
     size_t fixups = 0;
     size_t keep = 0;
     for (file_t * i = db->files; i != db->files_end; ++i) {
-        version_t * bv = branch->branch_versions[i - db->files];
-        if (bv != NULL && bv->dead)
-            bv = NULL;
-        if (bv != NULL)
-            bv = version_normalise (bv);
+        version_t * bv = version_live (branch->branch_versions[i - db->files]);
         version_t * tv = NULL;
         if (tf != tag->tag_files_end && (*tf)->file == i)
-            tv = (*tf++)->version;
-        if (tv != NULL && tv->dead)
-            tv = NULL;
-        if (tv != NULL)
-            tv = version_normalise (tv);
+            tv = version_live ((*tf++)->version);
 
         if (bv != tv) {
             ++fixups;
