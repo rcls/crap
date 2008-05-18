@@ -670,7 +670,7 @@ static int file_compare (const void * AA, const void * BB)
 {
     const file_t * A = AA;
     const file_t * B = BB;
-    return strcmp (A->rcs_path, B->rcs_path);
+    return strcmp (A->path, B->path);
 }
 
 

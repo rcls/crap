@@ -179,3 +179,25 @@ tag_t * database_tag_hash_next (tag_t * tag)
             return i;
     return NULL;
 }
+
+
+file_t * database_find_file (const database_t * db, const char * path)
+{
+    file_t * base = db->files;
+    size_t count = db->files_end - db->files;
+
+    while (count) {
+        size_t mid = count >> 1;
+        int c = strcmp (base[mid].path, path);
+        if (c < 0) {
+            base += mid + 1;
+            count -= mid + 1;
+        }
+        else if (c > 0)
+            count = mid;
+        else
+            return &base[mid];
+    }
+
+    return NULL;
+}

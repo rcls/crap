@@ -35,60 +35,59 @@ static const char * format_date (const time_t * time)
 }
 
 
-static bool check_entry (const char * s, const char * version)
+static const char * file_error (FILE * f)
 {
-    if (s[0] != '/')
-        return false;
-
-    const char * slash = strchr (s + 1, '/');
-    if (slash == NULL)
-        return false;
-
-    size_t vlen = strlen (version);
-    if (strncmp (slash + 1, version, vlen) != 0)
-        return false;
-
-    if (slash[vlen + 1] != '/')
-        return false;
-
-    return true;
+    return ferror (f) ? strerror (errno) : (feof (f) ? "EOF" : "unknown");
 }
 
 
-static void grab_version (cvs_connection_t * s, version_t * version)
+static void read_version (const database_t * db, cvs_connection_t * s)
 {
-    if (version == NULL || version->mark != SIZE_MAX)
-        return;
-
-    fprintf (s->stream,
-             "Argument -kk\n"
-             "Argument -r%s\n"
-             "Argument --\n"
-             "Argument %s/%s\nco\n",
-             version->version, s->module, version->file->path);
-
-    do
-        next_line (s);
-    while (starts_with (s->line, "M ") || starts_with (s->line, "MT "));
-
     if (!starts_with (s->line, "Created ") &&
         !starts_with (s->line, "Update-existing ") &&
         !starts_with (s->line, "Updated "))
-        fatal ("cvs checkout %s %s - did not get Update line: '%s'\n",
-               version->version, version->file->path, s->line);
+        fatal ("Did not get Update line: '%s'\n", s->line);
+        
+    const char * d = strchr (s->line, ' ') + 1;
+    // Get the directory part of the path after the module name.
+    if (strcmp (d, ".") == 0 || strcmp (d, "./") == 0)
+        d = xstrdup ("");
+    else {
+        size_t len = strlen (d);
+        if (d[len - 1] == '/')
+            len -= 1;
+        char * dd = xmalloc (len + 2);
+        memcpy (dd, d, len);
+        dd[len] = '/';
+        dd[len + 1] = 0;
+        d = dd;        
+    }
+
+    next_line (s);                      // Skip the repo directory.
 
     next_line (s);
-    // It looks like some CVS servers give us absolute paths; others give us
-    // relative.  So just check the end of the path.
-    if (!ends_with (s->line, version->file->path))
-        fatal ("cvs checkout %s %s - got unexpected file '%s'\n",
-               version->version, version->file->path, s->line);
+    if (s->line[0] != '/')
+        fatal ("cvs checkout - doesn't look like entry line: '%s'", s->line);
 
-    next_line (s);
+    const char * slash1 = strchr (s->line + 1, '/');
+    if (slash1 == NULL)
+        fatal ("cvs checkout - doesn't look like entry line: '%s'", s->line);
 
-    if (!check_entry (s->line, version->version))
-        fatal ("cvs checkout %s %s - got unexpected entry '%s'\n",
-               version->version, version->file->path, s->line);
+    const char * slash2 = strchr (slash1 + 1, '/');
+    if (slash2 == NULL)
+        fatal ("cvs checkout - doesn't look like entry line: '%s'", s->line);
+
+    const char * path = xasprintf ("%s%.*s", d,
+                                   slash1 - s->line - 1, s->line + 1);
+    const char * vers = xasprintf ("%.*s", slash2 - slash1 - 1, slash1 + 1);
+
+    file_t * file = database_find_file (db, path);
+    if (file == NULL)
+        fatal ("cvs checkout - got unknown file %s\n", path);
+
+    version_t * version = file_find_version (file, vers);
+    if (version == NULL)
+        fatal ("cvs checkout - got unknown file version %s %s\n", path, vers);
 
     next_line (s);
     if (!starts_with (s->line, "u="))
@@ -96,7 +95,6 @@ static void grab_version (cvs_connection_t * s, version_t * version)
                version->version, version->file->path, s->line);
 
     version->exec = (strchr (s->line, 'x') != NULL);
-    version->mark = ++mark_counter;
 
     next_line (s);
     char * tail;
@@ -105,31 +103,92 @@ static void grab_version (cvs_connection_t * s, version_t * version)
         fatal ("cvs checkout %s %s - got unexpected file length '%s'\n",
                version->version, version->file->path, s->line);
 
-    printf ("blob\nmark :%zu\ndata %lu\n", version->mark, len);
+    bool go = version->mark == SIZE_MAX;
+    if (go) {
+        version->mark = ++mark_counter;
+        printf ("blob\nmark :%zu\ndata %lu\n", version->mark, len);
+    }
+    else
+        fprintf (stderr, "cvs checkout %s %s - version is duplicate\n",
+                 path, vers);
 
+    // Process the content.
     while (len != 0) {
         char buffer[4096];
         size_t get = len < 4096 ? len : 4096;
         size_t got = fread (&buffer, 1, get, s->stream);
         if (got == 0)
-            fatal ("cvs checkout %s %s - interrupted: %s\n",
-                   version->version, version->file->path,
-                   ferror (s->stream) ? strerror (errno) : (
-                       feof (s->stream) ? "closed" : "unknown"));
-        size_t put = fwrite (&buffer, got, 1, stdout);
-        if (put != 1)
-            fatal ("git import %s %s - interrupted: %s\n",
-                   version->version, version->file->path,
-                   ferror (stdout) ? strerror (errno) : (
-                       feof (stdout) ? "closed" : "unknown"));
+            fatal ("cvs checkout %s %s - %s\n", path, vers,
+                   file_error (s->stream));
+        if (go) {
+            size_t put = fwrite (&buffer, got, 1, stdout);
+            if (put != 1)
+                fatal ("git import %s %s - interrupted: %s\n",
+                       version->version, version->file->path,
+                       ferror (stdout) ? strerror (errno) : (
+                           feof (stdout) ? "closed" : "unknown"));
+        }
+
         len -= got;
     }
-    printf ("\n");
 
-    next_line (s);
-    if (strcmp (s->line, "ok") != 0)
-        fatal ("cvs checkout %s %s - did not get ok: '%s'\n",
-               version->version, version->file->path, s->line);
+    if (go)
+        printf ("\n");
+
+    xfree (path);
+    xfree (vers);        
+}
+
+
+static void read_versions (const database_t * db, cvs_connection_t * s)
+{
+    while (1) {
+        next_line (s);
+        if (starts_with (s->line, "M ") || starts_with (s->line, "MT "))
+            continue;
+
+        if (strcmp (s->line, "ok") == 0)
+            return;
+
+        read_version (db, s);
+    }
+}
+
+
+static void grab_version (const database_t * db,
+                          cvs_connection_t * s, version_t * version)
+{
+    if (version == NULL || version->mark != SIZE_MAX)
+        return;
+
+    const char * path = version->file->path;
+    const char * slash = strrchr (path, '/');
+    // Make sure we have the directory.
+    if (slash != NULL
+        && (version->parent == NULL || version->parent->mark == SIZE_MAX))
+        fprintf (s->stream,
+                 "Directory %s/%.*s\n"
+                 "%s%.*s\n",
+                 s->module, slash - path, path,
+                 s->prefix, slash - path, path);
+
+    // Go to the main directory.
+    fprintf (s->stream,
+             "Directory %s\n%.*s\n", s->module,
+             strlen (s->prefix) - 1, s->prefix);
+
+    fprintf (s->stream,
+             "Argument -kk\n"
+             "Argument -r%s\n"
+             "Argument --\n"
+             "Argument %s\nupdate\n",
+             version->version, version->file->path);
+
+    read_versions (db, s);
+
+    if (version->mark == SIZE_MAX)
+        fatal ("cvs checkout - failed to get %s %s\n",
+               version->file->path, version->version);
 }
 
 
@@ -167,7 +226,7 @@ static void print_commit (const database_t * db, changeset_t * cs,
     // Get all the versions.
     for (version_t * i = v; i; i = i->cs_sibling)
         if (i->used)
-            grab_version (s, version_live (i));
+            grab_version (db, s, version_live (i));
 
     v->branch->tag->last = cs;
     cs->mark = ++mark_counter;
@@ -277,7 +336,7 @@ static void print_tag (const database_t * db, tag_t * tag,
         if (tf != tag->tag_files_end && (*tf)->file == i)
             tv = version_live ((*tf++)->version);
 
-        grab_version (s, tv);
+        grab_version (db, s, tv);
 
         if (bv == tv) {
             if (bv != NULL && keep <= deleted)
