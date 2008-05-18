@@ -47,7 +47,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         !starts_with (s->line, "Update-existing ") &&
         !starts_with (s->line, "Updated "))
         fatal ("Did not get Update line: '%s'\n", s->line);
-        
+
     const char * d = strchr (s->line, ' ') + 1;
     // Get the directory part of the path after the module name.
     if (strcmp (d, ".") == 0 || strcmp (d, "./") == 0)
@@ -192,6 +192,79 @@ static void grab_version (const database_t * db,
 }
 
 
+static void grab_by_date (const database_t * db,
+                          cvs_connection_t * s,
+                          changeset_t * cs)
+{
+    // Build an array of the paths that we're getting.
+    const char ** paths = NULL;
+    const char ** paths_end = NULL;
+
+    time_t last = cs->time;
+    for (version_t * i = cs->versions; i; i = i->cs_sibling) {
+        version_t * v = version_live (i);
+        if (v && v->used && v->mark == SIZE_MAX) {
+            if (last < v->time)
+                last = v->time;
+            ARRAY_APPEND (paths, v->file->path);
+        }
+    }
+
+    assert (paths != paths_end);
+
+    qsort (paths, paths_end - paths, sizeof (const char *),
+           (int(*)(const void *, const void *)) strcmp);
+
+    const char * d = NULL;
+    size_t d_len = SIZE_MAX;
+
+    for (const char ** i = paths; i != paths_end; ++i) {
+        const char * slash = strrchr (*i, '/');
+        if (slash == NULL)
+            continue;
+        if (slash - *i == d_len && memcmp (*i, d, d_len) == 0)
+            continue;
+        // Tell the server about this directory.
+        d = *i;
+        d_len = slash - d;
+        fprintf (s->stream,
+                 "Directory %s/%.*s\n"
+                 "%s%.*s\n",
+                 s->module, d_len, d,
+                 s->prefix, d_len, d);
+    }
+
+    // Go to the main directory.
+    fprintf (s->stream,
+             "Directory %s\n%.*s\n", s->module,
+             strlen (s->prefix) - 1, s->prefix);
+
+    // Format the date.
+    struct tm tm;
+    ++last;                             // Add a second...
+    gmtime_r (&last, &tm);
+    char date[64];
+    if (strftime (date, 64, "%d %b %Y %H:%M:%S -0000", &tm) == 0)
+        // Bugger.  Oh well, the fallbacks will get it anyway.
+        return;
+
+    // Update args:
+    if (cs->versions->branch->tag->tag[0])
+        fprintf (s->stream, "Argument -r%s\n", cs->versions->branch->tag->tag);
+    fprintf (s->stream,
+             "Argument -kk\n"
+             "Argument -D%s\n"
+             "Argument --\n", date);
+
+    for (const char ** i = paths; i != paths_end; ++i)
+        fprintf (s->stream, "Argument %s\n", *i);
+
+    fprintf (s->stream, "update\n");
+
+    read_versions (db, s);
+}
+
+
 static void print_commit (const database_t * db, changeset_t * cs,
                           cvs_connection_t * s)
 {
@@ -220,10 +293,27 @@ static void print_commit (const database_t * db, changeset_t * cs,
         return;
     }
 
-    // Get all the versions.
-    for (version_t * i = v; i; i = i->cs_sibling)
-        if (i->used)
-            grab_version (db, s, version_live (i));
+    // If we more than one outstanding version, then attempt a get by date.
+    size_t outstanding;
+    for (version_t * i = v; i; i = i->cs_sibling) {
+        version_t * v = version_live (i);
+        if (v && v->used && v->mark == SIZE_MAX)
+            ++outstanding;
+    }
+
+    if (outstanding > 1)
+        grab_by_date (db, s, cs);
+
+    // Get any remainning versions.
+    for (version_t * i = v; i; i = i->cs_sibling) {
+        version_t * v = version_live (i);
+        if (v && v->used && v->mark == SIZE_MAX) {
+            if (outstanding > 1)
+                fprintf (stderr, "Missed first time round: %s %s\n",
+                         i->file->path, i->version);
+            grab_version (db, s, v);
+        }
+    }
 
     v->branch->tag->last = cs;
     cs->mark = ++mark_counter;

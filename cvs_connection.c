@@ -270,7 +270,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 }
 
 
-size_t next_line (cvs_connection_t * conn)
+static size_t next_line_raw (cvs_connection_t * conn)
 {
     ssize_t s = getline (&conn->line, &conn->line_len, conn->stream);
     if (s < 0)
@@ -283,6 +283,17 @@ size_t next_line (cvs_connection_t * conn)
         conn->line[--s] = 0;
 
     return s;
+}
+
+
+size_t next_line (cvs_connection_t * conn)
+{
+    while (1) {
+        ssize_t s = next_line_raw (conn);
+        if (conn->line[0] != 'E' || conn->line[1] != ' ')
+            return s;
+        fprintf (stderr, "cvs: %s\n", conn->line + 2);
+    }
 }
 
 
