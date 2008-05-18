@@ -215,9 +215,6 @@ static void print_commit (const database_t * db, changeset_t * cs,
         }
 
     if (nil) {
-        fprintf (stderr, "%s %s %s %s COMMIT - does nothing\n",
-                 format_date (&cs->time), v->branch->tag->tag,
-                 v->author, v->commitid);
         cs->mark = v->branch->tag->last->mark;
         v->branch->tag->last = cs;
         return;
