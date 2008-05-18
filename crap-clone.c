@@ -55,12 +55,10 @@ static bool check_entry (const char * s, const char * version)
 }
 
 
-static void grab_version (cvs_connection_t * s, const version_t * version)
+static void grab_version (cvs_connection_t * s, version_t * version)
 {
-    if (version->dead) {
-        printf ("D %s\n", version->file->path); // Easy peasy.
+    if (version == NULL || version->mark != SIZE_MAX)
         return;
-    }
 
     fprintf (s->stream,
              "Argument -kk\n"
@@ -97,7 +95,8 @@ static void grab_version (cvs_connection_t * s, const version_t * version)
         fatal ("cvs checkout %s %s - got unexpected file mode '%s'\n",
                version->version, version->file->path, s->line);
 
-    bool exec = strchr (s->line, 'x') != NULL;
+    version->exec = (strchr (s->line, 'x') != NULL);
+    version->mark = ++mark_counter;
 
     next_line (s);
     char * tail;
@@ -106,8 +105,7 @@ static void grab_version (cvs_connection_t * s, const version_t * version)
         fatal ("cvs checkout %s %s - got unexpected file length '%s'\n",
                version->version, version->file->path, s->line);
 
-    printf ("M %s inline %s\ndata %lu\n",
-            exec ? "755" : "644", version->file->path, len);
+    printf ("blob\nmark :%zu\ndata %lu\n", version->mark, len);
 
     while (len != 0) {
         char buffer[4096];
@@ -138,7 +136,7 @@ static void grab_version (cvs_connection_t * s, const version_t * version)
 static void print_commit (const database_t * db, changeset_t * cs,
                           cvs_connection_t * s)
 {
-    const version_t * v = cs->versions;
+    version_t * v = cs->versions;
     if (!v->branch) {
         fprintf (stderr, "%s <anon> %s %s COMMIT - skip\n%s\n",
                  format_date (&cs->time), v->author, v->commitid, v->log);
@@ -147,14 +145,11 @@ static void print_commit (const database_t * db, changeset_t * cs,
 
     // Check to see if this commit actually does anything...
     bool nil = true;
-    for (const version_t * i = v; i; i = i->cs_sibling)
+    for (version_t * i = v; i; i = i->cs_sibling)
         if (i->used) {
-            const version_t * bv
+            version_t * bv
                 = v->branch->tag->branch_versions[i->file - db->files];
-            if (bv != NULL && bv->dead)
-                bv = NULL;
-            const version_t * cv = i->dead ? NULL : i;
-            if (bv != cv) {
+            if (version_live (bv) != version_live (i)) {
                 nil = false;
                 break;
             }
@@ -169,13 +164,13 @@ static void print_commit (const database_t * db, changeset_t * cs,
         return;
     }
 
+    // Get all the versions.
+    for (version_t * i = v; i; i = i->cs_sibling)
+        if (i->used)
+            grab_version (s, version_live (i));
+
     v->branch->tag->last = cs;
     cs->mark = ++mark_counter;
-
-    // Give CVS a unique directory for the changeset in case we have repeated
-    // checkouts of the same file.
-    fprintf (s->stream, "Directory %lu\n%s\n",
-             cs->mark, s->remote_root);
 
     printf ("commit refs/heads/%s\n",
             *v->branch->tag->tag ? v->branch->tag->tag : "cvs_master");
@@ -183,9 +178,15 @@ static void print_commit (const database_t * db, changeset_t * cs,
     printf ("committer %s <%s> %ld +0000\n", v->author, v->author, cs->time);
     printf ("data %u\n%s\n", strlen (v->log), v->log);
 
-    for (const version_t * i = v; i; i = i->cs_sibling)
-        if (i->used)
-            grab_version (s, i);
+    for (version_t * i = v; i; i = i->cs_sibling)
+        if (i->used) {
+            version_t * vv = version_normalise (i);
+            if (vv->dead)
+                printf ("D %s\n", vv->file->path);
+            else
+                printf ("M %s :%zu %s\n",
+                        vv->exec ? "755" : "644", vv->mark, vv->file->path);
+        }
 }
 
 
@@ -276,6 +277,8 @@ static void print_tag (const database_t * db, tag_t * tag,
         if (tf != tag->tag_files_end && (*tf)->file == i)
             tv = version_live ((*tf++)->version);
 
+        grab_version (s, tv);
+
         if (bv == tv) {
             if (bv != NULL && keep <= deleted)
                 ARRAY_APPEND (list, xasprintf ("%s KEEP %s\n",
@@ -284,7 +287,7 @@ static void print_tag (const database_t * db, tag_t * tag,
         }
 
         if (tv != NULL || deleted <= keep)
-            ARRAY_APPEND (list, xasprintf ("%s %s->%s\n", bv->file->path,
+            ARRAY_APPEND (list, xasprintf ("%s %s->%s\n", i->path,
                                            bv ? bv->version : "ADD",
                                            tv ? tv->version : "DELETE"));
     }
@@ -305,11 +308,6 @@ static void print_tag (const database_t * db, tag_t * tag,
     }
     xfree (list);
 
-    // Give CVS a unique directory for the changeset in case we have
-    // repeated checkouts of the same file.
-    fprintf (s->stream, "Directory %lu\n%s\n",
-             tag->changeset.mark, s->remote_root);
-
     tf = tag->tag_files;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = branch
@@ -322,7 +320,8 @@ static void print_tag (const database_t * db, tag_t * tag,
             if (tv == NULL)
                 printf ("D %s\n", i->path);
             else
-                grab_version (s, tv);
+                printf ("M %s :%zu %s\n",
+                        tv->exec ? "755" : "644", tv->mark, tv->file->path);
         }
     }
 }

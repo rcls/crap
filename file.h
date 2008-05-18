@@ -50,6 +50,9 @@ struct version {
     /// indicate if the revision was actually used.
     bool used;
 
+    /// Should this version be mode 755 instead of 644?
+    bool exec;
+
     version_t * parent;                 ///< Previous version.
     version_t * children;               ///< A child, or NULL.
     version_t * sibling;                ///< A sibling, or NULL.
@@ -64,7 +67,10 @@ struct version {
     struct changeset * commit;
     version_t * cs_sibling;             ///< Sibling in changeset.
 
-    size_t ready_index;                 ///< Heap index for emitting versions.
+    union {
+        size_t ready_index;             ///< Heap index for emitting versions.
+        size_t mark;                    ///< Mark during emission.
+    };
 };
 
 
