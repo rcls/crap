@@ -43,6 +43,21 @@ static const char * file_error (FILE * f)
 
 static void read_version (const database_t * db, cvs_connection_t * s)
 {
+    if (starts_with (s->line, "Removed ")) {
+        // Removed line; we got the date a bit silly, just ignore it.
+        next_line (s);
+        return;
+    }
+
+    if (starts_with (s->line, "Checked-in ")) {
+        // Update entry but no file change.  Hopefully this just means we
+        // screwed up the dates; if servers start sending this back for
+        // unchanged versions we might have to think again.
+        next_line (s);
+        next_line (s);
+        return;
+    }
+
     if (!starts_with (s->line, "Created ") &&
         !starts_with (s->line, "Update-existing ") &&
         !starts_with (s->line, "Updated "))
@@ -251,8 +266,9 @@ static void grab_by_date (const database_t * db,
         return;
 
     // Update args:
-    if (cs->versions->branch->tag->tag[0])
-        fprintf (s->stream, "Argument -r%s\n", cs->versions->branch->tag->tag);
+    const char * branch = version_normalise (cs->versions)->branch->tag->tag;
+    if (branch[0])
+        cvs_printf (s, "Argument -r%s\n", branch);
 
     cvs_printf (s, "Argument -kk\n" "Argument -D%s\n" "Argument --\n", date);
 
