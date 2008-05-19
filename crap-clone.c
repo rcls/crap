@@ -323,7 +323,7 @@ static void print_commit (const database_t * db, changeset_t * cs,
     if (outstanding > 1)
         grab_by_date (db, s, cs);
 
-    // Get any remainning versions.
+    // Get any remaining versions.
     for (version_t * i = v; i; i = i->cs_sibling) {
         version_t * v = version_live (i);
         if (v && v->used && v->mark == SIZE_MAX) {

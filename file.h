@@ -76,7 +76,7 @@ struct version {
 
 static inline version_t * version_normalise (version_t * v)
 {
-    return v && v->implicit_merge ? v - 1 : v;
+    return v ? v - v->implicit_merge : v;
 }
 
 

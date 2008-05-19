@@ -122,11 +122,11 @@ int main (int argc, const char * const * argv)
     stream.prefix = xasprintf ("%s/%s/", stream.remote_root, argv[2]);
     stream.module = xstrdup (argv[2]);
 
-    fprintf (stream.stream,
-             "Global_option -q\n"
-             "Argument --\n"
-             "Argument %s\n"
-             "rlog\n", argv[2]);
+    cvs_printf (&stream,
+                "Global_option -q\n"
+                "Argument --\n"
+                "Argument %s\n"
+                "rlog\n", argv[2]);
 
     database_t db;
 
