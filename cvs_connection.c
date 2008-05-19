@@ -5,8 +5,15 @@
 #include <errno.h>
 #include <netdb.h>
 #include <string.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
+
+
+/// All data sent from us into the server.
+static FILE * client_log_in;
+/// All data sent out from the server to us.
+static FILE * client_log_out;
 
 
 static const char * pserver_password (const char * root)
@@ -127,10 +134,9 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
 
     const char * password = pserver_password (root);
     fprintf (stderr, "Password '%s'\n", password);
-    if (fprintf (conn->stream,
-                 "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
-                 path, user_len, user, password) < 0)
-        fatal ("Writing to socket: %s\n", strerror (errno));
+    cvs_printf (conn,
+                "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
+                path, user_len, user, password);
     xfree (password);
 
     next_line (conn);
@@ -225,6 +231,19 @@ static void connect_to_fake (cvs_connection_t * conn, const char * root)
 
 void connect_to_cvs (cvs_connection_t * conn, const char * root)
 {
+    const char * client_log = getenv ("CVS_CLIENT_LOG");
+    if (client_log) {
+//        client_log += strlen ("CVS_CLIENT_LOG=");
+        char path[strlen (client_log) + 5];
+        strcpy (path, client_log);
+        strcat (path, ".in");
+        client_log_in = fopen (path, "w");
+
+        strcpy (path, client_log);
+        strcat (path, ".out");
+        client_log_out = fopen (path, "w");
+    }
+
     conn->line = NULL;
     conn->line_len = 0;
 
@@ -242,21 +261,21 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
     else
         connect_to_fork (conn, root);
 
-    fprintf (conn->stream,
-             "Root %s\n"
+    cvs_printf (conn,
+                "Root %s\n"
 
-             "Valid-responses ok error Valid-requests Checked-in New-entry "
-             "Checksum Copy-file Updated Created Update-existing Merged "
-             "Patched Rcs-diff Mode Removed Remove-entry "
-             // We don't actually want these:             
-             // "Set-static-directory Clear-static-directory Set-sticky "
-             // "Clear-sticky Mod-time "
-             "Template Notified Module-expansion "
-             "Wrapper-rcsOption M Mbinary E F MT\n"
+                "Valid-responses ok error Valid-requests Checked-in New-entry "
+                "Checksum Copy-file Updated Created Update-existing Merged "
+                "Patched Rcs-diff Mode Removed Remove-entry "
+                // We don't actually want these:             
+                // "Set-static-directory Clear-static-directory Set-sticky "
+                // "Clear-sticky Mod-time "
+                "Template Notified Module-expansion "
+                "Wrapper-rcsOption M Mbinary E F MT\n"
 
-             "valid-requests\n"
-             "UseUnchanged\n",
-             conn->remote_root);
+                "valid-requests\n"
+                "UseUnchanged\n",
+                conn->remote_root);
 
     next_line (conn);
     if (!starts_with (conn->line, "Valid-requests "))
@@ -282,6 +301,9 @@ static size_t next_line_raw (cvs_connection_t * conn)
     if (s > 0 && conn->line[s - 1] == '\n')
         conn->line[--s] = 0;
 
+    if (client_log_out)
+        fprintf (client_log_out, "%s\n", conn->line);
+
     return s;
 }
 
@@ -297,6 +319,24 @@ size_t next_line (cvs_connection_t * conn)
 }
 
 
+void cvs_printf (cvs_connection_t * conn, const char * format, ...)
+{
+    va_list args;
+    va_start (args, format);
+    if (client_log_in) {
+        va_list copy;
+        va_copy (copy, args);
+        vfprintf (client_log_in, format, args);
+        va_end (copy);
+    }
+
+    if (vfprintf (conn->stream, format, args) < 0)
+        fatal ("Writing to cvs socket: %s\n", strerror (errno));
+
+    va_end (args);
+}
+
+
 void cvs_connection_destroy (cvs_connection_t * conn)
 {
     xfree (conn->line);
@@ -305,3 +345,11 @@ void cvs_connection_destroy (cvs_connection_t * conn)
 
     fclose (conn->stream);
 }
+
+
+void cvs_record_read (cvs_connection_t * s, size_t bytes)
+{
+    if (client_log_out)
+        fprintf (client_log_out, "[%zu bytes of data]\n", bytes);
+}
+

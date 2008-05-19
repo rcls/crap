@@ -113,9 +113,11 @@ static void read_version (const database_t * db, cvs_connection_t * s)
                  path, vers);
 
     // Process the content.
-    while (len != 0) {
+    for (size_t done = 0; done != len; ) {
         char buffer[4096];
-        size_t get = len < 4096 ? len : 4096;
+        size_t get = len - done;
+        if (get > 4096)
+            get = 4096;
         size_t got = fread (&buffer, 1, get, s->stream);
         if (got == 0)
             fatal ("cvs checkout %s %s - %s\n", path, vers,
@@ -129,8 +131,10 @@ static void read_version (const database_t * db, cvs_connection_t * s)
                            feof (stdout) ? "closed" : "unknown"));
         }
 
-        len -= got;
+        done += got;
     }
+
+    cvs_record_read (s, len);
 
     if (go)
         printf ("\n");
@@ -166,23 +170,21 @@ static void grab_version (const database_t * db,
     // Make sure we have the directory.
     if (slash != NULL
         && (version->parent == NULL || version->parent->mark == SIZE_MAX))
-        fprintf (s->stream,
-                 "Directory %s/%.*s\n"
-                 "%s%.*s\n",
-                 s->module, slash - path, path,
-                 s->prefix, slash - path, path);
+        cvs_printf (s, "Directory %s/%.*s\n" "%s%.*s\n",
+                    s->module, slash - path, path,
+                    s->prefix, slash - path, path);
 
     // Go to the main directory.
-    fprintf (s->stream,
-             "Directory %s\n%.*s\n", s->module,
-             strlen (s->prefix) - 1, s->prefix);
+    cvs_printf (s,
+                "Directory %s\n%.*s\n", s->module,
+                strlen (s->prefix) - 1, s->prefix);
 
-    fprintf (s->stream,
-             "Argument -kk\n"
-             "Argument -r%s\n"
-             "Argument --\n"
-             "Argument %s\nupdate\n",
-             version->version, version->file->path);
+    cvs_printf (s,
+                "Argument -kk\n"
+                "Argument -r%s\n"
+                "Argument --\n"
+                "Argument %s\nupdate\n",
+                version->version, version->file->path);
 
     read_versions (db, s);
 
@@ -227,17 +229,17 @@ static void grab_by_date (const database_t * db,
         // Tell the server about this directory.
         d = *i;
         d_len = slash - d;
-        fprintf (s->stream,
-                 "Directory %s/%.*s\n"
-                 "%s%.*s\n",
-                 s->module, d_len, d,
-                 s->prefix, d_len, d);
+        cvs_printf (s,
+                    "Directory %s/%.*s\n"
+                    "%s%.*s\n",
+                    s->module, d_len, d,
+                    s->prefix, d_len, d);
     }
 
     // Go to the main directory.
-    fprintf (s->stream,
-             "Directory %s\n%.*s\n", s->module,
-             strlen (s->prefix) - 1, s->prefix);
+    cvs_printf (s,
+                "Directory %s\n%.*s\n", s->module,
+                strlen (s->prefix) - 1, s->prefix);
 
     // Format the date.
     struct tm tm;
@@ -251,15 +253,13 @@ static void grab_by_date (const database_t * db,
     // Update args:
     if (cs->versions->branch->tag->tag[0])
         fprintf (s->stream, "Argument -r%s\n", cs->versions->branch->tag->tag);
-    fprintf (s->stream,
-             "Argument -kk\n"
-             "Argument -D%s\n"
-             "Argument --\n", date);
+
+    cvs_printf (s, "Argument -kk\n" "Argument -D%s\n" "Argument --\n", date);
 
     for (const char ** i = paths; i != paths_end; ++i)
-        fprintf (s->stream, "Argument %s\n", *i);
+        cvs_printf (s, "Argument %s\n", *i);
 
-    fprintf (s->stream, "update\n");
+    cvs_printf (s, "update\n");
 
     read_versions (db, s);
 }
@@ -483,11 +483,11 @@ int main (int argc, const char * const * argv)
     stream.prefix = xasprintf ("%s/%s/", stream.remote_root, argv[2]);
     stream.module = xstrdup (argv[2]);
 
-    fprintf (stream.stream,
-             "Global_option -q\n"
-             "Argument --\n"
-             "Argument %s\n"
-             "rlog\n", stream.module);
+    cvs_printf (&stream,
+                "Global_option -q\n"
+                "Argument --\n"
+                "Argument %s\n"
+                "rlog\n", stream.module);
 
     database_t db;
 

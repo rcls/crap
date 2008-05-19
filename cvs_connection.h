@@ -22,5 +22,11 @@ void cvs_connection_destroy (cvs_connection_t * conn);
 /// Call getline and do some sanity checking.
 size_t next_line (cvs_connection_t * s);
 
+/// Send some data to the cvs connection.
+void cvs_printf (cvs_connection_t * s, const char * format, ...)
+    __attribute__ ((format (printf, 2, 3)));
+
+/// Record that we've read some data behind the back of the above functions.
+void cvs_record_read (cvs_connection_t * s, size_t bytes);
 
 #endif
