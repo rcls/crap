@@ -9,4 +9,4 @@ mkdir t
 cd t
 
 git init
-../crap-clone "$@" | git-fast-import --export-marks=marks.txt
+valgrind --leak-check=full --show-reachable=yes ../crap-clone "$@" | git-fast-import --export-marks=marks.txt

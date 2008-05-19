@@ -154,6 +154,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
     if (go)
         printf ("\n");
 
+    xfree (d);
     xfree (path);
     xfree (vers);        
 }
@@ -274,6 +275,8 @@ static void grab_by_date (const database_t * db,
 
     for (const char ** i = paths; i != paths_end; ++i)
         cvs_printf (s, "Argument %s\n", *i);
+
+    xfree (paths);
 
     cvs_printf (s, "update\n");
 
