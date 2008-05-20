@@ -157,16 +157,10 @@ static bool valid_version (const char * s)
 }
 
 
-static bool predecessor (char * s, bool is_branch)
+static bool predecessor (char * s)
 {
     char * l = strrchr (s, '.');
     assert (l);
-
-    if (is_branch) {
-        // Branch; just truncate the last component.
-        *l = 0;
-        return true;
-    }
 
     if (l[1] == '1' && l[2] == 0) {
         // .1 version; just remove the last two components.
@@ -196,29 +190,28 @@ static bool predecessor (char * s, bool is_branch)
 
 
 /// Normalise a version string for a tag in place.  Rewrite the 'x.y.0.z' style
-/// branch tags to 'x.y.z'.  Return -1 on a bogus string, 0 on a normal tag, 1
-/// on a branch tag.
-static int normalise_tag_version (char * s)
+/// branch tags to 'x.y.z'.
+static bool normalise_tag_version (char * s)
 {
     do {
         if (*s < '1' || *s > '9')
-            return -1;                  // Bogus.
+            return false;               // Bogus.
 
         for ( ; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
-            return 1;                   // x.y.z style branch.
+            return true;                // x.y.z style branch.
 
         if (*s++ != '.' || *s < '1' || *s > '9')
-            return -1;                  // Bogus.
+            return false;               // Bogus.
 
         for ( ; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
-            return 0;                   // Done.
+            return true;                // Done.
 
         if (*s++ != '.')
-            return -1;                  // Bogus.
+            return false;               // Bogus.
     }
     while (*s != '0');
 
@@ -226,16 +219,28 @@ static int normalise_tag_version (char * s)
     char * last = s;
 
     if (*++s != '.' || *++s < '1' || *s > '9')
-        return -1;
+        return false;
 
     for ( ; *s >= '0' && *s <= '9'; ++s);
 
     if (*s != 0)
-        return -1;                      // Bogus.
+        return false;                   // Bogus.
 
     memmove (last, last + 2, s - last - 1);
 
-    return 1;
+    return true;
+}
+
+
+/// Is this version a tag version?  Assumes the normalisation above, so we just
+/// count the '.'s.  This does the right thing on the empty string, which
+/// is used as the branch version for the trunk.
+static bool is_branch (const char * v)
+{
+    bool res = true;
+    for (; *v; ++v)
+        res ^= (*v == '.');
+    return res;
 }
 
 
@@ -274,7 +279,7 @@ static void fill_in_parents (file_t * file)
         char vers[1 + strlen (v->version)];
         strcpy (vers, v->version);
         v->parent = NULL;
-        while (predecessor (vers, false)) {
+        while (predecessor (vers)) {
             v->parent = file_find_version (file, vers);
             if (v->parent) {
                 // The parent of an implicit merge should be an implicit merge
@@ -334,7 +339,7 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
         if (i != ft)
             *ft = *i;
 
-        if (!ft->is_branch) {
+        if (!is_branch (ft->vers)) {
             ft->version = file_find_version (file, ft->vers);
             if (ft->version == NULL) {
                 warning ("%s: Tag %s version %s does not exist.\n",
@@ -353,10 +358,13 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
 
         // We try and find a predecessor version, to use as the branch point.
         // If none exists, that's fine, it makes sense as a branch addition.
-        char vers[1 + strlen (ft->vers)];
-        strcpy (vers, ft->vers);
-        if (vers[0] != 0 && predecessor (vers, true))
+        if (ft->vers[0] != 0) {
+            size_t len = strrchr (ft->vers, '.') - ft->vers;
+            char vers[len + 1];
+            memcpy (vers, ft->vers, len);
+            vers[len] = 0;
             ft->version = file_find_version (file, vers);
+        }
         else
             ft->version = NULL;
 
@@ -599,7 +607,6 @@ static void read_file_versions (database_t * db,
     const char * empty_string = cache_string ("");
     file_tag_t * dummy_tag = file_add_tag (tags, file, empty_string);
     dummy_tag->vers = empty_string;
-    dummy_tag->is_branch = 1;
 
     do
         len = next_line (s);
@@ -619,20 +626,19 @@ static void read_file_versions (database_t * db,
             fatal ("Tag on (%s) did not have version: %s\n",
                    file->rcs_path, s->line);
 
-        const char * tag_name = cache_string_n (s->line + 3, colon - s->line - 3);
+        const char * tag_name = cache_string_n (s->line + 3,
+                                                colon - s->line - 3);
         file_tag_t * file_tag = file_add_tag (tags, file, tag_name);
 
         ++colon;
         if (*colon == ' ')
             ++colon;
 
-        int type = normalise_tag_version (colon);
-        if (type < 0)
+        if (!normalise_tag_version (colon))
             fatal ("Tag %s on (%s) has bogus version '%s'\n",
                    tag_name, file->rcs_path, colon);
 
         file_tag->vers = cache_string (colon);
-        file_tag->is_branch = type;
 
         len = next_line (s);
     };
@@ -733,7 +739,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
             (*j)->tag = i;
-            if (i->branch_versions == NULL && (*j)->is_branch)
+            if (i->branch_versions == NULL && is_branch ((*j)->vers))
                 i->branch_versions = ARRAY_CALLOC (version_t *,
                                                    db->files_end - db->files);
         }
