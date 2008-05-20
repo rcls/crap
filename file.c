@@ -103,22 +103,20 @@ void tag_init (tag_t * tag, const char * name)
 
 file_tag_t * find_file_tag (file_t * file, tag_t * tag)
 {
-    file_tag_t * base = file->file_tags;
-    size_t count = file->file_tags_end - file->file_tags;
+    file_tag_t ** base = tag->tag_files;
+    size_t count = tag->tag_files_end - tag->tag_files;
 
-    // FIXME - this relies on file_tags and tags having the same sort order;
-    // is that correct?
     while (count > 0) {
         size_t mid = count >> 1;
-        file_tag_t * mid_tag = base + mid;
-        if (tag < mid_tag->tag)
+        file_tag_t ** midp = base + mid;
+        if (file < (*midp)->file)
             count = mid;
-        else if (tag > mid_tag->tag) {
+        else if (file > (*midp)->file) {
             base += mid + 1;
             count -= mid + 1;
         }
         else
-            return mid_tag;
+            return *midp;
     }
 
     return NULL;
