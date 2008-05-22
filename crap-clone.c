@@ -210,22 +210,21 @@ static void grab_version (const database_t * db,
 }
 
 
-static void grab_by_date (const database_t * db,
-                          cvs_connection_t * s,
-                          changeset_t * cs)
+static void grab_by_option (const database_t * db,
+                            cvs_connection_t * s,
+                            const char * r_arg,
+                            const char * D_arg,
+                            version_t ** fetch, version_t ** fetch_end)
 {
-    // Build an array of the paths that we're getting.
+    // Build an array of the paths that we're getting.  FIXME - if changesets
+    // were sorted we wouldn't need this.
     const char ** paths = NULL;
     const char ** paths_end = NULL;
 
-    time_t last = cs->time;
-    for (version_t * i = cs->versions; i; i = i->cs_sibling) {
-        version_t * v = version_live (i);
-        if (v && v->used && v->mark == SIZE_MAX) {
-            if (last < v->time)
-                last = v->time;
-            ARRAY_APPEND (paths, v->file->path);
-        }
+    for (version_t ** i = fetch; i != fetch_end; ++i) {
+        version_t * v = version_live (*i);
+        assert (v && v->used && v->mark == SIZE_MAX);
+        ARRAY_APPEND (paths, v->file->path);
     }
 
     assert (paths != paths_end);
@@ -257,21 +256,14 @@ static void grab_by_date (const database_t * db,
                 "Directory %s\n%.*s\n", s->module,
                 strlen (s->prefix) - 1, s->prefix);
 
-    // Format the date.
-    struct tm tm;
-    ++last;                             // Add a second...
-    gmtime_r (&last, &tm);
-    char date[64];
-    if (strftime (date, 64, "%d %b %Y %H:%M:%S -0000", &tm) == 0)
-        // Bugger.  Oh well, the fallbacks will get it anyway.
-        return;
-
     // Update args:
-    const char * branch = version_normalise (cs->versions)->branch->tag->tag;
-    if (branch[0])
-        cvs_printf (s, "Argument -r%s\n", branch);
+    if (r_arg)
+        cvs_printf (s, "Argument -r%s\n", r_arg);
 
-    cvs_printf (s, "Argument -kk\n" "Argument -D%s\n" "Argument --\n", date);
+    if (D_arg)
+        cvs_printf (s, "Argument -D%s\n", D_arg);
+
+    cvs_printf (s, "Argument -kk\n" "Argument --\n");
 
     for (const char ** i = paths; i != paths_end; ++i)
         cvs_printf (s, "Argument %s\n", *i);
@@ -281,6 +273,68 @@ static void grab_by_date (const database_t * db,
     cvs_printf (s, "update\n");
 
     read_versions (db, s);
+}
+
+
+static void grab_versions (const database_t * db,
+                           cvs_connection_t * s,
+                           version_t ** fetch, version_t ** fetch_end)
+{
+    if (fetch_end == fetch)
+        return;
+
+    if (fetch_end == fetch + 1) {
+        grab_version (db, s, *fetch);
+        return;
+    }
+
+    bool idver = true;
+    for (version_t ** i = fetch + 1; i != fetch_end; ++i)
+        if ((*i)->version != fetch[0]->version) {
+            idver = false;
+            break;
+        }
+    if (idver) {
+        grab_by_option (db, s,
+                        fetch[0]->version, NULL,
+                        fetch, fetch_end);
+        return;
+    }        
+
+    bool tried_date = false;
+    time_t dmin = fetch[0]->time;
+    time_t dmax = fetch[0]->time;
+    for (version_t ** i = fetch + 1; i != fetch_end; ++i)
+        if ((*i)->time < dmin)
+            dmin = (*i)->time;
+        else if ((*i)->time > dmax)
+            dmax = (*i)->time;
+
+    if (dmax - dmin < 300) {
+        tried_date = true;
+
+        // Format the date.
+        struct tm tm;
+//            ++last;                     // Add a second...
+        gmtime_r (&dmax, &tm);
+        char date[64];
+        if (strftime (date, 64, "%d %b %Y %H:%M:%S -0000", &tm) == 0)
+            fatal ("strftime failed\n");
+
+        grab_by_option (db, s,
+                        fetch[0]->branch->tag->tag[0]
+                        ? fetch[0]->branch->tag->tag : NULL,
+                        format_date (&dmax),
+                        fetch, fetch_end);
+    }
+
+    for (version_t ** i = fetch; i != fetch_end; ++i)
+        if ((*i)->mark == SIZE_MAX) {
+            if (tried_date > 1)
+                fprintf (stderr, "Missed first time round: %s %s\n",
+                         (*i)->file->path, (*i)->version);
+            grab_version (db, s, *i);
+        }
 }
 
 
@@ -294,17 +348,24 @@ static void print_commit (const database_t * db, changeset_t * cs,
         return;
     }
 
+    version_t ** fetch = NULL;
+    version_t ** fetch_end = NULL;
+
     // Check to see if this commit actually does anything...
     bool nil = true;
-    for (version_t * i = v; i; i = i->cs_sibling)
-        if (i->used) {
-            version_t * bv
-                = v->branch->tag->branch_versions[i->file - db->files];
-            if (version_live (bv) != version_live (i)) {
-                nil = false;
-                break;
-            }
-        }
+    for (version_t * i = v; i; i = i->cs_sibling) {
+        if (!i->used)
+            continue;
+
+        version_t * cv = version_live (i);
+        if (cv == version_live (
+                v->branch->tag->branch_versions[i->file - db->files]))
+            continue;
+
+        nil = false;
+        if (cv != NULL && cv->mark == SIZE_MAX)
+            ARRAY_APPEND (fetch, cv);
+    }
 
     if (nil) {
         cs->mark = v->branch->tag->last->mark;
@@ -312,27 +373,9 @@ static void print_commit (const database_t * db, changeset_t * cs,
         return;
     }
 
-    // If we more than one outstanding version, then attempt a get by date.
-    size_t outstanding;
-    for (version_t * i = v; i; i = i->cs_sibling) {
-        version_t * v = version_live (i);
-        if (v && v->used && v->mark == SIZE_MAX)
-            ++outstanding;
-    }
-
-    if (outstanding > 1)
-        grab_by_date (db, s, cs);
-
-    // Get any remaining versions.
-    for (version_t * i = v; i; i = i->cs_sibling) {
-        version_t * v = version_live (i);
-        if (v && v->used && v->mark == SIZE_MAX) {
-            if (outstanding > 1)
-                fprintf (stderr, "Missed first time round: %s %s\n",
-                         i->file->path, i->version);
-            grab_version (db, s, v);
-        }
-    }
+    // Get the versions.
+    grab_versions (db, s, fetch, fetch_end);
+    xfree (fetch);
 
     v->branch->tag->last = cs;
     cs->mark = ++mark_counter;
@@ -358,13 +401,11 @@ static void print_commit (const database_t * db, changeset_t * cs,
 static void print_tag (const database_t * db, tag_t * tag,
                        cvs_connection_t * s)
 {
-    fprintf (stderr, "%s %s %s\n",
+    fprintf (stderr, "%s %s %s%s\n",
              format_date (&tag->changeset.time),
              tag->branch_versions ? "BRANCH" : "TAG",
-             tag->tag);
-
-    if (tag->exact_match)
-        fprintf (stderr, "Exact match\n");
+             tag->tag,
+             tag->exact_match ? " Exact match" : "");
 
     tag_t * branch;
     if (tag->parent == NULL)
@@ -394,6 +435,9 @@ static void print_tag (const database_t * db, tag_t * tag,
     size_t deleted = 0;
     size_t modified = 0;
 
+    version_t ** fetch = NULL;
+    version_t ** fetch_end = NULL;
+
     file_tag_t ** tf = tag->tag_files;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = branch
@@ -408,19 +452,29 @@ static void print_tag (const database_t * db, tag_t * tag,
             continue;
         }
 
+        if (tv == NULL) {
+            ++deleted;
+            continue;
+        }
+
+        if (tv->mark == SIZE_MAX)
+            ARRAY_APPEND (fetch, tv);
+
         if (bv == NULL)
             ++added;
-        else if (tv == NULL)
-            ++deleted;
         else
             ++modified;
     }
 
     if (added == 0 && deleted == 0 && modified == 0) {
+        assert (fetch == NULL);
         if (!tag->exact_match)
             fprintf (stderr, "WIERD: no fixups but not exact match\n");
         return;                         // Nothing to do.
     }
+
+    grab_versions (db, s, fetch, fetch_end);
+    xfree (fetch);
 
     tag->changeset.mark = ++mark_counter;
     if (tag->exact_match)
@@ -441,8 +495,6 @@ static void print_tag (const database_t * db, tag_t * tag,
         version_t * tv = NULL;
         if (tf != tag->tag_files_end && (*tf)->file == i)
             tv = version_live ((*tf++)->version);
-
-        grab_version (db, s, tv);
 
         if (bv == tv) {
             if (bv != NULL && keep <= deleted)
