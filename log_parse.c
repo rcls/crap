@@ -302,9 +302,11 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
 {
     qsort (file->versions, file->versions_end - file->versions,
            sizeof (version_t), version_compare);
+    ARRAY_TRIM (file->versions);
 
     qsort (file->file_tags, file->file_tags_end - file->file_tags,
            sizeof (file_tag_t), file_tag_compare);
+    ARRAY_TRIM (file->file_tags);
 
     fill_in_parents (file);
 
@@ -737,6 +739,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
     // Update the pointers from file_tags to tags, and compute the version
     // hashes.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        ARRAY_TRIM (i->tag_files);
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
             (*j)->tag = i;
             if (i->branch_versions == NULL && is_branch ((*j)->vers))

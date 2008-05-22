@@ -69,10 +69,18 @@ static inline bool ends_with (const char * haystack, const char * needle)
 #define ARRAY_APPEND(P,I) do {                                  \
         size_t ITEMS = P##_end - P;                             \
         if ((ITEMS & (ITEMS - 1)) == 0) {                       \
-            P = ARRAY_REALLOC (P, ITEMS * 2 + (ITEMS ==0));     \
+            P = ARRAY_REALLOC (P, ITEMS * 2 + (ITEMS == 0));    \
             P##_end = P + ITEMS;                                \
         }                                                       \
         *(P##_end)++ = I;                                       \
     } while (0)
+
+/// Resize an array to it's exact size.
+#define ARRAY_TRIM(P) do {                      \
+        if (P != P##_end) {                     \
+            size_t ITEMS = P##_end - P;         \
+            P = ARRAY_REALLOC (P, ITEMS);       \
+            P##_end = P + ITEMS;                \
+        } } while (0)
 
 #endif
