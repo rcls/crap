@@ -166,7 +166,7 @@ tag_t * database_tag_hash_find (database_t * db, const uint32_t hash[5])
 {
     for (tag_t * i = db->tag_hash[hash[0] & (db->tag_hash_num_buckets - 1)];
          i; i = i->hash_next)
-        if (memcmp (hash, i->hash, sizeof (i->hash)) == 0)
+        if (memcmp (hash, i->hash, sizeof i->hash) == 0)
             return i;
     return NULL;
 }
@@ -175,7 +175,7 @@ tag_t * database_tag_hash_find (database_t * db, const uint32_t hash[5])
 tag_t * database_tag_hash_next (tag_t * tag)
 {
     for (tag_t * i = tag->hash_next; i; i = i->hash_next)
-        if (memcmp (tag->hash, i->hash, sizeof (i->hash)) == 0)
+        if (memcmp (tag->hash, i->hash, sizeof i->hash) == 0)
             return i;
     return NULL;
 }

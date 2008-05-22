@@ -108,7 +108,7 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
 
     struct addrinfo hints;
     struct addrinfo * ai;
-    memset (&hints, 0, sizeof (hints));
+    memset (&hints, 0, sizeof hints);
     hints.ai_socktype = SOCK_STREAM;
     int r = getaddrinfo (host, port, &hints, &ai);
     if (r != 0)

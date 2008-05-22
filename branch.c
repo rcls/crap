@@ -321,7 +321,7 @@ static void update_branch_hash (struct database * db,
     for (version_t ** i = branch; i != branch_end; ++i)
         if (*i != NULL && !(*i)->dead) {
             const version_t * v = version_normalise (*i);
-            SHA1_Update (&sha, &v, sizeof (v));
+            SHA1_Update (&sha, &v, sizeof v);
         }
 
     uint32_t hash[5];
