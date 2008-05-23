@@ -269,23 +269,21 @@ static void assign_tag_point (database_t * db, tag_t * tag)
         // version, then decrement current.  Just to make life fun, the
         // changeset versions are not sorted by file, so we have to search for
         // them.  FIXME - again, this does not get vendor imports correct.
-        version_t * v;
         if ((*i)->type != ct_commit)
             continue;                   // Tags play no role here.
-        v = (*i)->versions;
-        for (version_t * j = v; j; j = j->cs_sibling) {
-            if (!j->used) {
-                assert (j->implicit_merge);
+        for (version_t ** j = (*i)->versions; j != (*i)->versions_end; ++j) {
+            if (!(*j)->used) {
+                assert ((*j)->implicit_merge);
                 continue;
             }
-            file_tag_t * ft = find_file_tag (j->file, tag);
+            file_tag_t * ft = find_file_tag ((*j)->file, tag);
             // FIXME - we should process ft->version==NULL.
             if (ft == NULL || ft->version == NULL)
                 continue;
             assert (!ft->version->implicit_merge);
-            if (ft->version == version_normalise (j))
+            if (ft->version == version_normalise (*j))
                 ++current;
-            else if (ft->version == version_normalise (j->parent))
+            else if (ft->version == version_normalise ((*j)->parent))
                 --current;              // FIXME check parent on branch.
         }
 
@@ -312,7 +310,7 @@ static void update_branch_hash (struct database * db,
         return;
 
     assert (changeset->type == ct_commit);
-    version_t ** branch = changeset->versions->branch->tag->branch_versions;
+    version_t ** branch = changeset->versions[0]->branch->tag->branch_versions;
 
     // Compute the SHA1 hash of the current branch state.
     SHA_CTX sha;
@@ -360,8 +358,8 @@ static void branch_changesets (database_t * db)
     for (changeset_t * i; (i = next_changeset (db));) {
         changeset_emitted (db, NULL, i);
         assert (i->type == ct_commit);
-        if (i->versions->branch)
-            ARRAY_APPEND (i->versions->branch->tag->changeset.children, i);
+        if (i->versions[0]->branch)
+            ARRAY_APPEND (i->versions[0]->branch->tag->changeset.children, i);
     }
 }
 

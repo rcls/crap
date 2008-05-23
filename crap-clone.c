@@ -215,8 +215,8 @@ static void grab_by_option (const database_t * db,
                             const char * D_arg,
                             version_t ** fetch, version_t ** fetch_end)
 {
-    // Build an array of the paths that we're getting.  FIXME - if changesets
-    // were sorted we wouldn't need this.
+    // Build an array of the paths that we're getting.  FIXME - if changeset
+    // versions were sorted we wouldn't need this.
     const char ** paths = NULL;
     const char ** paths_end = NULL;
 
@@ -340,7 +340,7 @@ static void grab_versions (const database_t * db,
 static void print_commit (const database_t * db, changeset_t * cs,
                           cvs_connection_t * s)
 {
-    version_t * v = cs->versions;
+    version_t * v = cs->versions[0];
     if (!v->branch) {
         fprintf (stderr, "%s <anon> %s %s COMMIT - skip\n%s\n",
                  format_date (&cs->time), v->author, v->commitid, v->log);
@@ -352,13 +352,13 @@ static void print_commit (const database_t * db, changeset_t * cs,
 
     // Check to see if this commit actually does anything...
     bool nil = true;
-    for (version_t * i = v; i; i = i->cs_sibling) {
-        if (!i->used)
+    for (version_t ** i = cs->versions; i != cs->versions_end; ++i) {
+        if (!(*i)->used)
             continue;
 
-        version_t * cv = version_live (i);
+        version_t * cv = version_live (*i);
         if (cv == version_live (
-                v->branch->tag->branch_versions[i->file - db->files]))
+                v->branch->tag->branch_versions[(*i)->file - db->files]))
             continue;
 
         nil = false;
@@ -385,9 +385,9 @@ static void print_commit (const database_t * db, changeset_t * cs,
     printf ("committer %s <%s> %ld +0000\n", v->author, v->author, cs->time);
     printf ("data %u\n%s\n", strlen (v->log), v->log);
 
-    for (version_t * i = v; i; i = i->cs_sibling)
-        if (i->used) {
-            version_t * vv = version_normalise (i);
+    for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
+        if ((*i)->used) {
+            version_t * vv = version_normalise (*i);
             if (vv->dead)
                 printf ("D %s\n", vv->file->path);
             else
@@ -410,7 +410,7 @@ static void print_tag (const database_t * db, tag_t * tag,
     if (tag->parent == NULL)
         branch = NULL;
     else if (tag->parent->type == ct_commit)
-        branch = tag->parent->versions->branch->tag;
+        branch = tag->parent->versions[0]->branch->tag;
     else
         branch = as_tag (tag->parent);
 

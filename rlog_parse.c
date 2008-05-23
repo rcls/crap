@@ -32,7 +32,7 @@ static const char * format_date (const time_t * time)
 
 static void print_commit (const changeset_t * cs)
 {
-    const version_t * v = cs->versions;
+    const version_t * v = *cs->versions;
     printf ("%s %s %s %s COMMIT\n%s\n",
             format_date (&cs->time),
             v->branch
@@ -44,9 +44,9 @@ static void print_commit (const changeset_t * cs)
 /*         if (changeset_update_branch_hash (&db, changeset) == 0) */
 /*             printf ("[There were no real changes in this changeset]\n"); */
 
-    for (const version_t * i = v; i; i = i->cs_sibling)
-        if (i->used)
-            printf ("\t%s %s\n", i->file->path, i->version);
+    for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
+        if ((*i)->used)
+            printf ("\t%s %s\n", (*i)->file->path, (*i)->version);
 
     printf ("\n");
     fflush (stdout);
@@ -76,7 +76,7 @@ static void print_tag (const database_t * db, const tag_t * tag)
 
     tag_t * branch;
     if (tag->parent->type == ct_commit)
-        branch = tag->parent->versions->branch->tag;
+        branch = tag->parent->versions[0]->branch->tag;
     else
         branch = as_tag (tag->parent);
 

@@ -64,8 +64,9 @@ struct version {
     const char * log;
     file_tag_t * branch;
 
+    /// The principal commit for this version; note that there may be other
+    /// commits (branch fix-ups).
     struct changeset * commit;
-    version_t * cs_sibling;             ///< Sibling in changeset.
 
     union {
         size_t ready_index;             ///< Heap index for emitting versions.

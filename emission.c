@@ -2,6 +2,7 @@
 #include "database.h"
 #include "emission.h"
 #include "file.h"
+#include "utils.h"
 
 #include <assert.h>
 #include <stdio.h>
@@ -28,20 +29,19 @@ void version_release (database_t * db, heap_t * version_heap,
 
 
 void changeset_emitted (database_t * db, heap_t * ready_versions,
-                        changeset_t * changeset)
+                        changeset_t * cs)
 {
     /* FIXME - this could just as well be merged into next_changeset. */
 
-    if (changeset->type == ct_commit)
-        for (version_t * i = changeset->versions; i; i = i->cs_sibling) {
+    if (cs->type == ct_commit)
+        for (version_t ** i = cs->versions; i != cs->versions_end; ++i) {
             if (ready_versions)
-                heap_remove (ready_versions, i);
-            for (version_t * v = i->children; v; v = v->sibling)
+                heap_remove (ready_versions, *i);
+            for (version_t * v = (*i)->children; v; v = v->sibling)
                 version_release (db, ready_versions, v);
         }
 
-    for (changeset_t ** i = changeset->children;
-         i != changeset->children_end; ++i)
+    for (changeset_t ** i = cs->children; i != cs->children_end; ++i)
         changeset_release (db, *i);
 }
 
@@ -57,48 +57,48 @@ static bool can_replace_with_implicit_merge (const version_t * v)
 
 
 size_t changeset_update_branch_versions (struct database * db,
-                                         struct changeset * changeset)
+                                         struct changeset * cs)
 {
-    if (changeset->versions->branch == NULL)
+    if (cs->versions[0]->branch == NULL)
         // FIXME - what should we do about changesets on anonymous branches?
         // Stringing them together into branches is probably more bother
         // than it's worth, so we should probably really just never actually
         // create those changesets.
         return 0;                   // Changeset on unknown branch.
 
-    version_t ** branch = changeset->versions->branch->tag->branch_versions;
-    version_t * versions = changeset->versions;
+    version_t ** branch = cs->versions[0]->branch->tag->branch_versions;
     size_t changes = 0;
 
-    for (version_t * i = versions; i; i = i->cs_sibling) {
-        version_t ** bv = &branch[i->file - db->files];
-        i->used = !i->implicit_merge || can_replace_with_implicit_merge (*bv);
-        if (!i->used)
+    for (version_t ** i = cs->versions; i != cs->versions_end; ++i) {
+        version_t ** bv = &branch[(*i)->file - db->files];
+        (*i)->used = !(*i)->implicit_merge
+            || can_replace_with_implicit_merge (*bv);
+        if (!(*i)->used)
             continue;
 
-        if (version_live (*bv) != version_live (i))
+        if (version_live (*bv) != version_live (*i))
             ++changes;
 
         // We need to keep dead versions here, because dead versions block
         // implicit merges of vendor imports.
-        *bv = i;
+        *bv = *i;
     }
 
     return changes;
 }
 
 
-static const version_t * preceed (const version_t * v)
+static const version_t * preceed (const changeset_t * cs)
 {
     // If cs is not ready to emit, then some version in cs is blocked.  The
     // earliest un-emitted ancestor of that version will be ready to emit.
     // Search for it.  FIXME We should be a bit smarter by searching harder for
     // the oldest possible version.
-    for (version_t * csv = v->commit->versions; csv; csv = csv->cs_sibling)
-        if (csv->ready_index == SIZE_MAX)
-            for (version_t * v = csv->parent; v; v = v->parent)
-                if (v->ready_index != SIZE_MAX)
-                    return v;
+    for (version_t ** csv = cs->versions; csv != cs->versions_end; ++csv)
+        if ((*csv)->ready_index == SIZE_MAX)
+            for (version_t * i = (*csv)->parent; i; i = i->parent)
+                if (i->ready_index != SIZE_MAX)
+                    return i;
 
     abort();
 }
@@ -106,8 +106,6 @@ static const version_t * preceed (const version_t * v)
 
 static void cycle_split (database_t * db, changeset_t * cs)
 {
-    // FIXME - the changeset may have an implicit merge; we should then split
-    // the implicit merge also.
     fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");
     // We split the changeset into to.  We leave all the blocked versions
@@ -115,53 +113,36 @@ static void cycle_split (database_t * db, changeset_t * cs)
 
     changeset_t * new = database_new_changeset (db);
     new->type = ct_commit;
-    new->time = cs->time;
-    version_t ** cs_v = &cs->versions;
-    version_t ** new_v = &new->versions;
-    for (version_t * v = cs->versions; v; v = v->cs_sibling) {
-        if (v->ready_index == SIZE_MAX) {
+    new->time = cs->time;               // FIXME.
+    version_t ** cs_v = cs->versions;
+    for (version_t ** v = cs->versions; v != cs->versions_end; ++v)
+        if ((*v)->ready_index == SIZE_MAX)
             // Blocked; stays in cs.
-            *cs_v = v;
-            cs_v = &v->cs_sibling;
-        }
+            *cs_v++ = *v;
         else {
             // Ready-to-emit; goes into new.
-            v->commit = new;
-            *new_v = v;
-            new_v = &v->cs_sibling;
+            ARRAY_APPEND (new->versions, *v);
+            (*v)->commit = new;
         }
-    }
 
-    *cs_v = NULL;
-    *new_v = NULL;
-    assert (cs->versions);
-    assert (new->versions);
+    cs->versions_end = cs_v;
+    assert (cs->versions != cs->versions_end);
+    assert (new->versions != new->versions_end);
+    ARRAY_TRIM (cs->versions);
+    ARRAY_TRIM (new->versions);
 
     heap_insert (&db->ready_changesets, new);
 
     fprintf (stderr, "Changeset %s %s\n%s\n",
-             cs->versions->branch ? cs->versions->branch->tag->tag : "",
-             cs->versions->author, cs->versions->log);
-    for (const version_t * v = new->versions; v; v = v->cs_sibling)
-        fprintf (stderr, "    %s:%s\n", v->file->path, v->version);
+             cs->versions[0]->branch ? cs->versions[0]->branch->tag->tag : "",
+             cs->versions[0]->author, cs->versions[0]->log);
+    for (version_t ** v = new->versions; v != new->versions_end; ++v)
+        fprintf (stderr, "    %s:%s\n", (*v)->file->path, (*v)->version);
 
     fprintf (stderr, "Deferring:\n");
 
-    for (const version_t * v = cs->versions; v; v = v->cs_sibling)
-        fprintf (stderr, "    %s:%s\n", v->file->path, v->version);
-}
-
-
-static const version_t * cycle_find (const version_t * v)
-{
-    const version_t * slow = v;
-    const version_t * fast = v;
-    do {
-        slow = preceed (slow);
-        fast = preceed (preceed (fast));
-    }
-    while (slow != fast);
-    return slow;
+    for (version_t ** v = cs->versions; v != cs->versions_end; ++v)
+        fprintf (stderr, "    %s:%s\n", (*v)->file->path, (*v)->version);
 }
 
 
@@ -175,13 +156,13 @@ changeset_t * next_changeset_split (database_t * db, heap_t * ready_versions)
         const version_t * slow = heap_front (ready_versions);
         const version_t * fast = slow;
         do {
-            slow = preceed (slow);
-            fast = preceed (preceed (fast));
+            slow = preceed (slow->commit);
+            fast = preceed (preceed (fast->commit)->commit);
         }
         while (slow != fast);
 
         // And split it.
-        cycle_split (db, cycle_find (heap_front (ready_versions))->commit);
+        cycle_split (db, slow->commit);
 
         assert (db->ready_changesets.entries
                 != db->ready_changesets.entries_end);
@@ -204,9 +185,7 @@ void prepare_for_emission (database_t * db, heap_t * ready_versions)
 {
     // Re-do the changeset unready counts.
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
-        if ((*i)->type == ct_commit)
-            for (version_t * j = (*i)->versions; j; j = j->cs_sibling)
-                ++(*i)->unready_count;
+        (*i)->unready_count += (*i)->versions_end - (*i)->versions;
 
         for (changeset_t ** j = (*i)->children; j != (*i)->children_end; ++j)
             ++(*j)->unready_count;

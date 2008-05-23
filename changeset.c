@@ -20,6 +20,8 @@ void changeset_init (changeset_t * cs)
     cs->unready_count = 0;
     cs->children = NULL;
     cs->children_end = NULL;
+    cs->versions = NULL;
+    cs->versions_end = NULL;
 }
 
 
@@ -103,23 +105,6 @@ static int version_compare_heap (const void * AA, const void * BB)
 }
 
 
-static int cs_compare (const void * AA, const void * BB)
-{
-    const changeset_t * A = * (changeset_t * const *) AA;
-    const changeset_t * B = * (changeset_t * const *) BB;
-
-    if (A->time != B->time)
-        return A->time < B->time ? -1 : 1;
-
-    if (A->type != B->type)
-        return A->type < B->type ? -1 : 1;
-
-    assert (A->type == ct_commit);
-
-    return version_compare (A->versions, B->versions);
-}
-
-
 void create_changesets (database_t * db)
 {
     size_t total_versions = 0;
@@ -143,34 +128,25 @@ void create_changesets (database_t * db)
            version_compare_qsort);
 
     changeset_t * current = database_new_changeset (db);
-    version_t * tail = version_list[0];
-    tail->commit = current;
-    current->time = tail->time;
+    ARRAY_APPEND (current->versions, version_list[0]);
+    version_list[0]->commit = current;
+    current->time = version_list[0]->time;
     current->type = ct_commit;
-    current->versions = tail;
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
-        if (strings_match (tail, next)
-            && next->time - current->time <= FUZZ_TIME) {
-            tail->cs_sibling = next;
-        }
-        else {
-            tail->cs_sibling = NULL;
+        if (!strings_match (*current->versions, next)
+            || next->time - current->time > FUZZ_TIME) {
+            ARRAY_TRIM (current->versions);
             current = database_new_changeset (db);
             current->time = next->time;
             current->type = ct_commit;
-            current->versions = next;
         }
-        next->commit = current;
-        tail = next;
+        ARRAY_APPEND (current->versions, version_list[i]);
+        version_list[i]->commit = current;
     }
 
-    tail->cs_sibling = NULL;
-
+    ARRAY_TRIM (current->versions);
     free (version_list);
-
-    qsort (db->changesets, db->changesets_end - db->changesets,
-           sizeof (changeset_t *), cs_compare);
 
     // Do a pass through the changesets; this breaks any cycles.
     heap_t ready_versions;

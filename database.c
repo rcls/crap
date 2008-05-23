@@ -30,30 +30,32 @@ static int compare_changeset (const void * AA, const void * BB)
     if (A->type == ct_tag)
         return strcmp (as_tag (A)->tag, as_tag (B)->tag);
 
-    if (A->versions->author != B->versions->author)
-        return strcmp (A->versions->author, B->versions->author);
+    const version_t * vA = A->versions[0];
+    const version_t * vB = B->versions[0];
+    if (vA->author != vB->author)
+        return strcmp (vA->author, vB->author);
 
-    if (A->versions->commitid != B->versions->commitid)
-        return strcmp (A->versions->commitid, B->versions->commitid);
+    if (vA->commitid != vB->commitid)
+        return strcmp (vA->commitid, vB->commitid);
 
-    if (A->versions->log != B->versions->log)
-        return strcmp (A->versions->log, B->versions->log);
+    if (vA->log != vB->log)
+        return strcmp (vA->log, vB->log);
 
-    if (A->versions->branch == NULL && B->versions->branch != NULL)
+    if (vA->branch == NULL && vB->branch != NULL)
         return -1;
 
-    if (A->versions->branch != NULL && B->versions->branch == NULL)
+    if (vA->branch != NULL && vB->branch == NULL)
         return 1;
 
-    if (A->versions->branch->tag != B->versions->branch->tag)
-        return A->versions->branch->tag < B->versions->branch->tag ? -1 : 1;
+    if (vA->branch->tag != vB->branch->tag)
+        return vA->branch->tag < vB->branch->tag ? -1 : 1;
 
-    assert (A->versions->implicit_merge == B->versions->implicit_merge);
+    assert (vA->implicit_merge == vB->implicit_merge);
 
-    if (A->versions->file != B->versions->file)
-        return A->versions->file > B->versions->file;
+    if (vA->file != vB->file)
+        return vA->file > vB->file;
 
-    return A->versions > B->versions;
+    return vA > vB;
 }
 
 
@@ -91,6 +93,7 @@ void database_destroy (database_t * db)
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
         free ((*i)->children);
+        free ((*i)->versions);
         free (*i);
     }
 
