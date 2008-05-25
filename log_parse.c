@@ -347,8 +347,6 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
                          file->path, ft->tag->tag, ft->vers);
                 continue;
             }
-            if (ft->version->time > ft->tag->changeset.time)
-                ft->tag->changeset.time = ft->version->time;
 
             // FIXME - it would be better to keep dead version tags, because
             // that would allow better tag matching.

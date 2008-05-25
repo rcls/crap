@@ -114,8 +114,10 @@ static void break_cycle (heap_t * heap, tag_t * t)
 
 
 // Release all the child tags of a branch.
-static void tag_released (heap_t * heap, tag_t * tag)
+static void tag_released (heap_t * heap, tag_t * tag,
+                          tag_t *** tree_order, tag_t *** tree_order_end)
 {
+    ARRAY_APPEND (*tree_order, tag);
     for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
         assert (i->tag->changeset.unready_count != 0);
         if (--i->tag->changeset.unready_count == 0) {
@@ -144,7 +146,8 @@ static void record_branch_tag (tag_t * branch, tag_t * tag)
 // created, files deleted, and then the branch tagged (without rtag).  We'll
 // never know that the tag was placed on the branch; instead we'll place the tag
 // on the trunk.
-static void branch_graph (database_t * db)
+static void branch_graph (database_t * db,
+                          tag_t *** tree_order, tag_t *** tree_order_end)
 {
     // First, go through each tag, and put it on all the branches.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
@@ -190,13 +193,14 @@ static void branch_graph (database_t * db)
     }
 
     while (!heap_empty (&heap))
-        tag_released (&heap, heap_pop (&heap));
+        tag_released (&heap, heap_pop (&heap), tree_order, tree_order_end);
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         while (!i->is_released) {
             break_cycle (&heap, i);
             while (!heap_empty (&heap))
-                tag_released (&heap, heap_pop (&heap));
+                tag_released (&heap, heap_pop (&heap),
+                              tree_order, tree_order_end);
         }
 
     heap_destroy (&heap);
@@ -321,15 +325,6 @@ static void branch_choose (tag_t * tag)
     xfree (tag->tags);
     tag->tags = NULL;
     tag->tags_end = NULL;
-
-/*     // Now reconstruct the branch tag lists, keeping only the ones we've */
-/*     // choosen. */
-/*     for (tag_t * i = db->tags; i != db->tags_end; ++i) */
-/*         if (i->parent) { */
-/*             tag_t * branch = as_tag (i->parent); */
-/*             ARRAY_EXTEND (branch->tags); */
-/*             branch->tags_end[-1].tag = i; */
-/*         } */
 }
 
 
@@ -356,12 +351,26 @@ void branch_analyse (database_t * db)
 {
     branch_changesets (db);
 
-    branch_graph (db);
+    tag_t ** tree_order = NULL;
+    tag_t ** tree_order_end = NULL;
 
+    branch_graph (db, &tree_order, &tree_order_end);
+
+    // Choose the branch on which to place each tag.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         branch_choose (i);
 
+    // Choose the changeset on which to place each tag.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         if (i->parent)
             branch_tag_point (db, as_tag (i->parent), i);
+
+    // Set the timestamps on the tags.
+    for (tag_t ** i = tree_order; i != tree_order_end; ++i)
+        if ((*i)->parent)
+            (*i)->changeset.time = (*i)->parent->time;
+        else
+            (*i)->changeset.time = 0;
+
+    xfree (tree_order);
 }
