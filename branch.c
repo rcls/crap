@@ -126,6 +126,20 @@ static void tag_released (heap_t * heap, tag_t * tag)
 }
 
 
+static void record_branch_tag (tag_t * branch, tag_t * tag)
+{
+    if (branch->tags != branch->tags_end && branch->tags_end[-1].tag == tag) {
+        ++branch->tags_end[-1].weight;
+        return;
+    }
+
+    ARRAY_EXTEND (branch->tags);
+    branch->tags_end[-1].tag = tag;
+    branch->tags_end[-1].weight = 1;
+}
+
+
+
 // FIXME - we don't cope optimally with the situation where a branch is
 // created, files deleted, and then the branch tagged (without rtag).  We'll
 // never know that the tag was placed on the branch; instead we'll place the tag
@@ -136,17 +150,17 @@ static void branch_graph (database_t * db)
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         i->changeset.unready_count = 0;
         for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
-            if ((*j)->version == NULL || (*j)->version->branch == NULL)
+            if ((*j)->version == NULL)
                 continue;
-            tag_t * b = (*j)->version->branch->tag;
-            if (b->tags_end != b->tags && b->tags_end[-1].tag == i) {
-                ++b->tags_end[-1].weight;
-                continue;
-            }
 
-            ARRAY_EXTEND (b->tags);
-            b->tags_end[-1].tag = i;
-            b->tags_end[-1].weight = 1;
+            if ((*j)->version->branch)
+                record_branch_tag ((*j)->version->branch->tag, i);
+
+            if ((*j)->version != (*j)->file->versions &&
+                (*j)->version[-1].implicit_merge &&
+                (*j)->version[-1].used &&
+                (*j)->version[-1].branch)
+                record_branch_tag ((*j)->version[-1].branch->tag, i);
         }
     }
 
@@ -334,12 +348,12 @@ static void branch_changesets (database_t * db)
 
 void branch_analyse (database_t * db)
 {
+    branch_changesets (db);
+
     branch_graph (db);
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         branch_choose (i);
-
-    branch_changesets (db);
 
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         if (i->parent)
