@@ -749,17 +749,6 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
                 i->branch_versions[(*j)->file - db->files] = (*j)->version;
 
-#if 0
-        SHA_CTX sha;
-        SHA1_Init (&sha);
-        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-            if ((*j)->version != NULL && !(*j)->version->dead)
-                SHA1_Update (&sha, &(*j)->version, sizeof (version_t *));
-
-        SHA1_Final ((unsigned char *) i->hash, &sha);
-        database_tag_hash_insert (db, i);
-#endif
-
         i->is_released = false;
     }
 }

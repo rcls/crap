@@ -313,58 +313,6 @@ static void branch_choose (tag_t * tag)
 }
 
 
-#if 0
-/// Record the new changeset versions; update the branch hash and find any
-/// matching tags.  FIXME - suspect we're not coping with vendor merges
-/// correctly.
-static void update_branch_hash (struct database * db,
-                                struct changeset * changeset,
-                                struct heap * ready_tags)
-{
-    if (changeset_update_branch_versions (db, changeset) == 0)
-        return;
-
-    assert (changeset->type == ct_commit);
-    version_t ** branch = changeset->versions[0]->branch->tag->branch_versions;
-
-    // Compute the SHA1 hash of the current branch state.
-    SHA_CTX sha;
-    SHA1_Init (&sha);
-    version_t ** branch_end = branch + (db->files_end - db->files);
-    for (version_t ** i = branch; i != branch_end; ++i)
-        if (*i != NULL && !(*i)->dead) {
-            const version_t * v = version_normalise (*i);
-            SHA1_Update (&sha, &v, sizeof v);
-        }
-
-    uint32_t hash[5];
-    SHA1_Final ((unsigned char *) hash, &sha);
-
-    // Iterate over all the tags that match.  FIXME the duplicate flag is no
-    // longer accurate.
-    for (tag_t * i = database_tag_hash_find (db, hash); i;
-         i = database_tag_hash_next (i)) {
-        fprintf (stderr, "*** HIT %s %s%s ***\n",
-                 i->branch_versions ? "BRANCH" : "TAG", i->tag,
-                 i->parent
-                 ? i->exact_match ? " (DUPLICATE)" : " (ALREADY EMITTED)" : "");
-        if (i->parent == NULL) {
-            // FIXME - we want better logic for exact matches following a
-            // generic release.  Ideally an exact match would replace a generic
-            // release if this does not risk introducing cycles.
-            i->exact_match = true;
-            i->parent = changeset;
-            ARRAY_APPEND (changeset->children, &i->changeset);
-        }
-        if (!i->is_released) {
-            i->is_released = true;
-            heap_insert (ready_tags, i);
-        }
-    }
-}
-#endif
-
-
 static void branch_changesets (database_t * db)
 {
     // Do a pass through the changesets, assigning changesets to their branches.
@@ -376,9 +324,6 @@ static void branch_changesets (database_t * db)
         assert (cs->type == ct_commit);
         changeset_emitted (db, NULL, cs);
         changeset_update_branch_versions (db, cs);
-#if 0
-        update_branch_hash (db, cs, &ready_tags);
-#endif
         if (cs->versions[0]->branch == NULL)
             continue;               // Anonymous branch: skip.
         tag_t * branch = cs->versions[0]->branch->tag;
