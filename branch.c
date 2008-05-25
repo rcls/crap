@@ -18,7 +18,6 @@
 #include "file.h"
 #include "utils.h"
 
-#include <openssl/sha.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -114,12 +113,12 @@ static void break_cycle (heap_t * heap, tag_t * t)
 }
 
 
-// Release all the child tags.
+// Release all the child tags of a branch.
 static void tag_released (heap_t * heap, tag_t * tag)
 {
     for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
         assert (i->tag->changeset.unready_count != 0);
-        if (--i->tag->changeset.unready_count == 0 && !i->tag->is_released) {
+        if (--i->tag->changeset.unready_count == 0) {
             i->tag->is_released = true;
             heap_insert (heap, i->tag);
         }
@@ -151,7 +150,7 @@ static void branch_graph (database_t * db)
         }
     }
 
-    // Go through each branch and put it onto each tag.
+    // Go through each branch and put record it on the tags.
     for (tag_t * i = db->tags; i != db->tags_end; ++i)
         for (branch_tag_t * j = i->tags; j != i->tags_end; ++j) {
             ARRAY_EXTEND (j->tag->parents);
@@ -198,31 +197,72 @@ static bool better_than (tag_t * new, tag_t * old)
 }
 
 
-static void assign_tag_point (database_t * db, tag_t * tag)
+static bool is_on_branch (database_t * db, tag_t * branch, version_t * version)
 {
-    const char * bt = tag->branch_versions ? "Branch" : "Tag";
+    if (version == NULL || version->dead)
+        return false;
 
-    // Exact matches have already assigned tag points.
-    if (tag->exact_match) {
-        fprintf (stderr, "%s '%s' already exactly matched\n", bt, tag->tag);
-        return;
+    if (version->branch && version->branch->tag == branch)
+        return true;
+
+    file_tag_t * bt = find_file_tag (version->file, branch);
+    return bt != NULL && bt->version == version;
+}
+
+
+static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
+{
+    changeset_t * best_cs = &branch->changeset;
+    ssize_t hit = 0;
+    ssize_t best_hit = 0;
+    ssize_t extra = 0;
+    ssize_t best_extra = 0;
+
+    for (changeset_t ** i = branch->changeset.children;
+         i != branch->changeset.children_end; ++i) {
+        changeset_t * cs = *i;
+        if (cs->type == ct_tag)
+            continue;               // Ignore child tags.
+        for (version_t ** j = cs->versions; j != cs->versions_end; ++j) {
+            if (!(*j)->used)
+                continue;
+            file_tag_t * ft = find_file_tag ((*j)->file, tag);
+            if (ft == NULL || ft->version == NULL) {
+                extra -= is_on_branch (db, branch, (*j)->parent);
+                extra += is_on_branch (db, branch, *j);
+                continue;
+            }
+            assert (!ft->version->implicit_merge);
+            if (ft->version == version_normalise (*j))
+                ++hit;
+            else if (ft->version == version_normalise ((*j)->parent))
+                // FIXME check parent actually on branch.
+                --hit;
+        }
+        if (hit > best_hit || (hit == best_hit && extra < best_extra)) {
+            hit = best_hit;
+            extra = best_extra;
+            best_cs = cs;
+        }
     }
 
-    // Some branches have no parents.  I think this should only be the trunk.
-    if (tag->parents == tag->parents_end) {
-        fprintf (stderr, "%s '%s' has no parents\n", bt, tag->tag);
-        return;
-    }
+    tag->parent = best_cs;
+    ARRAY_APPEND (best_cs->children, &tag->changeset);
 
-    // We're going to do this the hard way.
+    // FIXME Now walk through the changesets a second time; each time we
+    // come to a child tag, generate any needed fix-up.
+}
+
+
+/// Choose which branch to put a tag.  We choose the branch with the largest
+/// number of tag versions.
+static void branch_choose (tag_t * tag)
+{
     size_t best_weight = 0;
     tag_t * best_branch = NULL;
-
-    // First of all, check to see which parent branches contain the most
-    // versions from the tag.
-    // FIXME - no need to do this if only one parent.
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
         size_t weight = 1;
+            
         file_tag_t ** j = tag->tag_files;
         file_tag_t ** jj = i->branch->tag_files;
         while (j != tag->tag_files_end && jj != i->branch->tag_files_end) {
@@ -234,71 +274,46 @@ static void assign_tag_point (database_t * db, tag_t * tag)
                 ++jj;
                 continue;
             }
-            // FIXME - misses vendor imports that get merged.
-            if (((*j)->version && (*j)->version->branch
-                 && (*j)->version->branch->tag == i->branch)
-                || (*j)->version == (*jj)->version)
+            version_t * tv = version_live ((*j++)->version);
+            version_t * bv = (*jj++)->version;
+            if (!tv)
+                continue;
+            if ((tv->branch && tv->branch->tag == i->branch) || tv == bv)
                 ++weight;
-            ++j;
-            ++jj;
         }
-        if (weight > best_weight ||
-            (weight == best_weight && better_than (i->branch, best_branch))) {
+        if (weight > best_weight
+            || (weight == best_weight
+                && better_than (i->branch, best_branch))) {
             best_weight = weight;
             best_branch = i->branch;
         }
     }
-
-    // We should now have a branch to use.  Now we need to find at what point
-    // on the branch to place the tag.  We walk through the branch changesets,
-    // keeping tabs on how many file versions match.  The one with the most
-    // matches wins.
-    assert (best_branch != NULL);
-
-    fprintf (stderr, "%s '%s' placing on branch '%s'\n",
-             bt, tag->tag, best_branch->tag);
-
-    ssize_t current = 0;
-    ssize_t best = 0;
-    changeset_t * best_cs = &best_branch->changeset;
-
-    for (changeset_t ** i = best_branch->changeset.children;
-         i != best_branch->changeset.children_end; ++i) {
-        // Go through the changeset versions; if it matches the tag version,
-        // then increment current; if the previous version matches the tag
-        // version, then decrement current.  Just to make life fun, the
-        // changeset versions are not sorted by file, so we have to search for
-        // them.  FIXME - again, this does not get vendor imports correct.
-        if ((*i)->type != ct_commit)
-            continue;                   // Tags play no role here.
-        for (version_t ** j = (*i)->versions; j != (*i)->versions_end; ++j) {
-            if (!(*j)->used) {
-                assert ((*j)->implicit_merge);
-                continue;
-            }
-            file_tag_t * ft = find_file_tag ((*j)->file, tag);
-            // FIXME - we should process ft->version==NULL.
-            if (ft == NULL || ft->version == NULL)
-                continue;
-            assert (!ft->version->implicit_merge);
-            if (ft->version == version_normalise (*j))
-                ++current;
-            else if (ft->version == version_normalise ((*j)->parent))
-                --current;              // FIXME check parent on branch.
-        }
-
-        if (current > best) {
-            best = current;
-            best_cs = *i;
-        }
+    if (best_branch) {
+        fprintf (stderr, "Tag '%s' placing on branch '%s'\n",
+                 tag->tag, best_branch->tag);
+        tag->parent = &best_branch->changeset;
     }
+    else
+        tag->parent = NULL;
+    xfree (tag->parents);
+    tag->parents = NULL;
+    tag->parents_end = NULL;
+    xfree (tag->tags);
+    tag->tags = NULL;
+    tag->tags_end = NULL;
 
-    // Set the tag as a child of the changeset.
-    tag->parent = best_cs;
-    ARRAY_APPEND (best_cs->children, &tag->changeset);
+/*     // Now reconstruct the branch tag lists, keeping only the ones we've */
+/*     // choosen. */
+/*     for (tag_t * i = db->tags; i != db->tags_end; ++i) */
+/*         if (i->parent) { */
+/*             tag_t * branch = as_tag (i->parent); */
+/*             ARRAY_EXTEND (branch->tags); */
+/*             branch->tags_end[-1].tag = i; */
+/*         } */
 }
 
 
+#if 0
 /// Record the new changeset versions; update the branch hash and find any
 /// matching tags.  FIXME - suspect we're not coping with vendor merges
 /// correctly.
@@ -347,77 +362,41 @@ static void update_branch_hash (struct database * db,
         }
     }
 }
+#endif
 
 
-// Do a pass through the changesets, assigning them to their branch in emission
-// order.
 static void branch_changesets (database_t * db)
 {
+    // Do a pass through the changesets, assigning changesets to their branches.
+    // This will place the changesets in emission order.
     prepare_for_emission (db, NULL);
 
-    for (changeset_t * i; (i = next_changeset (db));) {
-        changeset_emitted (db, NULL, i);
-        assert (i->type == ct_commit);
-        if (i->versions[0]->branch)
-            ARRAY_APPEND (i->versions[0]->branch->tag->changeset.children, i);
+    changeset_t * cs;
+    while ((cs = next_changeset (db))) {
+        assert (cs->type == ct_commit);
+        changeset_emitted (db, NULL, cs);
+        changeset_update_branch_versions (db, cs);
+#if 0
+        update_branch_hash (db, cs, &ready_tags);
+#endif
+        if (cs->versions[0]->branch == NULL)
+            continue;               // Anonymous branch: skip.
+        tag_t * branch = cs->versions[0]->branch->tag;
+        ARRAY_APPEND (branch->changeset.children, cs);
     }
-}
-
-
-static void branch_tree (database_t * db)
-{
-    // Do a pass through the changesets, this time assigning branch-points.
-    heap_t ready_tags;
-    heap_init (&ready_tags,
-               offsetof (tag_t, changeset.ready_index), tag_compare);
-
-    // Child unready counts.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        i->is_released = false;
-        i->exact_match = false;
-        for (changeset_t ** j = i->changeset.children;
-             j != i->changeset.children_end; ++j)
-            ++(*j)->unready_count;
-        for (branch_tag_t * j = i->tags; j != i->tags_end; ++j)
-            ++j->tag->changeset.unready_count;
-    }
-    prepare_for_emission (db, NULL);
-
-    // Put the tags that are ready right now on to the heap.
-    for (tag_t * i = db->tags; i != db->tags_end; ++i)
-        if (i->changeset.unready_count == 0) {
-            i->is_released = true;
-            heap_insert (&ready_tags, i);
-        }
-
-    while (!heap_empty (&ready_tags)) {
-        tag_t * tag = heap_pop (&ready_tags);
-        tag_released (&ready_tags, tag);
-
-        // Release all the children; none should be tags.  (tag_released has
-        // released the child tags).
-        for (changeset_t ** i = tag->changeset.children;
-             i != tag->changeset.children_end; ++i) {
-            assert ((*i)->type != ct_tag);
-            changeset_release (db, *i);
-        }
-
-        assign_tag_point (db, tag);
-
-        changeset_t * changeset;
-        while ((changeset = next_changeset (db))) {
-            changeset_emitted (db, NULL, changeset);
-            update_branch_hash (db, changeset, &ready_tags);
-        }
-    }
-
-    heap_destroy (&ready_tags);
 }
 
 
 void branch_analyse (database_t * db)
 {
     branch_graph (db);
+
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+        branch_choose (i);
+
     branch_changesets (db);
-    branch_tree (db);
+
+    for (tag_t * i = db->tags; i != db->tags_end; ++i)
+        if (i->parent)
+            branch_tag_point (db, as_tag (i->parent), i);
 }

@@ -53,24 +53,22 @@ static void print_commit (const changeset_t * cs)
 }
 
 
-static void print_tag (const database_t * db, const tag_t * tag)
+static void print_tag (const database_t * db, tag_t * tag)
 {
     printf ("%s %s %s\n",
             format_date (&tag->changeset.time),
             tag->branch_versions ? "BRANCH" : "TAG",
             tag->tag);
 
-    if (tag->exact_match)
-        printf ("Exact match\n");
-
     if (tag->parent == NULL) {
         // Special case.
         printf ("No parent; create from scratch\n");
         for (file_tag_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
-            if ((*i)->version && !(*i)->version->dead)
+            if ((*i)->version && !(*i)->version->dead) {
+                tag->fixup = true;
                 printf ("\t%s %s\n",
                         (*i)->version->file->path, (*i)->version->version);
-        printf ("WIERD: exact but create from scratch\n\n");
+            }
         return;
     }
 
@@ -85,7 +83,6 @@ static void print_tag (const database_t * db, const tag_t * tag)
     file_tag_t ** tf = tag->tag_files;
     // Go through the current versions on the branch and note any version
     // fix-ups required.
-    size_t fixups = 0;
     size_t keep = 0;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = version_live (branch->branch_versions[i - db->files]);
@@ -94,18 +91,13 @@ static void print_tag (const database_t * db, const tag_t * tag)
             tv = version_live ((*tf++)->version);
 
         if (bv != tv) {
-            ++fixups;
+            tag->fixup = true;
             printf ("\t%s %s (was %s)\n", i->path,
                     tv ? tv->version : "dead", bv ? bv->version : "dead");
         }
         else if (bv != NULL)
             ++keep;
     }
-
-    if (fixups == 0 && !tag->exact_match)
-        printf ("WIERD: no fixups but not exact match\n");
-    else if (fixups != 0 && tag->exact_match)
-        printf ("WIERD: fixups for exact match\n");
 
     printf ("Keep %u live file versions\n\n", keep);
 }
@@ -188,29 +180,29 @@ int main (int argc, const char * const * argv)
              emitted_commits == db.changesets_end - db.changesets ? "=" : "!=",
              db.changesets_end - db.changesets);
 
-    size_t matched_branches = 0;
-    size_t late_branches = 0;
-    size_t matched_tags = 0;
-    size_t late_tags = 0;
+    size_t exact_branches = 0;
+    size_t fixup_branches = 0;
+    size_t exact_tags = 0;
+    size_t fixup_tags = 0;
     for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         assert (i->is_released);
         if (i->branch_versions)
-            if (i->exact_match)
-                ++matched_branches;
+            if (i->fixup)
+                ++fixup_branches;
             else
-                ++late_branches;
+                ++exact_branches;
         else
-            if (i->exact_match)
-                ++matched_tags;
+            if (i->fixup)
+                ++fixup_tags;
             else
-                ++late_tags;
+                ++exact_tags;
     }
 
     fprintf (stderr,
-             "Matched %5u + %5u = %5u branches + tags.\n"
-             "Late    %5u + %5u = %5u branches + tags.\n",
-             matched_branches, matched_tags, matched_branches + matched_tags,
-             late_branches, late_tags, late_branches + late_tags);
+             "Exact %5u + %5u = %5u branches + tags.\n"
+             "Fixup %5u + %5u = %5u branches + tags.\n",
+             exact_branches, exact_tags, exact_branches + exact_tags,
+             fixup_branches, fixup_tags, fixup_branches + fixup_tags);
 
     string_cache_stats (stderr);
 

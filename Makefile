@@ -6,8 +6,10 @@ all: crap-clone rlog_parse
 %: %.o
 	$(LD) $(LDFLAGS) -o $@ $+
 
-crap-clone: libcrap.a -lssl -lm
-rlog_parse: libcrap.a -lssl -lm
+%: %.c
+
+crap-clone: libcrap.a -lm
+rlog_parse: libcrap.a -lm
 
 libcrap.a: branch.o changeset.o cvs_connection.o database.o emission.o file.o \
 	heap.o log.o log_parse.o string_cache.o utils.o

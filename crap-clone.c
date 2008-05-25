@@ -51,7 +51,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
     if (starts_with (s->line, "Checked-in ")) {
         // Update entry but no file change.  Hopefully this just means we
         // screwed up the dates; if servers start sending this back for
-        // unchanged versions we might have to think again.
+        // identical versions we might have to think again.
         next_line (s);
         next_line (s);
         return;
@@ -400,11 +400,10 @@ static void print_commit (const database_t * db, changeset_t * cs,
 static void print_tag (const database_t * db, tag_t * tag,
                        cvs_connection_t * s)
 {
-    fprintf (stderr, "%s %s %s%s\n",
+    fprintf (stderr, "%s %s %s\n",
              format_date (&tag->changeset.time),
              tag->branch_versions ? "BRANCH" : "TAG",
-             tag->tag,
-             tag->exact_match ? " Exact match" : "");
+             tag->tag);
 
     tag_t * branch;
     if (tag->parent == NULL)
@@ -467,17 +466,14 @@ static void print_tag (const database_t * db, tag_t * tag,
 
     if (added == 0 && deleted == 0 && modified == 0) {
         assert (fetch == NULL);
-        if (!tag->exact_match)
-            fprintf (stderr, "WIERD: no fixups but not exact match\n");
         return;                         // Nothing to do.
     }
 
     grab_versions (db, s, fetch, fetch_end);
     xfree (fetch);
 
+    tag->fixup = true;
     tag->changeset.mark = ++mark_counter;
-    if (tag->exact_match)
-        fprintf (stderr, "WIERD: fixups for exact match\n");
 
     const char ** list = NULL;
     const char ** list_end = NULL;
@@ -619,29 +615,29 @@ int main (int argc, const char * const * argv)
              emitted_commits == db.changesets_end - db.changesets ? "=" : "!=",
              db.changesets_end - db.changesets);
 
-    size_t matched_branches = 0;
-    size_t late_branches = 0;
-    size_t matched_tags = 0;
-    size_t late_tags = 0;
+    size_t exact_branches = 0;
+    size_t fixup_branches = 0;
+    size_t exact_tags = 0;
+    size_t fixup_tags = 0;
     for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         assert (i->is_released);
         if (i->branch_versions)
-            if (i->exact_match)
-                ++matched_branches;
+            if (i->fixup)
+                ++fixup_branches;
             else
-                ++late_branches;
+                ++exact_branches;
         else
-            if (i->exact_match)
-                ++matched_tags;
+            if (i->fixup)
+                ++fixup_tags;
             else
-                ++late_tags;
+                ++exact_tags;
     }
 
     fprintf (stderr,
-             "Matched %5u + %5u = %5u branches + tags.\n"
-             "Late    %5u + %5u = %5u branches + tags.\n",
-             matched_branches, matched_tags, matched_branches + matched_tags,
-             late_branches, late_tags, late_branches + late_tags);
+             "Exact %5u + %5u = %5u branches + tags.\n"
+             "Fixup %5u + %5u = %5u branches + tags.\n",
+             exact_branches, exact_tags, exact_branches + exact_tags,
+             fixup_branches, fixup_tags, fixup_branches + fixup_tags);
 
     string_cache_stats (stderr);
 
