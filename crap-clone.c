@@ -321,8 +321,7 @@ static void grab_versions (const database_t * db,
             fatal ("strftime failed\n");
 
         grab_by_option (db, s,
-                        fetch[0]->branch->tag->tag[0]
-                        ? fetch[0]->branch->tag->tag : NULL,
+                        fetch[0]->branch->tag[0] ? fetch[0]->branch->tag : NULL,
                         format_date (&dmax),
                         fetch, fetch_end);
     }
@@ -358,7 +357,7 @@ static void print_commit (const database_t * db, changeset_t * cs,
 
         version_t * cv = version_live (*i);
         if (cv == version_live (
-                v->branch->tag->branch_versions[(*i)->file - db->files]))
+                v->branch->branch_versions[(*i)->file - db->files]))
             continue;
 
         nil = false;
@@ -367,8 +366,8 @@ static void print_commit (const database_t * db, changeset_t * cs,
     }
 
     if (nil) {
-        cs->mark = v->branch->tag->last->mark;
-        v->branch->tag->last = cs;
+        cs->mark = v->branch->last->mark;
+        v->branch->last = cs;
         return;
     }
 
@@ -376,11 +375,11 @@ static void print_commit (const database_t * db, changeset_t * cs,
     grab_versions (db, s, fetch, fetch_end);
     xfree (fetch);
 
-    v->branch->tag->last = cs;
+    v->branch->last = cs;
     cs->mark = ++mark_counter;
 
     printf ("commit refs/heads/%s\n",
-            *v->branch->tag->tag ? v->branch->tag->tag : "cvs_master");
+            *v->branch->tag ? v->branch->tag : "cvs_master");
     printf ("mark :%lu\n", cs->mark);
     printf ("committer %s <%s> %ld +0000\n", v->author, v->author, cs->time);
     printf ("data %u\n%s\n", strlen (v->log), v->log);
@@ -409,7 +408,7 @@ static void print_tag (const database_t * db, tag_t * tag,
     if (tag->parent == NULL)
         branch = NULL;
     else if (tag->parent->type == ct_commit)
-        branch = tag->parent->versions[0]->branch->tag;
+        branch = tag->parent->versions[0]->branch;
     else
         branch = as_tag (tag->parent);
 

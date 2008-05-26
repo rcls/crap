@@ -27,11 +27,9 @@ void changeset_init (changeset_t * cs)
 
 static bool strings_match (const version_t * A, const version_t * B)
 {
-    tag_t * Abranch = A->branch ? A->branch->tag : NULL;
-    tag_t * Bbranch = B->branch ? B->branch->tag : NULL;
     return A->author   == B->author
         && A->commitid == B->commitid
-        && Abranch     == Bbranch
+        && A->branch   == B->branch
         && A->log      == B->log
         && A->implicit_merge == B->implicit_merge;
 }
@@ -54,7 +52,7 @@ static int version_compare (const version_t * A, version_t * B)
         return -1;
 
     if (A->branch != NULL) {
-        r = cache_strcmp (A->branch->tag->tag, B->branch->tag->tag);
+        r = cache_strcmp (A->branch->tag, B->branch->tag);
         if (r != 0)
             return r;
     }

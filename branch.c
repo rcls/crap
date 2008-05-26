@@ -157,13 +157,13 @@ static void branch_graph (database_t * db,
                 continue;
 
             if ((*j)->version->branch)
-                record_branch_tag ((*j)->version->branch->tag, i);
+                record_branch_tag ((*j)->version->branch, i);
 
             if ((*j)->version != (*j)->file->versions &&
                 (*j)->version[-1].implicit_merge &&
                 (*j)->version[-1].used &&
                 (*j)->version[-1].branch)
-                record_branch_tag ((*j)->version[-1].branch->tag, i);
+                record_branch_tag ((*j)->version[-1].branch, i);
         }
     }
 
@@ -220,7 +220,7 @@ static bool is_on_branch (database_t * db, tag_t * branch, version_t * version)
     if (version == NULL || version->dead)
         return false;
 
-    if (version->branch && version->branch->tag == branch)
+    if (version->branch == branch)
         return true;
 
     file_tag_t * bt = find_file_tag (version->file, branch);
@@ -300,7 +300,7 @@ static void branch_choose (tag_t * tag)
             // this file, (b) the tag version is the branch point, (c) the
             // tag version is an implicit merge and the branch we are
             // considering is the trunk.
-            if ((tv->branch && tv->branch->tag == i->branch) || tv == bv
+            if (tv->branch == i->branch || tv == bv
                 || (i->branch->tag[0] == 0 && tv != tv->file->versions_end
                     && tv[1].implicit_merge && tv[1].used))                 
                 ++weight;
@@ -341,7 +341,7 @@ static void branch_changesets (database_t * db)
         changeset_update_branch_versions (db, cs);
         if (cs->versions[0]->branch == NULL)
             continue;               // Anonymous branch: skip.
-        tag_t * branch = cs->versions[0]->branch->tag;
+        tag_t * branch = cs->versions[0]->branch;
         ARRAY_APPEND (branch->changeset.children, cs);
     }
 }

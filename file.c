@@ -40,45 +40,6 @@ version_t * file_find_version (const file_t * f, const char * s)
 }
 
 
-file_tag_t * file_find_branch (const file_t * f,
-                               file_tag_t * const * branches,
-                               file_tag_t * const * branches_end,
-                               const char * s)
-{
-    char vers[strlen (s) + 1];
-    strcpy (vers, s);
-    char * dot = strrchr (vers, '.');
-    assert (dot != NULL);
-    if (memchr (vers, '.', dot - vers) == NULL)
-        dot = vers;                     // On trunk.
-
-    *dot = 0;                           // Truncate the last component.
-
-    // Now bsearch for the branch.
-    file_tag_t * const * base = branches;
-    ssize_t count = branches_end - branches;
-
-    while (count > 0) {
-        size_t mid = count >> 1;
-
-        int c = strcmp (base[mid]->vers, vers);
-        if (c < 0) {
-            base += mid + 1;
-            count -= mid + 1;
-        }
-        else if (c > 0)
-            count = mid;
-        else
-            return base[mid];
-    }
-
-    fprintf (stderr, "File %s version %s (%s) has no branch\n",
-             f->path, s, vers);
-
-    return NULL;
-}
-
-
 void tag_init (tag_t * tag, const char * name)
 {
     changeset_init (&tag->changeset);

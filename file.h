@@ -31,12 +31,6 @@ version_t * file_new_version (file_t * f);
 /// need not be cached.
 version_t * file_find_version (const file_t * f, const char * s);
 
-/// Find a branch on which version @c s of file @c lies.
-file_tag_t * file_find_branch (const file_t * f,
-                               file_tag_t * const * branches,
-                               file_tag_t * const * branches_end,
-                               const char * s);
-
 struct version {
     file_t * file;                      ///< File this is a version of.
     const char * version;               ///< Version string.
@@ -62,7 +56,7 @@ struct version {
     time_t time;
     time_t offset;
     const char * log;
-    file_tag_t * branch;
+    tag_t * branch;
 
     /// The principal commit for this version; note that there may be other
     /// commits (branch fix-ups).

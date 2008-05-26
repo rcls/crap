@@ -66,7 +66,7 @@ size_t changeset_update_branch_versions (struct database * db,
         // create those changesets.
         return 0;                   // Changeset on unknown branch.
 
-    version_t ** branch = cs->versions[0]->branch->tag->branch_versions;
+    version_t ** branch = cs->versions[0]->branch->branch_versions;
     size_t changes = 0;
 
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i) {
@@ -134,7 +134,7 @@ static void cycle_split (database_t * db, changeset_t * cs)
     heap_insert (&db->ready_changesets, new);
 
     fprintf (stderr, "Changeset %s %s\n%s\n",
-             cs->versions[0]->branch ? cs->versions[0]->branch->tag->tag : "",
+             cs->versions[0]->branch ? cs->versions[0]->branch->tag : "",
              cs->versions[0]->author, cs->versions[0]->log);
     for (version_t ** v = new->versions; v != new->versions_end; ++v)
         fprintf (stderr, "    %s:%s\n", (*v)->file->path, (*v)->version);

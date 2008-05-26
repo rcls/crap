@@ -36,7 +36,7 @@ static void print_commit (const changeset_t * cs)
     printf ("%s %s %s %s COMMIT\n%s\n",
             format_date (&cs->time),
             v->branch
-            ? *v->branch->tag->tag ? v->branch->tag->tag : "<trunk>"
+            ? *v->branch->tag ? v->branch->tag : "<trunk>"
             : "<anon>",
             v->author, v->commitid, v->log);
 
@@ -74,7 +74,7 @@ static void print_tag (const database_t * db, tag_t * tag)
 
     tag_t * branch;
     if (tag->parent->type == ct_commit)
-        branch = tag->parent->versions[0]->branch->tag;
+        branch = tag->parent->versions[0]->branch;
     else
         branch = as_tag (tag->parent);
 
