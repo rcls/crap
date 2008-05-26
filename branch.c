@@ -288,11 +288,17 @@ static void branch_choose (tag_t * tag)
                 ++jj;
                 continue;
             }
-            version_t * tv = version_live ((*j++)->version);
+            version_t * tv = (*j++)->version;
             version_t * bv = (*jj++)->version;
             if (!tv)
                 continue;
-            if ((tv->branch && tv->branch->tag == i->branch) || tv == bv)
+            // We cound the branch if (a) the tag version is on the branch for
+            // this file, (b) the tag version is the branch point, (c) the
+            // tag version is an implicit merge and the branch we are
+            // considering is the trunk.
+            if ((tv->branch && tv->branch->tag == i->branch) || tv == bv
+                || (i->branch->tag[0] == 0 && tv != tv->file->versions_end
+                    && tv[1].implicit_merge && tv[1].used))                 
                 ++weight;
         }
         if (weight > best_weight
