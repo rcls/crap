@@ -19,24 +19,9 @@ version_t * file_new_version (file_t * f)
 
 version_t * file_find_version (const file_t * f, const char * s)
 {
-    version_t * base = f->versions;
-    size_t count = f->versions_end - f->versions;
-
-    while (count > 0) {
-        size_t mid = count >> 1;
-
-        int c = strcmp (base[mid].version, s);
-        if (c < 0) {
-            base += mid + 1;
-            count -= mid + 1;
-        }
-        else if (c > 0)
-            count = mid;
-        else
-            return version_normalise (base + mid);
-    }
-
-    return NULL;
+    return version_normalise (
+        find_string (f->versions, f->versions_end - f->versions,
+                     sizeof (version_t), offsetof (version_t, version), s));
 }
 
 

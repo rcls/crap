@@ -291,22 +291,12 @@ static tag_t * find_branch (const file_t * f,
     *dot = 0;                           // Truncate the last component.
 
     // Now bsearch for the branch.
-    const file_branch_t * base = branches;
-    ssize_t count = branches_end - branches;
+    const file_branch_t * b = find_string (
+        branches, branches_end - branches,
+        sizeof (file_branch_t), offsetof (file_branch_t, version), vers);
 
-    while (count > 0) {
-        size_t mid = count >> 1;
-
-        int c = strcmp (base[mid].version, vers);
-        if (c < 0) {
-            base += mid + 1;
-            count -= mid + 1;
-        }
-        else if (c > 0)
-            count = mid;
-        else
-            return base[mid].branch;
-    }
+    if (b != NULL)
+        return b->branch;
 
     fprintf (stderr, "File %s version %s (%s) has no branch\n",
              f->path, s, vers);

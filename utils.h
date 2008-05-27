@@ -29,6 +29,11 @@ char * xstrdup (const char * s)
 char * xasprintf (const char * format, ...)
     __attribute__ ((malloc, warn_unused_result, format (printf, 1, 2)));
 
+/// Binary search for the string @c needle in an @c array of @c count items
+/// of @c size bytes each, with a string point at offset @c position.
+void * find_string (const void * array, size_t count, size_t size,
+                    size_t position, const char * needle);
+
 /// Does @c haystack start with @c needle?
 static inline bool starts_with (const char * haystack, const char * needle)
 {

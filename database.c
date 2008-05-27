@@ -126,21 +126,6 @@ changeset_t * database_new_changeset (database_t * db)
 
 file_t * database_find_file (const database_t * db, const char * path)
 {
-    file_t * base = db->files;
-    size_t count = db->files_end - db->files;
-
-    while (count) {
-        size_t mid = count >> 1;
-        int c = strcmp (base[mid].path, path);
-        if (c < 0) {
-            base += mid + 1;
-            count -= mid + 1;
-        }
-        else if (c > 0)
-            count = mid;
-        else
-            return &base[mid];
-    }
-
-    return NULL;
+    return find_string (db->files, db->files_end - db->files,
+                        sizeof (file_t), offsetof (file_t, path), path);
 }
