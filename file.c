@@ -71,9 +71,9 @@ file_tag_t * find_file_tag (file_t * file, tag_t * tag)
     while (count > 0) {
         size_t mid = count >> 1;
         file_tag_t ** midp = base + mid;
-        if (file < (*midp)->file)
+        if (file < (*midp)->version->file)
             count = mid;
-        else if (file > (*midp)->file) {
+        else if (file > (*midp)->version->file) {
             base += mid + 1;
             count -= mid + 1;
         }

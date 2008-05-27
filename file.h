@@ -82,7 +82,6 @@ static inline version_t * version_live (version_t * v)
 
 
 struct file_tag {
-    file_t * file;
     tag_t * tag;
     /// vers is the version information stored in cvs.  For a branch, version is
     /// the version to use as the branch point.  Version may be null.

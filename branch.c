@@ -159,7 +159,7 @@ static void branch_graph (database_t * db,
             if ((*j)->version->branch)
                 record_branch_tag ((*j)->version->branch, i);
 
-            if ((*j)->version != (*j)->file->versions &&
+            if ((*j)->version != (*j)->version->file->versions &&
                 (*j)->version[-1].implicit_merge &&
                 (*j)->version[-1].used &&
                 (*j)->version[-1].branch)
@@ -284,11 +284,11 @@ static void branch_choose (tag_t * tag)
         file_tag_t ** j = tag->tag_files;
         file_tag_t ** jj = i->branch->tag_files;
         while (j != tag->tag_files_end && jj != i->branch->tag_files_end) {
-            if ((*j)->file < (*jj)->file) {
+            if ((*j)->version->file < (*jj)->version->file) {
                 ++j;
                 continue;
             }
-            if ((*j)->file > (*jj)->file) {
+            if ((*j)->version->file > (*jj)->version->file) {
                 ++jj;
                 continue;
             }

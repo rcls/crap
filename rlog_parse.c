@@ -87,7 +87,7 @@ static void print_tag (const database_t * db, tag_t * tag)
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = version_live (branch->branch_versions[i - db->files]);
         version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->file == i)
+        if (tf != tag->tag_files_end && (*tf)->version->file == i)
             tv = version_live ((*tf++)->version);
 
         if (bv != tv) {
@@ -151,7 +151,8 @@ int main (int argc, const char * const * argv)
             memset (i->branch_versions, 0,
                     sizeof (version_t *) * (db.files_end - db.files));
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-                i->branch_versions[(*j)->file - db.files] = (*j)->version;
+                i->branch_versions[(*j)->version->file - db.files]
+                    = (*j)->version;
         }
     }
 

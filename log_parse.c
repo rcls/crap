@@ -759,10 +759,8 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
         for (version_t * j = f->versions; j != f->versions_end; ++j)
             j->file = f;
 
-        for (file_tag_t * j = f->file_tags; j != f->file_tags_end; ++j) {
-            j->file = f;
+        for (file_tag_t * j = f->file_tags; j != f->file_tags_end; ++j)
             ARRAY_APPEND (j->tag->tag_files, j);
-        }
     }
 
     // Flatten the hash of tags to an array.
@@ -799,7 +797,8 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
             i->branch_versions = ARRAY_CALLOC (version_t *,
                                                db->files_end - db->files);
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-                i->branch_versions[(*j)->file - db->files] = (*j)->version;
+                i->branch_versions[(*j)->version->file - db->files]
+                    = (*j)->version;
         }
 
         i->is_released = false;
