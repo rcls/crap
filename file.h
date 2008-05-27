@@ -93,8 +93,8 @@ struct file_tag {
 struct tag {
     const char * tag;                   ///< The tag name.
 
-    file_tag_t ** tag_files;
-    file_tag_t ** tag_files_end;
+    version_t ** tag_files;
+    version_t ** tag_files_end;
 
     /// This is non-NULL for branches, where a tag is considered a branch if the
     /// tag is a branch tag on any file.  It points to an array of versions, the
@@ -131,7 +131,7 @@ struct tag {
 void tag_init (tag_t * tag, const char * name);
 
 /// Find a @c file_tag for the given @c file and @c tag.
-file_tag_t * find_file_tag (file_t * file, tag_t * tag);
+version_t * find_file_tag (file_t * file, tag_t * tag);
 
 static inline tag_t * as_tag (const changeset_t * cs)
 {

@@ -435,13 +435,13 @@ static void print_tag (const database_t * db, tag_t * tag,
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
 
-    file_tag_t ** tf = tag->tag_files;
+    version_t ** tf = tag->tag_files;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = branch
             ? version_live (branch->branch_versions[i - db->files]) : NULL;
         version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->version->file == i)
-            tv = version_live ((*tf++)->version);
+        if (tf != tag->tag_files_end && (*tf)->file == i)
+            tv = version_live (*tf++);
 
         if (bv == tv) {
             if (bv != NULL)
@@ -487,8 +487,8 @@ static void print_tag (const database_t * db, tag_t * tag,
         version_t * bv = branch
             ? version_live (branch->branch_versions[i - db->files]) : NULL;
         version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->version->file == i)
-            tv = version_live ((*tf++)->version);
+        if (tf != tag->tag_files_end && (*tf)->file == i)
+            tv = version_live (*tf++);
 
         if (bv == tv) {
             if (bv != NULL && keep <= deleted)
@@ -524,8 +524,8 @@ static void print_tag (const database_t * db, tag_t * tag,
         version_t * bv = branch
             ? version_live (branch->branch_versions[i - db->files]) : NULL;
         version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->version->file == i)
-            tv = version_live ((*tf++)->version);
+        if (tf != tag->tag_files_end && (*tf)->file == i)
+            tv = version_live (*tf++);
 
         if (tv != bv) {
             if (tv == NULL)
@@ -584,9 +584,8 @@ int main (int argc, const char * const * argv)
         if (i->branch_versions) {
             memset (i->branch_versions, 0,
                     sizeof (version_t *) * (db.files_end - db.files));
-            for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-                i->branch_versions[(*j)->version->file - db.files]
-                    = (*j)->version;
+            for (version_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+                i->branch_versions[(*j)->file - db.files] = *j;
         }
     }
 

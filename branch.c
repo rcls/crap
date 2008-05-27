@@ -152,18 +152,15 @@ static void branch_graph (database_t * db,
     // First, go through each tag, and put it on all the branches.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         i->changeset.unready_count = 0;
-        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
-            if ((*j)->version == NULL)
-                continue;
+        for (version_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
+            if ((*j)->branch)
+                record_branch_tag ((*j)->branch, i);
 
-            if ((*j)->version->branch)
-                record_branch_tag ((*j)->version->branch, i);
-
-            if ((*j)->version != (*j)->version->file->versions &&
-                (*j)->version[-1].implicit_merge &&
-                (*j)->version[-1].used &&
-                (*j)->version[-1].branch)
-                record_branch_tag ((*j)->version[-1].branch, i);
+            if (*j != (*j)->file->versions &&
+                (*j)[-1].implicit_merge &&
+                (*j)[-1].used &&
+                (*j)[-1].branch)
+                record_branch_tag ((*j)[-1].branch, i);
         }
     }
 
@@ -223,8 +220,7 @@ static bool is_on_branch (database_t * db, tag_t * branch, version_t * version)
     if (version->branch == branch)
         return true;
 
-    file_tag_t * bt = find_file_tag (version->file, branch);
-    return bt != NULL && bt->version == version;
+    return find_file_tag (version->file, branch) == version;
 }
 
 
@@ -244,16 +240,16 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
         for (version_t ** j = cs->versions; j != cs->versions_end; ++j) {
             if (!(*j)->used)
                 continue;
-            file_tag_t * ft = find_file_tag ((*j)->file, tag);
-            if (ft == NULL || ft->version == NULL) {
+            version_t * ft = find_file_tag ((*j)->file, tag);
+            if (ft == NULL) {
                 extra -= is_on_branch (db, branch, (*j)->parent);
                 extra += is_on_branch (db, branch, *j);
                 continue;
             }
-            assert (!ft->version->implicit_merge);
-            if (ft->version == version_normalise (*j))
+            assert (!ft->implicit_merge);
+            if (ft == version_normalise (*j))
                 ++hit;
-            else if (ft->version == version_normalise ((*j)->parent))
+            else if (ft == version_normalise ((*j)->parent))
                 // FIXME check parent actually on branch.
                 --hit;
         }
@@ -281,21 +277,20 @@ static void branch_choose (tag_t * tag)
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
         size_t weight = 1;
             
-        file_tag_t ** j = tag->tag_files;
-        file_tag_t ** jj = i->branch->tag_files;
+        version_t ** j = tag->tag_files;
+        version_t ** jj = i->branch->tag_files;
         while (j != tag->tag_files_end && jj != i->branch->tag_files_end) {
-            if ((*j)->version->file < (*jj)->version->file) {
+            if ((*j)->file < (*jj)->file) {
                 ++j;
                 continue;
             }
-            if ((*j)->version->file > (*jj)->version->file) {
+            if ((*j)->file > (*jj)->file) {
                 ++jj;
                 continue;
             }
-            version_t * tv = (*j++)->version;
-            version_t * bv = (*jj++)->version;
-            if (!tv)
-                continue;
+            version_t * tv = *j++;
+            version_t * bv = *jj++;
+
             // We cound the branch if (a) the tag version is on the branch for
             // this file, (b) the tag version is the branch point, (c) the
             // tag version is an implicit merge and the branch we are

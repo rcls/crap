@@ -63,11 +63,10 @@ static void print_tag (const database_t * db, tag_t * tag)
     if (tag->parent == NULL) {
         // Special case.
         printf ("No parent; create from scratch\n");
-        for (file_tag_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
-            if ((*i)->version && !(*i)->version->dead) {
+        for (version_t ** i = tag->tag_files; i != tag->tag_files_end; ++i)
+            if (!(*i)->dead) {
                 tag->fixup = true;
-                printf ("\t%s %s\n",
-                        (*i)->version->file->path, (*i)->version->version);
+                printf ("\t%s %s\n", (*i)->file->path, (*i)->version);
             }
         return;
     }
@@ -80,15 +79,15 @@ static void print_tag (const database_t * db, tag_t * tag)
 
     printf ("Parent branch is '%s'\n", branch->tag);
 
-    file_tag_t ** tf = tag->tag_files;
+    version_t ** tf = tag->tag_files;
     // Go through the current versions on the branch and note any version
     // fix-ups required.
     size_t keep = 0;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = version_live (branch->branch_versions[i - db->files]);
         version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->version->file == i)
-            tv = version_live ((*tf++)->version);
+        if (tf != tag->tag_files_end && (*tf)->file == i)
+            tv = version_live (*tf++);
 
         if (bv != tv) {
             tag->fixup = true;
@@ -150,9 +149,8 @@ int main (int argc, const char * const * argv)
         if (i->branch_versions) {
             memset (i->branch_versions, 0,
                     sizeof (version_t *) * (db.files_end - db.files));
-            for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
-                i->branch_versions[(*j)->version->file - db.files]
-                    = (*j)->version;
+            for (version_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+                i->branch_versions[(*j)->file - db.files] = *j;
         }
     }
 
