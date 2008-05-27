@@ -292,7 +292,7 @@ static void branch_choose (tag_t * tag)
             // tag version is an implicit merge and the branch we are
             // considering is the trunk.
             if (tv->branch == i->branch || tv == bv
-                || (i->branch->tag[0] == 0 && tv != tv->file->versions_end
+                || (i->branch->tag[0] == 0 && tv + 1 != tv->file->versions_end
                     && tv[1].implicit_merge && tv[1].used))                 
                 ++weight;
         }
