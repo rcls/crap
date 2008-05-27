@@ -67,6 +67,7 @@ size_t changeset_update_branch_versions (struct database * db,
         return 0;                   // Changeset on unknown branch.
 
     version_t ** branch = cs->versions[0]->branch->branch_versions;
+    assert (branch);
     size_t changes = 0;
 
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i) {

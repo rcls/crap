@@ -387,43 +387,40 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
 
         if (!is_branch (ft->vers)) {
             ft->version = file_find_version (file, ft->vers);
-            if (ft->version == NULL) {
+            if (ft->version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
                          file->path, ft->tag->tag, ft->vers);
-                continue;
-            }
-
-            // FIXME - it would be better to keep dead version tags, because
-            // that would allow better tag matching.
-            if (!ft->version->dead)
+            else if (!ft->version->dead)
+                // FIXME - it might be better to keep dead version tags, because
+                // that would allow better tag matching.
                 ++ft;
             continue;
         }
 
-        // We try and find a predecessor version, to use as the branch point.
-        // If none exists, that's fine, it makes sense as a branch addition.
-        if (ft->vers[0] != 0) {
-            size_t len = strrchr (ft->vers, '.') - ft->vers;
-            char vers[len + 1];
-            memcpy (vers, ft->vers, len);
-            vers[len] = 0;
-            ft->version = file_find_version (file, vers);
-        }
-        else
-            ft->version = NULL;
-
-        if (ft->version != NULL && ft->version->time > ft->tag->changeset.time)
-            ft->tag->changeset.time = ft->version->time;
-
-        if (ft->version && ft->version->dead)
-            // This hits for branch additions.  We don't log, and unlike tags
-            // on dead versions, we keep the file_tag.
-            ft->version = NULL;
-
+        // Record the branch on the branch list.
         ARRAY_EXTEND (branches);
         branches_end[-1].version = ft->vers;
         branches_end[-1].branch = ft->tag;
-        ++ft;
+
+        // We try and find a predecessor version, to use as the branch point.
+        // If none exists, that's fine, it makes sense as a branch addition.
+        if (ft->vers[0] == 0)
+            continue;                   // All trunk files are trunk additions.
+
+        size_t len = strrchr (ft->vers, '.') - ft->vers;
+        char vers[len + 1];
+        memcpy (vers, ft->vers, len);
+        vers[len] = 0;
+        ft->version = file_find_version (file, vers);
+
+        if (ft->version == NULL)
+            continue;                   // Branch addition.
+
+        if (ft->version->time > ft->tag->changeset.time)
+            ft->tag->changeset.time = ft->version->time;
+
+        if (!ft->version->dead)
+            ++ft;                       // Don't keep dead branch points.
     }
     file->file_tags_end = ft;
 
@@ -434,8 +431,11 @@ static void fill_in_versions_and_parents (file_t * file, bool attic)
     // Check for duplicate branches.
     file_branch_t * bb = branches;
     for (file_branch_t * i = branches; i != branches_end; ++i)
-        if (i == branches || bb[-1].version != i->version)
+        if (i == branches || bb[-1].version != i->version) {
             *bb++ = *i;
+            static version_t * dummy_pointer;
+            i->branch->branch_versions = &dummy_pointer;
+        }
         else
             fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
                      file->path, i->branch->tag, i[-1].branch->tag,
@@ -792,15 +792,15 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
     // hashes.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         ARRAY_TRIM (i->tag_files);
-        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j) {
+        for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
             (*j)->tag = i;
-            if (i->branch_versions == NULL && is_branch ((*j)->vers))
-                i->branch_versions = ARRAY_CALLOC (version_t *,
-                                                   db->files_end - db->files);
-        }
-        if (i->branch_versions)
+
+        if (i->branch_versions) {
+            i->branch_versions = ARRAY_CALLOC (version_t *,
+                                               db->files_end - db->files);
             for (file_tag_t ** j = i->tag_files; j != i->tag_files_end; ++j)
                 i->branch_versions[(*j)->file - db->files] = (*j)->version;
+        }
 
         i->is_released = false;
     }
