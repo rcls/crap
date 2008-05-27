@@ -277,21 +277,17 @@ static void branch_choose (tag_t * tag)
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
         size_t weight = 1;
             
-        version_t ** j = tag->tag_files;
         version_t ** jj = i->branch->tag_files;
-        while (j != tag->tag_files_end && jj != i->branch->tag_files_end) {
-            if ((*j)->file < (*jj)->file) {
-                ++j;
-                continue;
-            }
-            if ((*j)->file > (*jj)->file) {
+        for (version_t ** j = tag->tag_files; j != tag->tag_files_end; ++j) {
+            while (jj != i->branch->tag_files_end && (*jj)->file < (*j)->file)
                 ++jj;
-                continue;
-            }
-            version_t * tv = *j++;
-            version_t * bv = *jj++;
 
-            // We cound the branch if (a) the tag version is on the branch for
+            version_t * tv = version_normalise (*j);
+            version_t * bv = NULL;
+            if (jj != i->branch->tag_files_end && (*jj)->file == (*j)->file)
+                bv = version_normalise (*jj++);
+
+            // We count the branch if (a) the tag version is on the branch for
             // this file, (b) the tag version is the branch point, (c) the
             // tag version is an implicit merge and the branch we are
             // considering is the trunk.
