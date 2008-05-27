@@ -11,7 +11,6 @@
 
 typedef struct file file_t;
 typedef struct version version_t;
-typedef struct file_tag file_tag_t;
 typedef struct tag tag_t;
 
 struct file {
@@ -20,9 +19,6 @@ struct file {
 
     version_t * versions;
     version_t * versions_end;
-
-    file_tag_t * file_tags;
-    file_tag_t * file_tags_end;
 };
 
 version_t * file_new_version (file_t * f);
@@ -79,15 +75,6 @@ static inline version_t * version_live (version_t * v)
 {
     return v && !v->dead ? v - v->implicit_merge : NULL;
 }
-
-
-struct file_tag {
-    tag_t * tag;
-    /// vers is the version information stored in cvs.  For a branch, version is
-    /// the version to use as the branch point.  Version may be null.
-    const char * vers;
-    version_t * version;
-};
 
 
 struct tag {
