@@ -276,7 +276,7 @@ static void branch_choose (tag_t * tag)
     tag_t * best_branch = NULL;
     for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i) {
         size_t weight = 1;
-            
+
         version_t ** jj = i->branch->tag_files;
         for (version_t ** j = tag->tag_files; j != tag->tag_files_end; ++j) {
             while (jj != i->branch->tag_files_end && (*jj)->file < (*j)->file)
@@ -293,7 +293,7 @@ static void branch_choose (tag_t * tag)
             // considering is the trunk.
             if (tv->branch == i->branch || tv == bv
                 || (i->branch->tag[0] == 0 && tv + 1 != tv->file->versions_end
-                    && tv[1].implicit_merge && tv[1].used))                 
+                    && tv[1].implicit_merge && tv[1].used))
                 ++weight;
         }
         if (weight > best_weight

@@ -267,7 +267,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
                 "Valid-responses ok error Valid-requests Checked-in New-entry "
                 "Checksum Copy-file Updated Created Update-existing Merged "
                 "Patched Rcs-diff Mode Removed Remove-entry "
-                // We don't actually want these:             
+                // We don't actually want these:
                 // "Set-static-directory Clear-static-directory Set-sticky "
                 // "Clear-sticky Mod-time "
                 "Template Notified Module-expansion "

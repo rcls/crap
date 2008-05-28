@@ -74,7 +74,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         memcpy (dd, d, len);
         dd[len] = '/';
         dd[len + 1] = 0;
-        d = dd;        
+        d = dd;
     }
 
     next_line (s);                      // Skip the repo directory.
@@ -155,7 +155,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
 
     xfree (d);
     xfree (path);
-    xfree (vers);        
+    xfree (vers);
 }
 
 
@@ -298,7 +298,7 @@ static void grab_versions (const database_t * db,
                         fetch[0]->version, NULL,
                         fetch, fetch_end);
         return;
-    }        
+    }
 
     bool tried_date = false;
     time_t dmin = fetch[0]->time;
