@@ -232,6 +232,8 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
     ssize_t extra = 0;
     ssize_t best_extra = 0;
 
+    // FIXME - the use of 'parent' is bogus for vendor-imports; we should
+    // really do a full version calculation.
     for (changeset_t ** i = branch->changeset.children;
          i != branch->changeset.children_end; ++i) {
         changeset_t * cs = *i;
@@ -241,6 +243,18 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
             if (!(*j)->used)
                 continue;
             version_t * ft = find_file_tag ((*j)->file, tag);
+            if ((*j)->dead) {
+                // Branch deletion.
+                if ((*j)->parent == NULL || (*j)->parent->dead
+                    || !is_on_branch (db, branch, (*j)->parent))
+                    continue;           // Wasn't on branch to start with.
+
+                if (ft == (*j)->parent)
+                    --hit;
+                else if (ft == NULL)
+                    --extra;
+                continue;
+            }
             if (ft == NULL) {
                 extra -= is_on_branch (db, branch, (*j)->parent);
                 extra += is_on_branch (db, branch, *j);
@@ -262,9 +276,6 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
 
     tag->parent = best_cs;
     ARRAY_APPEND (best_cs->children, &tag->changeset);
-
-    // FIXME Now walk through the changesets a second time; each time we
-    // come to a child tag, generate any needed fix-up.
 }
 
 

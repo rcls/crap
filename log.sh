@@ -1,2 +1,2 @@
 #!/bin/sh
-git-log  --pretty=format:'%ad %an %ae%n%T%n%s%n%b' "$@"
+git-log  --pretty=format:'%T%n%ad %an %ae%n%s%n%b' "$@"
