@@ -354,10 +354,6 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
            sizeof (version_t), version_compare);
     ARRAY_TRIM (file->versions);
 
-/*     qsort (file->file_tags, file->file_tags_end - file->file_tags, */
-/*            sizeof (file_tag_t), file_tag_compare); */
-/*     ARRAY_TRIM (file->file_tags); */
-
     fill_in_parents (file);
 
     // If the file is in the Attic, make sure any last version on the trunk is
@@ -451,6 +447,7 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
             fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
                      file->path, i->branch->tag, i[-1].branch->tag,
                      i->version);
+    branches_end = bb;
 
     // Fill in the branch pointers on the versions.
     for (version_t * i = file->versions; i != file->versions_end; ++i)
