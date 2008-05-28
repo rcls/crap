@@ -309,7 +309,7 @@ static void grab_versions (const database_t * db,
         else if ((*i)->time > dmax)
             dmax = (*i)->time;
 
-    if (dmax - dmin < 300) {
+    if (dmax - dmin < 300 && fetch[0]->branch) {
         tried_date = true;
 
         // Format the date.
@@ -468,6 +468,8 @@ static void print_tag (const database_t * db, tag_t * tag,
         return;                         // Nothing to do.
     }
 
+    // FIXME - grab_versions assumes that all versions are on the same branch!
+    // We should pass in the tag rather than guessing it!
     grab_versions (db, s, fetch, fetch_end);
     xfree (fetch);
 
