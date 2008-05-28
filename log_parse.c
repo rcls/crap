@@ -25,17 +25,9 @@ typedef struct tag_hash_item {
 } tag_hash_item_t;
 
 
-typedef struct file_branch {
-    const char * version;
-    tag_t * branch;
-} file_branch_t;
-
-
 typedef struct file_tag {
     tag_t * tag;
-    /// vers is the version information stored in cvs.  For a branch, version is
-    /// the version to use as the branch point.  Version may be null.
-    const char * vers;
+    const char * version;
 } file_tag_t;
 
 
@@ -251,7 +243,7 @@ static bool is_branch (const char * v)
 }
 
 
-static int version_compare (const void * AA, const void * BB)
+static int compare_version (const void * AA, const void * BB)
 {
     const version_t * A = AA;
     const version_t * B = BB;
@@ -262,7 +254,7 @@ static int version_compare (const void * AA, const void * BB)
 }
 
 
-static int file_tag_compare (const void * AA, const void * BB)
+static int compare_file_tag (const void * AA, const void * BB)
 {
     const file_tag_t * A = AA;
     const file_tag_t * B = BB;
@@ -282,17 +274,17 @@ static int compare_versionp (const void * AA, const void * BB)
 }
 
 
-static int branch_compare (const void * AA, const void * BB)
+static int compare_branch (const void * AA, const void * BB)
 {
-    const file_branch_t * A = AA;
-    const file_branch_t * B = BB;
+    const file_tag_t * A = AA;
+    const file_tag_t * B = BB;
     return strcmp (A->version, B->version);
 }
 
 
 static tag_t * find_branch (const file_t * f,
-                            const file_branch_t * branches,
-                            const file_branch_t * branches_end,
+                            const file_tag_t * branches,
+                            const file_tag_t * branches_end,
                             const char * s)
 {
     char vers[strlen (s) + 1];
@@ -305,12 +297,12 @@ static tag_t * find_branch (const file_t * f,
     *dot = 0;                           // Truncate the last component.
 
     // Now bsearch for the branch.
-    const file_branch_t * b = find_string (
+    const file_tag_t * b = find_string (
         branches, branches_end - branches,
-        sizeof (file_branch_t), offsetof (file_branch_t, version), vers);
+        sizeof (file_tag_t), offsetof (file_tag_t, version), vers);
 
     if (b != NULL)
-        return b->branch;
+        return b->tag;
 
     fprintf (stderr, "File %s version %s (%s) has no branch\n",
              f->path, s, vers);
@@ -351,7 +343,7 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
                                           file_tag_t * file_tags_end)
 {
     qsort (file->versions, file->versions_end - file->versions,
-           sizeof (version_t), version_compare);
+           sizeof (version_t), compare_version);
     ARRAY_TRIM (file->versions);
 
     fill_in_parents (file);
@@ -378,26 +370,26 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
         }
     }
 
-    file_branch_t * branches = NULL;
-    file_branch_t * branches_end = NULL;
+    file_tag_t * branches = NULL;
+    file_tag_t * branches_end = NULL;
 
     // Sort tags so we can detect duplicates.
     qsort (file_tags, file_tags_end - file_tags, sizeof (file_tag_t),
-           file_tag_compare);
+           compare_file_tag);
 
     // Fill in the tag version links, and remove tags to dead versions.
     for (file_tag_t * i = file_tags; i != file_tags_end; ++i) {
         if (i != file_tags && i[-1].tag == i[0].tag) {
             warning ("%s: Duplicate tag '%s', versions '%s' and '%s'.\n",
-                     file->path, i->tag->tag, i[-1].vers, i->vers);
+                     file->path, i->tag->tag, i[-1].version, i->version);
             continue;
         }
 
-        if (!is_branch (i->vers)) {
-            version_t * version = file_find_version (file, i->vers);
+        if (!is_branch (i->version)) {
+            version_t * version = file_find_version (file, i->version);
             if (version == NULL)
                 warning ("%s: Tag %s version %s does not exist.\n",
-                         file->path, i->tag->tag, i->vers);
+                         file->path, i->tag->tag, i->version);
             else if (!version->dead)
                 // FIXME - it might be better to keep dead version tags, because
                 // that would allow better tag matching.
@@ -406,18 +398,16 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
         }
 
         // Record the branch on the branch list.
-        ARRAY_EXTEND (branches);
-        branches_end[-1].version = i->vers;
-        branches_end[-1].branch = i->tag;
+        ARRAY_APPEND (branches, *i);
 
         // We try and find a predecessor version, to use as the branch point.
         // If none exists, that's fine, it makes sense as a branch addition.
-        if (i->vers[0] == 0)
+        if (i->version[0] == 0)
             continue;                   // All trunk files are trunk additions.
 
-        size_t len = strrchr (i->vers, '.') - i->vers;
+        size_t len = strrchr (i->version, '.') - i->version;
         char vers[len + 1];
-        memcpy (vers, i->vers, len);
+        memcpy (vers, i->version, len);
         vers[len] = 0;
         version_t * version = file_find_version (file, vers);
 
@@ -433,19 +423,19 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
 
     // Sort the branches by version.
     qsort (branches, branches_end - branches,
-           sizeof (file_branch_t), branch_compare);
+           sizeof (file_tag_t), compare_branch);
 
-    // Check for duplicate branches.
-    file_branch_t * bb = branches;
-    for (file_branch_t * i = branches; i != branches_end; ++i)
+    // Mark the branches as such.  Check for duplicate branches.
+    file_tag_t * bb = branches;
+    for (file_tag_t * i = branches; i != branches_end; ++i)
         if (i == branches || bb[-1].version != i->version) {
             *bb++ = *i;
             static version_t * dummy_pointer;
-            i->branch->branch_versions = &dummy_pointer;
+            i->tag->branch_versions = &dummy_pointer;
         }
         else
             fprintf (stderr, "File %s branch %s duplicates branch %s (%s)\n",
-                     file->path, i->branch->tag, i[-1].branch->tag,
+                     file->path, i->tag->tag, i[-1].tag->tag,
                      i->version);
     branches_end = bb;
 
@@ -664,7 +654,7 @@ static void read_file_versions (database_t * db,
     const char * empty_string = cache_string ("");
     ARRAY_EXTEND (file_tags);
     file_tags_end[-1].tag = get_tag (tags, empty_string);
-    file_tags_end[-1].vers = empty_string;
+    file_tags_end[-1].version = empty_string;
 
     do
         len = next_line (s);
@@ -687,9 +677,6 @@ static void read_file_versions (database_t * db,
 
         const char * tag_name = cache_string_n (s->line + 3,
                                                 colon - s->line - 3);
-        ARRAY_EXTEND (file_tags);
-        file_tags_end[-1].tag = get_tag (tags, tag_name);
-
         ++colon;
         if (*colon == ' ')
             ++colon;
@@ -698,7 +685,9 @@ static void read_file_versions (database_t * db,
             fatal ("Tag %s on (%s) has bogus version '%s'\n",
                    tag_name, file->rcs_path, colon);
 
-        file_tags_end[-1].vers = cache_string (colon);
+        ARRAY_EXTEND (file_tags);
+        file_tags_end[-1].tag = get_tag (tags, tag_name);
+        file_tags_end[-1].version = cache_string (colon);
 
         len = next_line (s);
     };
@@ -734,7 +723,7 @@ static void read_file_versions (database_t * db,
 }
 
 
-static int file_compare (const void * AA, const void * BB)
+static int compare_file (const void * AA, const void * BB)
 {
     const file_t * A = AA;
     const file_t * B = BB;
@@ -742,7 +731,7 @@ static int file_compare (const void * AA, const void * BB)
 }
 
 
-static int tag_compare (const void * AA, const void * BB)
+static int compare_tag (const void * AA, const void * BB)
 {
     const tag_t * A = AA;
     const tag_t * B = BB;
@@ -766,7 +755,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
             read_file_versions (db, &tags, s);
 
     // Sort the list of files.
-    qsort (db->files, db->files_end - db->files, sizeof (file_t), file_compare);
+    qsort (db->files, db->files_end - db->files, sizeof (file_t), compare_file);
 
     // Set the pointers from versions to files.
     for (file_t * f = db->files; f != db->files_end; ++f)
@@ -784,7 +773,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
     assert (db->tags_end == db->tags + tags.num_entries);
 
     // Sort the list of tags.
-    qsort (db->tags, db->tags_end - db->tags, sizeof (tag_t), tag_compare);
+    qsort (db->tags, db->tags_end - db->tags, sizeof (tag_t), compare_tag);
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         tag_hash_item_t * h = string_hash_find (&tags, i->tag);
         assert (h);
