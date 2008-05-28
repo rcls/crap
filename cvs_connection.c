@@ -231,6 +231,9 @@ static void connect_to_fake (cvs_connection_t * conn, const char * root)
 
 void connect_to_cvs (cvs_connection_t * conn, const char * root)
 {
+    conn->count_versions = 0;
+    conn->count_transactions = 0;
+
     const char * client_log = getenv ("CVS_CLIENT_LOG");
     if (client_log) {
 //        client_log += strlen ("CVS_CLIENT_LOG=");

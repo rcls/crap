@@ -12,6 +12,9 @@ typedef struct cvs_connection {
 
     char * line;
     size_t line_len;
+
+    unsigned long count_versions;
+    unsigned long count_transactions;
 } cvs_connection_t;
 
 

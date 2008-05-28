@@ -123,8 +123,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         printf ("blob\nmark :%zu\ndata %lu\n", version->mark, len);
     }
     else
-        fprintf (stderr, "cvs checkout %s %s - version is duplicate\n",
-                 path, vers);
+        warning ("cvs checkout %s %s - version is duplicate\n", path, vers);
 
     // Process the content.
     for (size_t done = 0; done != len; ) {
@@ -148,6 +147,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         done += got;
     }
 
+    ++s->count_versions;
     cvs_record_read (s, len);
 
     if (go)
@@ -161,6 +161,7 @@ static void read_version (const database_t * db, cvs_connection_t * s)
 
 static void read_versions (const database_t * db, cvs_connection_t * s)
 {
+    ++s->count_transactions;
     while (1) {
         next_line (s);
         if (starts_with (s->line, "M ") || starts_with (s->line, "MT "))
@@ -639,6 +640,10 @@ int main (int argc, const char * const * argv)
              "Fixup %5u + %5u = %5u branches + tags.\n",
              exact_branches, exact_tags, exact_branches + exact_tags,
              fixup_branches, fixup_tags, fixup_branches + fixup_tags);
+
+    fprintf (stderr,
+             "Download %lu cvs versions in %lu transactions.\n",
+             stream.count_versions, stream.count_transactions);
 
     string_cache_stats (stderr);
 
