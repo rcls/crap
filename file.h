@@ -105,12 +105,13 @@ struct tag {
 
     bool fixup;                         ///< Did we need a fix-up changeset?
 
+    unsigned rank;
+
     changeset_t * parent;               ///< Changeset we leach off.
 
     changeset_t changeset;              ///< Tag emission changeset.
 
-    /// The last changeset committed on this branch.
-    changeset_t * last;
+    changeset_t * last;           ///< The last changeset output on this branch.
 };
 
 

@@ -119,6 +119,11 @@ static void tag_released (heap_t * heap, tag_t * tag,
                           tag_t *** tree_order, tag_t *** tree_order_end)
 {
     ARRAY_APPEND (*tree_order, tag);
+    tag->rank = 0;
+    for (parent_branch_t * i = tag->parents; i != tag->parents_end; ++i)
+        if (i->branch->rank >= tag->rank)
+            tag->rank = i->branch->rank + 1;
+
     for (branch_tag_t * i = tag->tags; i != tag->tags_end; ++i) {
         assert (i->tag->changeset.unready_count != 0);
         if (--i->tag->changeset.unready_count == 0) {
@@ -207,9 +212,8 @@ static void branch_graph (database_t * db,
 
 static bool better_than (tag_t * new, tag_t * old)
 {
-    // FIXME - the actual test should be something like lower-rank-branches win;
-    // for equal rank, deterministicly order tags.
-    return false;
+    // FIXME - for equal rank, deterministicly order tags.
+    return new->rank > old->rank;
 }
 
 
@@ -229,7 +233,7 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
             bitset_set (&extra, (*i)->file - db->files);
         else if (*ii == *i)
             // Hit.
-            bitset_set (&extra, (*i)->file - db->files);
+            bitset_set (&hit, (*i)->file - db->files);
     }
 
     changeset_t * best_cs = &branch->changeset;
@@ -271,6 +275,9 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
 
     tag->parent = best_cs;
     ARRAY_APPEND (best_cs->children, &tag->changeset);
+
+    bitset_destroy (&hit);
+    bitset_destroy (&extra);
 }
 
 
