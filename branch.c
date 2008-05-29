@@ -12,6 +12,7 @@
 //
 // Later, we want to further reduce the digraph to a tree.
 
+#include "bitset.h"
 #include "branch.h"
 #include "database.h"
 #include "emission.h"
@@ -212,25 +213,28 @@ static bool better_than (tag_t * new, tag_t * old)
 }
 
 
-static bool is_on_branch (database_t * db, tag_t * branch, version_t * version)
-{
-    if (version == NULL || version->dead)
-        return false;
-
-    if (version->branch == branch)
-        return true;
-
-    return find_file_tag (version->file, branch) == version;
-}
-
-
 static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
 {
+    bitset_t hit;
+    bitset_init (&hit, db->files_end - db->files);
+    bitset_t extra;
+    bitset_init (&extra, db->files_end - db->files);
+
+    version_t ** ii = tag->tag_files;
+    for (version_t ** i = branch->tag_files; i != branch->tag_files_end; ++i) {
+        for (; ii != tag->tag_files_end && (*ii)->file < (*i)->file; ++ii);
+
+        if (ii == tag->tag_files_end || (*ii)->file > (*i)->file)
+            // Wrong file - counts as extra.
+            bitset_set (&extra, (*i)->file - db->files);
+        else if (*ii == *i)
+            // Hit.
+            bitset_set (&extra, (*i)->file - db->files);
+    }
+
     changeset_t * best_cs = &branch->changeset;
-    ssize_t hit = 0;
-    ssize_t best_hit = 0;
-    ssize_t extra = 0;
-    ssize_t best_extra = 0;
+    ssize_t best_hit = hit.count;
+    ssize_t best_extra = extra.count;
 
     // FIXME - the use of 'parent' is bogus for vendor-imports; we should
     // really do a full version calculation.
@@ -242,34 +246,25 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
         for (version_t ** j = cs->versions; j != cs->versions_end; ++j) {
             if (!(*j)->used)
                 continue;
-            version_t * ft = find_file_tag ((*j)->file, tag);
             if ((*j)->dead) {
                 // Branch deletion.
-                if ((*j)->parent == NULL || (*j)->parent->dead
-                    || !is_on_branch (db, branch, (*j)->parent))
-                    continue;           // Wasn't on branch to start with.
-
-                if (ft == (*j)->parent)
-                    --hit;
-                else if (ft == NULL)
-                    --extra;
+                bitset_reset (&hit, (*j)->file - db->files);
+                bitset_reset (&extra, (*j)->file - db->files);
                 continue;
             }
-            if (ft == NULL) {
-                extra -= is_on_branch (db, branch, (*j)->parent);
-                extra += is_on_branch (db, branch, *j);
-                continue;
-            }
-            assert (!ft->implicit_merge);
-            if (ft == version_normalise (*j))
-                ++hit;
-            else if (ft == version_normalise ((*j)->parent))
-                // FIXME check parent actually on branch.
-                --hit;
+            version_t * ft = find_file_tag ((*j)->file, tag);
+            assert (ft == NULL || !ft->implicit_merge);
+            if (ft == NULL)
+                bitset_set (&extra, (*j)->file - db->files);
+            else if (version_normalise (*j) == ft)
+                bitset_set (&hit, (*j)->file - db->files);
+            else
+                bitset_reset (&hit, (*j)->file - db->files);
         }
-        if (hit > best_hit || (hit == best_hit && extra < best_extra)) {
-            best_hit = hit;
-            best_extra = extra;
+        if (hit.count > best_hit
+            || (hit.count == best_hit && extra.count < best_extra)) {
+            best_hit = hit.count;
+            best_extra = extra.count;
             best_cs = cs;
         }
     }
