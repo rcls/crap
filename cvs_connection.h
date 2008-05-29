@@ -15,6 +15,9 @@ typedef struct cvs_connection {
 
     unsigned long count_versions;
     unsigned long count_transactions;
+
+    FILE * log_in;
+    FILE * log_out;
 } cvs_connection_t;
 
 

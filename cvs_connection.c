@@ -10,12 +10,6 @@
 #include <unistd.h>
 
 
-/// All data sent from us into the server.
-static FILE * client_log_in;
-/// All data sent out from the server to us.
-static FILE * client_log_out;
-
-
 static const char * pserver_password (const char * root)
 {
     size_t root_len = strlen (root);
@@ -233,6 +227,8 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 {
     conn->count_versions = 0;
     conn->count_transactions = 0;
+    conn->log_in = NULL;
+    conn->log_out = NULL;
 
     const char * client_log = getenv ("CVS_CLIENT_LOG");
     if (client_log) {
@@ -240,11 +236,11 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
         char path[strlen (client_log) + 5];
         strcpy (path, client_log);
         strcat (path, ".in");
-        client_log_in = fopen (path, "w");
+        conn->log_in = fopen (path, "w");
 
         strcpy (path, client_log);
         strcat (path, ".out");
-        client_log_out = fopen (path, "w");
+        conn->log_out = fopen (path, "w");
     }
 
     conn->line = NULL;
@@ -304,8 +300,8 @@ static size_t next_line_raw (cvs_connection_t * conn)
     if (s > 0 && conn->line[s - 1] == '\n')
         conn->line[--s] = 0;
 
-    if (client_log_out)
-        fprintf (client_log_out, "%s\n", conn->line);
+    if (conn->log_out)
+        fprintf (conn->log_out, "%s\n", conn->line);
 
     return s;
 }
@@ -326,10 +322,10 @@ void cvs_printf (cvs_connection_t * conn, const char * format, ...)
 {
     va_list args;
     va_start (args, format);
-    if (client_log_in) {
+    if (conn->log_in) {
         va_list copy;
         va_copy (copy, args);
-        vfprintf (client_log_in, format, args);
+        vfprintf (conn->log_in, format, args);
         va_end (copy);
     }
 
@@ -347,12 +343,15 @@ void cvs_connection_destroy (cvs_connection_t * conn)
     xfree (conn->prefix);
 
     fclose (conn->stream);
+    if (conn->log_in)
+        fclose (conn->log_in);
+    if (conn->log_out)
+        fclose (conn->log_out);
 }
 
 
 void cvs_record_read (cvs_connection_t * s, size_t bytes)
 {
-    if (client_log_out)
-        fprintf (client_log_out, "[%zu bytes of data]\n", bytes);
+    if (s->log_out)
+        fprintf (s->log_out, "[%zu bytes of data]\n", bytes);
 }
-
