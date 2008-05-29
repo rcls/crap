@@ -268,8 +268,8 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
                 --hit;
         }
         if (hit > best_hit || (hit == best_hit && extra < best_extra)) {
-            hit = best_hit;
-            extra = best_extra;
+            best_hit = hit;
+            best_extra = extra;
             best_cs = cs;
         }
     }
