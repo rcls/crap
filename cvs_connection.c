@@ -311,9 +311,12 @@ size_t next_line (cvs_connection_t * conn)
 {
     while (1) {
         ssize_t s = next_line_raw (conn);
-        if (conn->line[0] != 'E' || conn->line[1] != ' ')
+        if (conn->line[0] == 'E' && conn->line[1] == ' ')
+            fprintf (stderr, "cvs: %s\n", conn->line + 2);
+        else if (conn->line[0] == 'F' && conn->line[2] == 0)
+            fflush (stderr);
+        else
             return s;
-        fprintf (stderr, "cvs: %s\n", conn->line + 2);
     }
 }
 
