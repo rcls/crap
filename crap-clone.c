@@ -34,12 +34,6 @@ static const char * format_date (const time_t * time)
 }
 
 
-static const char * file_error (FILE * f)
-{
-    return ferror (f) ? strerror (errno) : (feof (f) ? "EOF" : "unknown");
-}
-
-
 static void read_version (const database_t * db, cvs_connection_t * s)
 {
     if (starts_with (s->line, "Removed ")) {
@@ -117,40 +111,19 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         fatal ("cvs checkout %s %s - got unexpected file length '%s'\n",
                version->version, version->file->path, s->line);
 
-    bool go = version->mark == SIZE_MAX;
-    if (go) {
+    FILE * out = version->mark == SIZE_MAX ? stdout : NULL;
+    if (out) {
         version->mark = ++mark_counter;
         printf ("blob\nmark :%zu\ndata %lu\n", version->mark, len);
     }
     else
         warning ("cvs checkout %s %s - version is duplicate\n", path, vers);
 
-    // Process the content.
-    for (size_t done = 0; done != len; ) {
-        char buffer[4096];
-        size_t get = len - done;
-        if (get > 4096)
-            get = 4096;
-        size_t got = fread (&buffer, 1, get, s->stream);
-        if (got == 0)
-            fatal ("cvs checkout %s %s - %s\n", path, vers,
-                   file_error (s->stream));
-        if (go) {
-            size_t put = fwrite (&buffer, got, 1, stdout);
-            if (put != 1)
-                fatal ("git import %s %s - interrupted: %s\n",
-                       version->version, version->file->path,
-                       ferror (stdout) ? strerror (errno) : (
-                           feof (stdout) ? "closed" : "unknown"));
-        }
-
-        done += got;
-    }
+    cvs_read_block (s, out, len);
 
     ++s->count_versions;
-    cvs_record_read (s, len);
 
-    if (go)
+    if (out)
         printf ("\n");
 
     xfree (d);
@@ -270,7 +243,7 @@ static void grab_by_option (const database_t * db,
 
     xfree (paths);
 
-    cvs_printf (s, "update\n");
+    cvs_printff (s, "update\n");
 
     read_versions (db, s);
 }
@@ -551,11 +524,11 @@ int main (int argc, const char * const * argv)
     stream.prefix = xasprintf ("%s/%s/", stream.remote_root, argv[2]);
     stream.module = xstrdup (argv[2]);
 
-    cvs_printf (&stream,
-                "Global_option -q\n"
-                "Argument --\n"
-                "Argument %s\n"
-                "rlog\n", stream.module);
+    cvs_printff (&stream,
+                 "Global_option -q\n"
+                 "Argument --\n"
+                 "Argument %s\n"
+                 "rlog\n", stream.module);
 
     database_t db;
 

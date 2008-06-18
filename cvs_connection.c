@@ -2,13 +2,14 @@
 #include "log.h"
 #include "utils.h"
 
+#include <assert.h>
 #include <errno.h>
+#include <limits.h>
 #include <netdb.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
-
 
 static const char * pserver_password (const char * root)
 {
@@ -128,7 +129,7 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
 
     const char * password = pserver_password (root);
     fprintf (stderr, "Password '%s'\n", password);
-    cvs_printf (conn,
+    cvs_printff (conn,
                 "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
                 path, user_len, user, password);
     xfree (password);
@@ -229,6 +230,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
     conn->count_transactions = 0;
     conn->log_in = NULL;
     conn->log_out = NULL;
+    conn->compress = false;
 
     const char * client_log = getenv ("CVS_CLIENT_LOG");
     if (client_log) {
@@ -260,17 +262,17 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
     else
         connect_to_fork (conn, root);
 
-    cvs_printf (conn,
-                "Root %s\n"
+    cvs_printff (conn,
+                 "Root %s\n"
 
-                "Valid-responses ok error Valid-requests Checked-in New-entry "
-                "Checksum Copy-file Updated Created Update-existing Merged "
-                "Patched Rcs-diff Mode Removed Remove-entry "
-                // We don't actually want these:
-                // "Set-static-directory Clear-static-directory Set-sticky "
-                // "Clear-sticky Mod-time "
-                "Template Notified Module-expansion "
-                "Wrapper-rcsOption M Mbinary E F MT\n"
+                 "Valid-responses ok error Valid-requests Checked-in New-entry "
+                 "Checksum Copy-file Updated Created Update-existing Merged "
+                 "Patched Rcs-diff Mode Removed Remove-entry "
+                 // We don't actually want these:
+                 // "Set-static-directory Clear-static-directory Set-sticky "
+                 // "Clear-sticky Mod-time "
+                 "Template Notified Module-expansion "
+                 "Wrapper-rcsOption M Mbinary E F MT\n"
 
                 "valid-requests\n"
                 "UseUnchanged\n",
@@ -321,40 +323,149 @@ size_t next_line (cvs_connection_t * conn)
 }
 
 
-void cvs_printf (cvs_connection_t * conn, const char * format, ...)
+static void cvs_send (cvs_connection_t * s, const unsigned char * data,
+                      size_t length, int flush)
 {
-    va_list args;
-    va_start (args, format);
-    if (conn->log_in) {
+    assert (length <= INT_MAX);
+
+    if (!s->compress) {
+        // Just write and maybe flush.
+        if (fwrite (data, length, 1, s->stream) != 1)
+            fatal ("Writing to cvs socket: %s\n", strerror (errno));
+        return;
+    }
+
+    s->deflater.next_in = (unsigned char *) data;
+    s->deflater.avail_in = length;
+
+    int r;
+    do {
+        unsigned char buffer[4096];
+        s->deflater.next_out = buffer;
+        s->deflater.avail_out = 4096;
+
+        r = deflate (&s->deflater, flush);
+        if (r != Z_OK) {
+            assert (r != Z_STREAM_ERROR);
+            assert (r != Z_BUF_ERROR);
+            assert (r == Z_STREAM_END);
+            assert (flush == Z_FINISH);
+        }
+
+        int done = 4096 - s->deflater.avail_out;
+        if (done != 0 && fwrite (buffer, done, 1, s->stream) != 1)
+            fatal ("Writing to cvs socket: %s\n", strerror (errno));
+    }
+    while (s->deflater.avail_in != 0
+           || (flush == Z_FINISH && r == Z_OK)
+           || (flush != Z_NO_FLUSH && s->deflater.avail_out == 0));
+}
+
+
+static void cvs_do_printf (cvs_connection_t * s, int flush,
+                           const char * format, va_list args)
+{
+    if (s->log_in) {
         va_list copy;
         va_copy (copy, args);
-        vfprintf (conn->log_in, format, args);
+        vfprintf (s->log_in, format, args); // Ignore errors.
         va_end (copy);
     }
 
-    if (vfprintf (conn->stream, format, args) < 0)
-        fatal ("Writing to cvs socket: %s\n", strerror (errno));
+    char * string;
+    int len = vasprintf (&string, format, args);
+    if (len < 0)
+        fatal ("Failed to format a string; %s\n", strerror (errno));
 
+    cvs_send (s, (const unsigned char *) string, len, flush);
+    free (string);
+}
+
+
+void cvs_printf (cvs_connection_t * s, const char * format, ...)
+{
+    va_list args;
+    va_start (args, format);
+    cvs_do_printf (s, Z_NO_FLUSH, format, args);
     va_end (args);
 }
 
 
-void cvs_connection_destroy (cvs_connection_t * conn)
+void cvs_printff (cvs_connection_t * s, const char * format, ...)
 {
-    xfree (conn->line);
-    xfree (conn->module);
-    xfree (conn->prefix);
-
-    fclose (conn->stream);
-    if (conn->log_in)
-        fclose (conn->log_in);
-    if (conn->log_out)
-        fclose (conn->log_out);
+    va_list args;
+    va_start (args, format);
+    cvs_do_printf (s, Z_SYNC_FLUSH, format, args);
+    va_end (args);
+    if (fflush (s->stream) != 0)
+        fatal ("Writing to cvs socket: %s\n", strerror (errno));
 }
 
 
-void cvs_record_read (cvs_connection_t * s, size_t bytes)
+void cvs_connection_destroy (cvs_connection_t * s)
 {
+    xfree (s->line);
+    xfree (s->module);
+    xfree (s->prefix);
+
+    fclose (s->stream);
+    if (s->log_in)
+        fclose (s->log_in);
+    if (s->log_out)
+        fclose (s->log_out);
+
+    if (s->compress) {
+        deflateEnd (&s->deflater);
+        deflateEnd (&s->inflater);
+    }
+}
+
+
+static const char * file_error (FILE * f)
+{
+    return ferror (f) ? strerror (errno) : (feof (f) ? "EOF" : "unknown");
+}
+
+
+void cvs_read_block (cvs_connection_t * s, FILE * f, size_t bytes)
+{
+    for (size_t done = 0; done != bytes; ) {
+        char buffer[4096];
+        size_t get = bytes - done;
+        if (get > 4096)
+            get = 4096;
+        size_t got = fread (&buffer, 1, get, s->stream);
+        if (got == 0)
+            fatal ("cvs checkout: %s\n", file_error (s->stream));
+        if (f && fwrite (&buffer, got, 1, f) != 1)
+            fatal ("git import interrupted: %s\n", file_error (f));
+
+        done += got;
+    }
+
     if (s->log_out)
         fprintf (s->log_out, "[%zu bytes of data]\n", bytes);
+}
+
+
+void cvs_connection_compress (cvs_connection_t * s, int level)
+{
+    if (s->compress || level == 0)
+        return;                         // Nothing to do.
+
+    s->deflater.zalloc = Z_NULL;
+    s->deflater.zfree = Z_NULL;
+    s->deflater.opaque = Z_NULL;
+    if (deflateInit (&s->deflater, level) != Z_OK)
+        fatal ("failed to initialise compression\n");
+
+    s->inflater.zalloc = Z_NULL;
+    s->inflater.zfree = Z_NULL;
+    s->inflater.opaque = Z_NULL;
+    s->inflater.next_in = Z_NULL;
+    s->inflater.avail_in = 0;
+    if (inflateInit (&s->inflater) != Z_OK)
+        fatal ("failed to initialise compression\n");
+
+    s->compress = true;
 }

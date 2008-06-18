@@ -240,8 +240,6 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
     ssize_t best_hit = hit.count;
     ssize_t best_extra = extra.count;
 
-    // FIXME - the use of 'parent' is bogus for vendor-imports; we should
-    // really do a full version calculation.
     for (changeset_t ** i = branch->changeset.children;
          i != branch->changeset.children_end; ++i) {
         changeset_t * cs = *i;
@@ -281,7 +279,7 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
 }
 
 
-/// Choose which branch to put a tag.  We choose the branch with the largest
+/// Choose which branch to put a tag on.  We choose the branch with the largest
 /// number of tag versions.
 static void branch_choose (tag_t * tag)
 {

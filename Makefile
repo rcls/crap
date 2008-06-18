@@ -8,8 +8,8 @@ all: crap-clone rlog_parse
 
 %: %.c
 
-crap-clone: libcrap.a -lm
-rlog_parse: libcrap.a -lm
+crap-clone: libcrap.a -lm -lz
+rlog_parse: libcrap.a -lm -lz
 
 libcrap.a: branch.o changeset.o cvs_connection.o database.o emission.o file.o \
 	heap.o log.o log_parse.o string_cache.o utils.o
