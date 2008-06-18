@@ -11,6 +11,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define IN_BLOCK_SIZE 4096
+
 static const char * pserver_password (const char * root)
 {
     size_t root_len = strlen (root);
@@ -246,7 +248,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
     }
 
     conn->line = NULL;
-    conn->line_len = 0;
+    conn->line_max = 0;
 
     conn->module = NULL;
     conn->prefix = NULL;
@@ -290,9 +292,40 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 }
 
 
-static size_t next_line_raw (cvs_connection_t * conn)
+static const char * file_error (FILE * f)
 {
-    ssize_t s = getline (&conn->line, &conn->line_len, conn->stream);
+    return ferror (f) ? strerror (errno) : (feof (f) ? "EOF" : "unknown");
+}
+
+
+static size_t inflate_read (cvs_connection_t * s)
+{
+    // FIXME - handle Z_STREAM_END.
+    int old_avail_out = s->inflater.avail_out;
+
+    int r;
+    while (1) {
+        r = inflate (&s->inflater, Z_SYNC_FLUSH);
+        if (r == Z_MEM_ERROR)
+            fatal ("Out-of-memory decompressing data from CVS");
+
+        if (r != Z_BUF_ERROR)
+            return old_avail_out - s->inflater.avail_out;
+
+        assert (s->inflater.avail_out != 0);
+        assert (s->inflater.avail_in == 0);
+        r = fread (s->in_block, 1, IN_BLOCK_SIZE, s->stream);
+        if (r <= 0)
+            fatal ("Error reading from CVS: %s", file_error (s->stream));
+        s->inflater.next_in = (unsigned char *) s->in_block;
+        s->inflater.avail_in = r;
+    }
+}
+
+
+static size_t next_line_uncompressed (cvs_connection_t * conn)
+{
+    ssize_t s = getline (&conn->line, &conn->line_max, conn->stream);
     if (s < 0)
         fatal ("Unexpected EOF from server.\n");
 
@@ -302,23 +335,58 @@ static size_t next_line_raw (cvs_connection_t * conn)
     if (s > 0 && conn->line[s - 1] == '\n')
         conn->line[--s] = 0;
 
-    if (conn->log_out)
-        fprintf (conn->log_out, "%s\n", conn->line);
-
     return s;
 }
 
 
-size_t next_line (cvs_connection_t * conn)
+static size_t next_line_inflate (cvs_connection_t * s)
+{
+    char * nl;
+    while (s->line_end == s->line_next
+           || (nl = memchr (s->line_next, '\n',
+                            s->line_end - s->line_next)) == NULL) {
+        size_t len = s->line_end - s->line_next;
+        if (len == s->line_max) {
+            // We need more buffer space.
+            assert (s->line_next == s->line_buf);
+            s->line_max *= 2;
+            s->line_buf = xrealloc (s->line_buf, s->line_max);
+            s->line_next = s->line_buf;
+            s->line_end = s->line_next + len;
+        }
+        else {
+            // Shuffle data to the front.
+            memmove (s->line_buf, s->line_next, len);
+            s->line_next = s->line_buf;
+            s->line_end = s->line_buf + len;
+        }
+
+        s->inflater.next_out = (unsigned char *) s->line_end;
+        s->inflater.avail_out = s->line_max - len;
+
+        s->line_end += inflate_read (s);
+    }
+
+    *nl = 0;
+    s->line = s->line_next;
+    s->line_next = nl + 1;
+    return nl - s->line;
+}
+
+
+size_t next_line (cvs_connection_t * s)
 {
     while (1) {
-        ssize_t s = next_line_raw (conn);
-        if (conn->line[0] == 'E' && conn->line[1] == ' ')
-            fprintf (stderr, "cvs: %s\n", conn->line + 2);
-        else if (conn->line[0] == 'F' && conn->line[2] == 0)
+        ssize_t len = s->compress
+            ? next_line_inflate (s) : next_line_uncompressed (s);
+        if (s->log_out)
+            fprintf (s->log_out, "%s\n", s->line);
+        if (s->line[0] == 'E' && s->line[1] == ' ')
+            fprintf (stderr, "cvs: %s\n", s->line + 2);
+        else if (s->line[0] == 'F' && s->line[2] == 0)
             fflush (stderr);
         else
-            return s;
+            return len;
     }
 }
 
@@ -421,22 +489,34 @@ void cvs_connection_destroy (cvs_connection_t * s)
 }
 
 
-static const char * file_error (FILE * f)
-{
-    return ferror (f) ? strerror (errno) : (feof (f) ? "EOF" : "unknown");
-}
-
-
 void cvs_read_block (cvs_connection_t * s, FILE * f, size_t bytes)
 {
     for (size_t done = 0; done != bytes; ) {
-        char buffer[4096];
+        unsigned char buffer[4096];
         size_t get = bytes - done;
         if (get > 4096)
             get = 4096;
-        size_t got = fread (&buffer, 1, get, s->stream);
-        if (got == 0)
-            fatal ("cvs checkout: %s\n", file_error (s->stream));
+        size_t got;
+        if (!s->compress) {
+            // Not compressing; just read from the stream.
+            got = fread (&buffer, 1, get, s->stream);
+            if (got == 0)
+                fatal ("cvs checkout: %s\n", file_error (s->stream));
+        }
+        else if (s->line_end != s->line_next) {
+            // We have some extra data in the line buffer; snarf it.
+            got = s->line_end - s->line_next;
+            if (got > get)
+                got = get;
+            memcpy (buffer, s->line_next, got);
+            s->line_next += got;
+        } 
+        else {
+            // Get some more data via the stream & inflater.
+            s->inflater.next_out = buffer;
+            s->inflater.avail_out = get;
+            got = inflate_read (s);
+        }
         if (f && fwrite (&buffer, got, 1, f) != 1)
             fatal ("git import interrupted: %s\n", file_error (f));
 
@@ -452,6 +532,8 @@ void cvs_connection_compress (cvs_connection_t * s, int level)
 {
     if (s->compress || level == 0)
         return;                         // Nothing to do.
+
+    s->in_block = xmalloc (IN_BLOCK_SIZE);
 
     s->deflater.zalloc = Z_NULL;
     s->deflater.zfree = Z_NULL;

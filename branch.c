@@ -147,7 +147,6 @@ static void record_branch_tag (tag_t * branch, tag_t * tag)
 }
 
 
-
 // FIXME - we don't cope optimally with the situation where a branch is
 // created, files deleted, and then the branch tagged (without rtag).  We'll
 // never know that the tag was placed on the branch; instead we'll place the tag
