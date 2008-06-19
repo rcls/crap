@@ -1,0 +1,6 @@
+# zlib seems to be doing something wierd but harmless internally.
+{
+   libz longest_match
+   Memcheck:Cond
+   fun:longest_match
+}

@@ -329,6 +329,7 @@ static void do_read (cvs_connection_t * s)
     }
 
     s->inflater.next_out = (unsigned char *) s->in_end;
+    s->inflater.avail_out = in_max (s) - s->in_end;
     while (1) {
         // Unfortunately, we can't just look at avail_in and avail_out to tell
         // if we need to read from the socket, because some data might be
@@ -507,7 +508,7 @@ void cvs_connection_destroy (cvs_connection_t * s)
 
     if (s->compress) {
         deflateEnd (&s->deflater);
-        deflateEnd (&s->inflater);
+        inflateEnd (&s->inflater);
     }
 }
 
