@@ -247,7 +247,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
         conn->log_out = fopen (path, "w");
     }
 
-    conn->line = NULL;
+    conn->line_buf = NULL;
     conn->line_max = 0;
 
     conn->module = NULL;
@@ -325,7 +325,8 @@ static size_t inflate_read (cvs_connection_t * s)
 
 static size_t next_line_uncompressed (cvs_connection_t * conn)
 {
-    ssize_t s = getline (&conn->line, &conn->line_max, conn->stream);
+    ssize_t s = getline (&conn->line_buf, &conn->line_max, conn->stream);
+    conn->line = conn->line_buf;
     if (s < 0)
         fatal ("Unexpected EOF from server.\n");
 
@@ -472,7 +473,7 @@ void cvs_printff (cvs_connection_t * s, const char * format, ...)
 
 void cvs_connection_destroy (cvs_connection_t * s)
 {
-    xfree (s->line);
+    xfree (s->line_buf);
     xfree (s->module);
     xfree (s->prefix);
 
@@ -533,6 +534,8 @@ void cvs_connection_compress (cvs_connection_t * s, int level)
     if (s->compress || level == 0)
         return;                         // Nothing to do.
 
+    cvs_printff (s, "Gzip-stream %d\n", level);
+
     s->in_block = xmalloc (IN_BLOCK_SIZE);
 
     s->deflater.zalloc = Z_NULL;
@@ -546,6 +549,10 @@ void cvs_connection_compress (cvs_connection_t * s, int level)
     s->inflater.opaque = Z_NULL;
     s->inflater.next_in = Z_NULL;
     s->inflater.avail_in = 0;
+
+    s->line_next = s->line_buf;
+    s->line_end = s->line_buf;
+
     if (inflateInit (&s->inflater) != Z_OK)
         fatal ("failed to initialise compression\n");
 

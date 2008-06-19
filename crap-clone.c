@@ -11,6 +11,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <getopt.h>
 #include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -514,15 +515,60 @@ static void print_tag (const database_t * db, tag_t * tag,
 }
 
 
-int main (int argc, const char * const * argv)
+static void usage (const char * prog, FILE * stream, int code)
+    __attribute__ ((noreturn));
+static void usage (const char * prog, FILE * stream, int code)
 {
-    if (argc != 3)
-        fatal ("Usage: %s <root> <repo>\n", argv[0]);
+    fprintf (stream,
+             "Usage: %s [-z <0--9>] <root> <repo>\n", prog);
+    exit (code);
+}
+
+static struct option opts[] = {
+    { "compress", required_argument, NULL, 'z' },
+    { "help", required_argument, NULL, 'h' },
+    { NULL, 0, NULL, 0 }
+};
+
+
+static unsigned long zlevel = 0;
+
+void process_opts (int argc, char * const argv[])
+{
+    int longindex;
+    while (1)
+        switch (getopt_long (argc, argv, "hz:", opts, &longindex)) {
+        case 'z':
+            zlevel = strtoul (optarg, NULL, 10);
+            if (zlevel > 9)
+                usage (argv[0], stderr, EXIT_FAILURE);
+            break;
+        case 'h':
+            usage (argv[0], stdout, EXIT_SUCCESS);
+        case '?':
+            usage (argv[0], stderr, EXIT_FAILURE);
+        case -1:
+            return;
+        default:
+            abort();
+        }
+}
+
+
+int main (int argc, char * const argv[])
+{
+    process_opts (argc, argv);
+    if (argc != optind + 2)
+        usage (argv[0], stderr, EXIT_FAILURE);
 
     cvs_connection_t stream;
-    connect_to_cvs (&stream, argv[1]);
-    stream.prefix = xasprintf ("%s/%s/", stream.remote_root, argv[2]);
-    stream.module = xstrdup (argv[2]);
+    connect_to_cvs (&stream, argv[optind]);
+
+    if (zlevel != 0)
+        cvs_connection_compress (&stream, zlevel);
+
+    stream.module = xstrdup (argv[optind + 1]);
+    stream.prefix = xasprintf ("%s/%s/", stream.remote_root, stream.module);
 
     cvs_printff (&stream,
                  "Global_option -q\n"

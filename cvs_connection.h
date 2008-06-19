@@ -40,7 +40,7 @@ typedef struct cvs_connection {
     z_stream deflater;                ///< State for compressing data to server.
     z_stream inflater;            ///< State for decompressing data from server.
 
-    /// Input buffer used for 
+    /// Input buffer.
     char * in_block;
 
 } cvs_connection_t;
