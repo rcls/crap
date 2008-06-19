@@ -117,8 +117,9 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
         if (!isdigit (d[0]) || !isdigit (d[1]))
             return false;
         off += (d[0] - '0') * 600 + (d[1] - '0') * 60;
+        d += 2;
     }
-    if (d[3] != 0)
+    if (*d != 0)
         return false;
 
     *time = timegm (&dtm) - sign * off;
