@@ -169,12 +169,12 @@ static void grab_version (const database_t * db,
                 "Directory %s\n%.*s\n", s->module,
                 strlen (s->prefix) - 1, s->prefix);
 
-    cvs_printf (s,
-                "Argument -kk\n"
-                "Argument -r%s\n"
-                "Argument --\n"
-                "Argument %s\nupdate\n",
-                version->version, version->file->path);
+    cvs_printff (s,
+                 "Argument -kk\n"
+                 "Argument -r%s\n"
+                 "Argument --\n"
+                 "Argument %s\nupdate\n",
+                 version->version, version->file->path);
 
     read_versions (db, s);
 

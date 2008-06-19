@@ -7,16 +7,13 @@
 #include <zlib.h>
 
 typedef struct cvs_connection {
-    FILE * stream;
+    int socket;
     const char * remote_root;
     const char * module;
     const char * prefix;
 
     /// Last input line; nul-terminated.
     char * line;
-
-    /// The malloc'd buffer for input lines.
-    char * line_buf;
 
     /// The start of the unused data in line_buf.  This is only used when
     /// inflating a compressed stream.
@@ -25,9 +22,6 @@ typedef struct cvs_connection {
     /// The end of the unused data in line_buf.  This is only used when
     /// inflating a compressed stream.
     char * line_end;
-
-    /// The number of bytes allocated for @c line_buf.
-    size_t line_max;
 
     unsigned long count_versions;
     unsigned long count_transactions;
@@ -40,9 +34,13 @@ typedef struct cvs_connection {
     z_stream deflater;                ///< State for compressing data to server.
     z_stream inflater;            ///< State for decompressing data from server.
 
-    /// Input buffer.
-    char * in_block;
+    char * in_next;                     ///< Next available input byte.
+    char * in_end;                      ///< End of available input data.
+    char * out_next;                    ///< Next byte to place output in.
 
+    char in[4096];                      ///< Input buffer.
+    char out[4096];                     ///< Output buffer.
+    char zin[4096];                     ///< (Compressed) input buffer.
 } cvs_connection_t;
 
 
