@@ -26,21 +26,21 @@ typedef struct cvs_connection {
     unsigned long count_versions;
     unsigned long count_transactions;
 
-    FILE * log_in;
-    FILE * log_out;
+    FILE * log_in;                      ///< Log of data to cvs server.
+    FILE * log_out;                     ///< Log of data from cvs server.
 
-    bool compress;
+    bool compress;                      ///< Are we compressing?
 
     z_stream deflater;                ///< State for compressing data to server.
     z_stream inflater;            ///< State for decompressing data from server.
 
-    char * in_next;                     ///< Next available input byte.
-    char * in_end;                      ///< End of available input data.
-    char * out_next;                    ///< Next byte to place output in.
+    unsigned char * in_next;            ///< Next available input byte.
+    unsigned char * in_end;             ///< End of available input data.
+    unsigned char * out_next;           ///< Next byte to place output in.
 
-    char in[4096];                      ///< Input buffer.
-    char out[4096];                     ///< Output buffer.
-    char zin[4096];                     ///< (Compressed) input buffer.
+    unsigned char in[4096];             ///< Input buffer.
+    unsigned char out[4096];            ///< Output buffer.
+    unsigned char zin[4096];            ///< (Compressed) input buffer.
 } cvs_connection_t;
 
 

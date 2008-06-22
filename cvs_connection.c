@@ -11,13 +11,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-static inline char * in_max (cvs_connection_t * s)
+static inline unsigned char * in_max (cvs_connection_t * s)
 {
     return s->in + sizeof (s->in);
 }
 
 
-static inline char * out_max (cvs_connection_t * s)
+static inline unsigned char * out_max (cvs_connection_t * s)
 {
     return s->out + sizeof (s->out);
 }
@@ -328,7 +328,7 @@ static void do_read (cvs_connection_t * s)
         return;
     }
 
-    s->inflater.next_out = (unsigned char *) s->in_end;
+    s->inflater.next_out = s->in_end;
     s->inflater.avail_out = in_max (s) - s->in_end;
     while (1) {
         // Unfortunately, we can't just look at avail_in and avail_out to tell
@@ -339,15 +339,15 @@ static void do_read (cvs_connection_t * s)
         if (r == Z_MEM_ERROR)
             fatal ("Out-of-memory decompressing data from CVS");
 
-        if (s->in_end != (char *) s->inflater.next_out) {
-            s->in_end = (char *) s->inflater.next_out;
+        if (s->in_end != s->inflater.next_out) {
+            s->in_end = s->inflater.next_out;
             return;
         }
 
         assert (s->inflater.avail_out != 0);
         assert (s->inflater.avail_in == 0);
         s->inflater.avail_in = checked_read (s, s->zin, sizeof (s->zin));
-        s->inflater.next_in = (unsigned char *) s->zin;
+        s->inflater.next_in = s->zin;
     }
 }
 
@@ -364,8 +364,8 @@ static size_t next_line_raw (cvs_connection_t * s)
     }
 
     *nl = 0;
-    s->line = s->in_next;
-    s->in_next = nl + 1;
+    s->line = (char *) s->in_next;
+    s->in_next = (unsigned char *) nl + 1;
     return nl - s->line;
 }
 
@@ -386,7 +386,8 @@ size_t next_line (cvs_connection_t * s)
 }
 
 
-static void do_write (cvs_connection_t * s, const char * data, size_t length)
+static void do_write (cvs_connection_t * s,
+                      const unsigned char * data, size_t length)
 {
     while (length) {
         ssize_t r = write (s->socket, data, length);
@@ -403,7 +404,7 @@ static void do_write (cvs_connection_t * s, const char * data, size_t length)
 
 
 
-static void cvs_send (cvs_connection_t * s, const char * data,
+static void cvs_send (cvs_connection_t * s, const unsigned char * data,
                       size_t length, int flush)
 {
     assert (length <= INT_MAX);
@@ -424,7 +425,7 @@ static void cvs_send (cvs_connection_t * s, const char * data,
         return;
     }
 
-    s->deflater.next_in = (unsigned char *) data;
+    s->deflater.next_in = (unsigned char *) data; // Zlib isn't const-correct.
     s->deflater.avail_in = length;
 
     int r;
@@ -435,7 +436,7 @@ static void cvs_send (cvs_connection_t * s, const char * data,
             s->out_next = s->out;
         }
 
-        s->deflater.next_out = (unsigned char *) s->out_next;
+        s->deflater.next_out = s->out_next;
         s->deflater.avail_out = out_max (s) - s->out_next;
 
         r = deflate (&s->deflater, flush);
@@ -445,7 +446,7 @@ static void cvs_send (cvs_connection_t * s, const char * data,
             assert (r == Z_STREAM_END);
             assert (flush == Z_FINISH);
         }
-        s->out_next = (char *) s->deflater.next_out;
+        s->out_next = s->deflater.next_out;
     }
     while (s->deflater.avail_out == 0
            || s->deflater.avail_in != 0
@@ -469,7 +470,7 @@ static void cvs_do_printf (cvs_connection_t * s, int flush,
     if (len < 0)
         fatal ("Failed to format a string; %s\n", strerror (errno));
 
-    cvs_send (s, string, len, flush);
+    cvs_send (s, (const unsigned char *) string, len, flush);
     free (string);
 }
 
