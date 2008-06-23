@@ -232,8 +232,8 @@ static bool normalise_tag_version (char * s)
 }
 
 
-/// Is this version a tag version?  Assumes the normalisation above, so we just
-/// count the '.'s.  This does the right thing on the empty string, which
+/// Is this version a branch version?  Assumes the normalisation above, so we
+/// just count the '.'s.  This does the right thing on the empty string, which
 /// is used as the branch version for the trunk.
 static bool is_branch (const char * v)
 {
@@ -286,7 +286,8 @@ static int compare_branch (const void * AA, const void * BB)
 static tag_t * find_branch (const file_t * f,
                             const file_tag_t * branches,
                             const file_tag_t * branches_end,
-                            const char * s)
+                            const char * s,
+                            string_hash_t * tags)
 {
     char vers[strlen (s) + 1];
     strcpy (vers, s);
@@ -305,10 +306,31 @@ static tag_t * find_branch (const file_t * f,
     if (b != NULL)
         return b->tag;
 
-    fprintf (stderr, "File %s version %s (%s) has no branch\n",
-             f->path, s, vers);
+    // Use a branch name 'unnamed-<vers>'.  It's not ideal but the best we can
+    // do right here.
+    char br[8 + strlen (vers) + 1];
+    strcpy (br, "unnamed-");
+    strcat (br, vers);
 
-    return NULL;
+    // Get the tag and mark it as a branch.
+    tag_t * branch = get_tag (tags, cache_string (br));
+    static version_t * dummy_pointer;
+    branch->branch_versions = &dummy_pointer;
+
+    // Record a branch point if not already done.
+    if (branch->tag_files_end != branch->tag_files
+        && branch->tag_files_end[-1]->file)
+        return branch;
+
+    dot = strrchr (vers, '.');
+    assert (dot != NULL);
+
+    *dot = 0;
+    version_t * branch_point = file_find_version (f, vers);
+    if (branch_point)
+        ARRAY_APPEND (branch->tag_files, branch_point);
+
+    return branch;
 }
 
 
@@ -341,7 +363,8 @@ static void fill_in_parents (file_t * file)
 
 static void fill_in_versions_and_parents (file_t * file, bool attic,
                                           file_tag_t * file_tags,
-                                          file_tag_t * file_tags_end)
+                                          file_tag_t * file_tags_end,
+                                          string_hash_t * tags)
 {
     qsort (file->versions, file->versions_end - file->versions,
            sizeof (version_t), compare_version);
@@ -444,10 +467,10 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
     for (version_t * i = file->versions; i != file->versions_end; ++i)
         if (i->implicit_merge)
             i->branch = find_branch (
-                file, branches, branches_end, "1.1"); // FIXME.
+                file, branches, branches_end, "1.1", tags); // FIXME.
         else
             i->branch = find_branch (
-                file, branches, branches_end, i->version);
+                file, branches, branches_end, i->version, tags);
 
     free (branches);
 }
@@ -718,7 +741,7 @@ static void read_file_versions (database_t * db,
 
     next_line (s);
 
-    fill_in_versions_and_parents (file, attic, file_tags, file_tags_end);
+    fill_in_versions_and_parents (file, attic, file_tags, file_tags_end, tags);
 
     xfree (file_tags);
 }

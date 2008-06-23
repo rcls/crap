@@ -52,9 +52,9 @@ void string_hash_init (string_hash_t * hash);
 void string_hash_destroy (string_hash_t * hash);
 
 /// Creates a new bucket for the cached string @c s and returns a pointer to it.
-/// pointer to it.  If the bucket already exists, return pointer to that instead.
-/// @c *n is set to @c true if a new bucket is created, @c false if an existing
-/// bucket is returned.
+/// pointer to it.  If the bucket already exists, return pointer to that
+/// instead.  @c *n is set to @c true if a new bucket is created, @c false if an
+/// existing bucket is returned.
 void * string_hash_insert (string_hash_t * hash,
                            const char * s, size_t entry_size, bool * n);
 /// String need not be cached.

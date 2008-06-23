@@ -10,6 +10,7 @@
 version_t * file_new_version (file_t * f)
 {
     ARRAY_EXTEND (f->versions);
+    f->versions_end[-1].file = f;
     f->versions_end[-1].implicit_merge = false;
     f->versions_end[-1].used = true;
     f->versions_end[-1].ready_index = SIZE_MAX;
