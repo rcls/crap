@@ -319,7 +319,7 @@ static tag_t * find_branch (const file_t * f,
 
     // Record a branch point if not already done.
     if (branch->tag_files_end != branch->tag_files
-        && branch->tag_files_end[-1]->file)
+        && branch->tag_files_end[-1]->file != f)
         return branch;
 
     dot = strrchr (vers, '.');
@@ -327,8 +327,13 @@ static tag_t * find_branch (const file_t * f,
 
     *dot = 0;
     version_t * branch_point = file_find_version (f, vers);
-    if (branch_point)
-        ARRAY_APPEND (branch->tag_files, branch_point);
+    if (branch_point == NULL || branch_point->dead)
+        return branch;
+
+    ARRAY_APPEND (branch->tag_files, branch_point);
+
+    if (branch_point->time > branch->changeset.time)
+        branch->changeset.time = branch_point->time;
 
     return branch;
 }
