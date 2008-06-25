@@ -388,10 +388,13 @@ static void print_tag (const database_t * db, tag_t * tag,
             tag->branch_versions ? "heads" : "tags",
             *tag->tag ? tag->tag : "cvs_master");
 
-    if (tag->parent) {
-        printf ("from :%lu\n\n", tag->parent->mark);
+    if (tag->parent)
         tag->changeset.mark = tag->parent->mark;
-    }
+    else
+        tag->changeset.mark = 0;
+
+    if (tag->changeset.mark != 0)
+        printf ("from :%lu\n\n", tag->changeset.mark);
 
     tag->last = &tag->changeset;
 
