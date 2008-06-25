@@ -340,8 +340,6 @@ static void branch_changesets (database_t * db)
         assert (cs->type == ct_commit);
         changeset_emitted (db, NULL, cs);
         changeset_update_branch_versions (db, cs);
-        if (cs->versions[0]->branch == NULL)
-            continue;               // Anonymous branch: skip.
         tag_t * branch = cs->versions[0]->branch;
         ARRAY_APPEND (branch->changeset.children, cs);
     }

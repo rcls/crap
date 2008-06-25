@@ -315,11 +315,6 @@ static void print_commit (const database_t * db, changeset_t * cs,
                           cvs_connection_t * s)
 {
     version_t * v = cs->versions[0];
-    if (!v->branch) {
-        fprintf (stderr, "%s <anon> %s %s COMMIT - skip\n%s\n",
-                 format_date (&cs->time), v->author, v->commitid, v->log);
-        return;
-    }
 
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;

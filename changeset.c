@@ -45,17 +45,9 @@ static int version_compare (const version_t * A, version_t * B)
     if (r != 0)
         return r;
 
-    if (A->branch != NULL && B->branch == NULL)
-        return 1;
-
-    if (A->branch == NULL && B->branch != NULL)
-        return -1;
-
-    if (A->branch != NULL) {
-        r = cache_strcmp (A->branch->tag, B->branch->tag);
-        if (r != 0)
-            return r;
-    }
+    r = cache_strcmp (A->branch->tag, B->branch->tag);
+    if (r != 0)
+        return r;
 
     if (A->implicit_merge != B->implicit_merge)
         return B->implicit_merge - A->implicit_merge;

@@ -41,12 +41,6 @@ static int compare_changeset (const void * AA, const void * BB)
     if (vA->log != vB->log)
         return strcmp (vA->log, vB->log);
 
-    if (vA->branch == NULL && vB->branch != NULL)
-        return -1;
-
-    if (vA->branch != NULL && vB->branch == NULL)
-        return 1;
-
     if (vA->branch->tag != vB->branch->tag)
         return vA->branch->tag < vB->branch->tag ? -1 : 1;
 

@@ -59,13 +59,6 @@ static bool can_replace_with_implicit_merge (const version_t * v)
 size_t changeset_update_branch_versions (struct database * db,
                                          struct changeset * cs)
 {
-    if (cs->versions[0]->branch == NULL)
-        // FIXME - what should we do about changesets on anonymous branches?
-        // Stringing them together into branches is probably more bother
-        // than it's worth, so we should probably really just never actually
-        // create those changesets.
-        return 0;                   // Changeset on unknown branch.
-
     version_t ** branch = cs->versions[0]->branch->branch_versions;
     assert (branch);
     size_t changes = 0;

@@ -35,9 +35,7 @@ static void print_commit (const changeset_t * cs)
     const version_t * v = *cs->versions;
     printf ("%s %s %s %s COMMIT\n%s\n",
             format_date (&cs->time),
-            v->branch
-            ? *v->branch->tag ? v->branch->tag : "<trunk>"
-            : "<anon>",
+            *v->branch->tag ? v->branch->tag : "<trunk>",
             v->author, v->commitid, v->log);
 
     // FIXME - replace this.
