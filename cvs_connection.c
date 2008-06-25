@@ -522,7 +522,7 @@ void cvs_read_block (cvs_connection_t * s, FILE * f, size_t bytes)
         if (avail > bytes - done)
             avail = bytes - done;
 
-        if (avail != 0 && fwrite (s->in_next, avail, 1, f) != 1)
+        if (avail != 0 && f != NULL && fwrite (s->in_next, avail, 1, f) != 1)
             fatal ("git import interrupted [%u %u]: %s\n",
                    avail, 1, file_error (f));
 
