@@ -111,7 +111,7 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
     port = strndup (port, port_len);
 
     fprintf (stderr, "Pserver '%.*s'@'%s':'%s' '%s'\n",
-             user_len, user, host, port, path);
+             (int) user_len, user, host, port, path);
 
     struct addrinfo hints;
     struct addrinfo * ai;
@@ -139,7 +139,7 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
     fprintf (stderr, "Password '%s'\n", password);
     cvs_printff (conn,
                 "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
-                path, user_len, user, password);
+                 path, (int) user_len, user, password);
     xfree (password);
 
     next_line (conn);
@@ -523,7 +523,7 @@ void cvs_read_block (cvs_connection_t * s, FILE * f, size_t bytes)
             avail = bytes - done;
 
         if (avail != 0 && f != NULL && fwrite (s->in_next, avail, 1, f) != 1)
-            fatal ("git import interrupted [%u %u]: %s\n",
+            fatal ("git import interrupted [%zu %u]: %s\n",
                    avail, 1, file_error (f));
 
         done += avail;

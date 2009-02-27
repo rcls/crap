@@ -102,7 +102,7 @@ void string_cache_stats (FILE * f)
         sumsq += len * (unsigned long long) len;
     }
 
-    fprintf (f, "String cache: %u items, %u/%u buckets used, RMS len %g\n",
+    fprintf (f, "String cache: %zu items, %zu/%zu buckets used, RMS len %g\n",
              cache_entries, used, cache_num_buckets,
              sqrt (sumsq / (double) used));
 }

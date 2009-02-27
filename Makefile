@@ -8,6 +8,9 @@ all: crap-clone rlog_parse
 
 %: %.c
 
+vpath lib%.so
+vpath lib%.so /usr/lib64
+
 crap-clone: libcrap.a -lm -lz
 rlog_parse: libcrap.a -lm -lz
 
@@ -16,7 +19,7 @@ libcrap.a: branch.o changeset.o cvs_connection.o database.o emission.o file.o \
 	ar crv $@ $+
 
 CFLAGS=-O2 -Wall -Werror -std=gnu99 -D_GNU_SOURCE -g3 \
-	-MMD -MP -MF.deps/$(subst /,:,$@).d
+	-MMD -MP -MF.deps/$(subst /,:,$@).d -Wunsafe-loop-optimizations
 CC=gcc
 
 %.o: %.c

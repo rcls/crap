@@ -96,7 +96,7 @@ static void print_tag (const database_t * db, tag_t * tag)
             ++keep;
     }
 
-    printf ("Keep %u live file versions\n\n", keep);
+    printf ("Keep %zu live file versions\n\n", keep);
 }
 
 
@@ -172,7 +172,7 @@ int main (int argc, const char * const * argv)
 
     fflush (NULL);
     fprintf (stderr,
-             "Emitted %u commits (%s total %u).\n",
+             "Emitted %zu commits (%s total %zu).\n",
              emitted_commits,
              emitted_commits == db.changesets_end - db.changesets ? "=" : "!=",
              db.changesets_end - db.changesets);
@@ -196,8 +196,8 @@ int main (int argc, const char * const * argv)
     }
 
     fprintf (stderr,
-             "Exact %5u + %5u = %5u branches + tags.\n"
-             "Fixup %5u + %5u = %5u branches + tags.\n",
+             "Exact %5zu + %5zu = %5zu branches + tags.\n"
+             "Fixup %5zu + %5zu = %5zu branches + tags.\n",
              exact_branches, exact_tags, exact_branches + exact_tags,
              fixup_branches, fixup_tags, fixup_branches + fixup_tags);
 

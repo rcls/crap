@@ -87,8 +87,9 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         fatal ("cvs checkout - doesn't look like entry line: '%s'", s->line);
 
     const char * path = xasprintf ("%s%.*s", d,
-                                   slash1 - s->line - 1, s->line + 1);
-    const char * vers = xasprintf ("%.*s", slash2 - slash1 - 1, slash1 + 1);
+                                   (int) (slash1 - s->line - 1), s->line + 1);
+    const char * vers = xasprintf ("%.*s",
+                                   (int) (slash2 - slash1 - 1), slash1 + 1);
 
     file_t * file = database_find_file (db, path);
     if (file == NULL)
@@ -161,13 +162,13 @@ static void grab_version (const database_t * db,
     if (slash != NULL
         && (version->parent == NULL || version->parent->mark == SIZE_MAX))
         cvs_printf (s, "Directory %s/%.*s\n" "%s%.*s\n",
-                    s->module, slash - path, path,
-                    s->prefix, slash - path, path);
+                    s->module, (int) (slash - path), path,
+                    s->prefix, (int) (slash - path), path);
 
     // Go to the main directory.
     cvs_printf (s,
                 "Directory %s\n%.*s\n", s->module,
-                strlen (s->prefix) - 1, s->prefix);
+                (int) strlen (s->prefix) - 1, s->prefix);
 
     cvs_printff (s,
                  "Argument -kk\n"
@@ -221,14 +222,14 @@ static void grab_by_option (const database_t * db,
         cvs_printf (s,
                     "Directory %s/%.*s\n"
                     "%s%.*s\n",
-                    s->module, d_len, d,
-                    s->prefix, d_len, d);
+                    s->module, (int) d_len, d,
+                    s->prefix, (int) d_len, d);
     }
 
     // Go to the main directory.
     cvs_printf (s,
                 "Directory %s\n%.*s\n", s->module,
-                strlen (s->prefix) - 1, s->prefix);
+                (int) (strlen (s->prefix) - 1), s->prefix);
 
     // Update args:
     if (r_arg)
@@ -341,6 +342,8 @@ static void print_commit (const database_t * db, changeset_t * cs,
         return;
     }
 
+    fprintf (stderr, "%s COMMIT", format_date (&cs->time));
+
     // Get the versions.
     grab_versions (db, s, fetch, fetch_end);
     xfree (fetch);
@@ -352,7 +355,7 @@ static void print_commit (const database_t * db, changeset_t * cs,
             *v->branch->tag ? v->branch->tag : "cvs_master");
     printf ("mark :%lu\n", cs->mark);
     printf ("committer %s <%s> %ld +0000\n", v->author, v->author, cs->time);
-    printf ("data %u\n%s\n", strlen (v->log), v->log);
+    printf ("data %zu\n%s\n", strlen (v->log), v->log);
 
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
         if ((*i)->used) {
@@ -363,6 +366,8 @@ static void print_commit (const database_t * db, changeset_t * cs,
                 printf ("M %s :%zu %s\n",
                         vv->exec ? "755" : "644", vv->mark, vv->file->path);
         }
+
+    fprintf (stderr, "\n");
 }
 
 
@@ -487,7 +492,7 @@ static void print_tag (const database_t * db, tag_t * tag,
             *tag->tag ? tag->tag : "cvs_master");
     printf ("mark :%lu\n", tag->changeset.mark);
     printf ("committer crap <crap> %ld +0000\n", tag->changeset.time);
-    printf ("data %u\n", log_len);
+    printf ("data %zu\n", log_len);
     for (const char ** i = list; i != list_end; ++i) {
         fputs (*i, stdout);
         xfree (*i);
@@ -629,7 +634,7 @@ int main (int argc, char * const argv[])
 
     fflush (NULL);
     fprintf (stderr,
-             "Emitted %u commits (%s total %u).\n",
+             "Emitted %zu commits (%s total %zu).\n",
              emitted_commits,
              emitted_commits == db.changesets_end - db.changesets ? "=" : "!=",
              db.changesets_end - db.changesets);
@@ -653,8 +658,8 @@ int main (int argc, char * const argv[])
     }
 
     fprintf (stderr,
-             "Exact %5u + %5u = %5u branches + tags.\n"
-             "Fixup %5u + %5u = %5u branches + tags.\n",
+             "Exact %5zu + %5zu = %5zu branches + tags.\n"
+             "Fixup %5zu + %5zu = %5zu branches + tags.\n",
              exact_branches, exact_tags, exact_branches + exact_tags,
              fixup_branches, fixup_tags, fixup_branches + fixup_tags);
 

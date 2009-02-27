@@ -92,7 +92,7 @@ static void break_cycle (heap_t * heap, tag_t * t)
 
     tag_t * parent = best_parent->branch;
 
-    fprintf (stderr, "Break branch cycle link %s child of %s weight %u\n",
+    fprintf (stderr, "Break branch cycle link %s child of %s weight %zu\n",
              best->tag, parent->tag, best_parent->weight);
 
     // Remove the parent from the child.
