@@ -186,8 +186,7 @@ static void branch_graph (database_t * db,
     // Release all the tags that are ready right now; also sort the parent
     // lists.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
-        qsort (i->parents, i->parents_end - i->parents,
-               sizeof (parent_branch_t), compare_pb);
+        ARRAY_SORT (i->parents, compare_pb);
         if (i->changeset.unready_count == 0) {
             i->is_released = true;
             heap_insert (&heap, i);

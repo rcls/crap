@@ -371,8 +371,7 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
                                           file_tag_t * file_tags_end,
                                           string_hash_t * tags)
 {
-    qsort (file->versions, file->versions_end - file->versions,
-           sizeof (version_t), compare_version);
+    ARRAY_SORT (file->versions, compare_version);
     ARRAY_TRIM (file->versions);
 
     fill_in_parents (file);
@@ -403,8 +402,7 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
     file_tag_t * branches_end = NULL;
 
     // Sort tags so we can detect duplicates.
-    qsort (file_tags, file_tags_end - file_tags, sizeof (file_tag_t),
-           compare_file_tag);
+    ARRAY_SORT (file_tags, compare_file_tag);
 
     // Fill in the tag version links, and remove tags to dead versions.
     for (file_tag_t * i = file_tags; i != file_tags_end; ++i) {
@@ -451,8 +449,7 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
     }
 
     // Sort the branches by version.
-    qsort (branches, branches_end - branches,
-           sizeof (file_tag_t), compare_branch);
+    ARRAY_SORT (branches, compare_branch);
 
     // Mark the branches as such.  Check for duplicate branches.
     file_tag_t * bb = branches;
@@ -784,7 +781,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
             read_file_versions (db, &tags, s);
 
     // Sort the list of files.
-    qsort (db->files, db->files_end - db->files, sizeof (file_t), compare_file);
+    ARRAY_SORT (db->files, compare_file);
 
     // Set the pointers from versions to files.
     for (file_t * f = db->files; f != db->files_end; ++f)
@@ -802,7 +799,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
     assert (db->tags_end == db->tags + tags.num_entries);
 
     // Sort the list of tags.
-    qsort (db->tags, db->tags_end - db->tags, sizeof (tag_t), compare_tag);
+    ARRAY_SORT (db->tags, compare_tag);
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         tag_hash_item_t * h = string_hash_find (&tags, i->tag);
         assert (h);
@@ -819,8 +816,7 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
     // Sort the tag version lists.  Set the initial branch version lists.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
         ARRAY_TRIM (i->tag_files);
-        qsort (i->tag_files, i->tag_files_end - i->tag_files,
-               sizeof (version_t *), compare_versionp);
+        ARRAY_SORT (i->tag_files, compare_versionp);
         if (i->branch_versions) {
             i->branch_versions = ARRAY_CALLOC (version_t *,
                                                db->files_end - db->files);

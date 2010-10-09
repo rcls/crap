@@ -221,8 +221,7 @@ static void grab_by_option (const database_t * db,
 
     assert (paths != paths_end);
 
-    qsort (paths, paths_end - paths, sizeof (const char *),
-           (int(*)(const void *, const void *)) strcmp);
+    ARRAY_SORT (paths, (int(*)(const void *, const void *)) strcmp);
 
     const char * d = NULL;
     size_t d_len = SIZE_MAX;
@@ -470,8 +469,7 @@ static void print_tag (const database_t * db, tag_t * tag,
     tag->fixups_curr = tag->fixups;
 
     // Sort fix-ups by date.
-    qsort (tag->fixups, tag->fixups_end - tag->fixups, sizeof (fixup_ver_t),
-           compare_fixup_by_time);
+    ARRAY_SORT (tag->fixups, compare_fixup_by_time);
 
     // If the tag is a branch, then rewind the current versions to the parent
     // versions.  The fix-up commits will restore things.  FIXME - we should
@@ -524,8 +522,7 @@ void print_fixups (const database_t * db,
         return;
 
     // Sort the fixups by file...
-    qsort (fixups, fixups_end - fixups, sizeof (fixups[0]),
-           compare_fixup_by_file);
+    ARRAY_SORT (fixups, compare_fixup_by_file);
 
     // Generate stats.
     size_t keep = 0;

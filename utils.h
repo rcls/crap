@@ -89,4 +89,7 @@ static inline bool ends_with (const char * haystack, const char * needle)
             P##_end = P + ITEMS;                \
         } } while (0)
 
+/// Sort an array using qsort.
+#define ARRAY_SORT(P, F) qsort (P, P##_end - P, sizeof(*(P)), F)
+
 #endif
