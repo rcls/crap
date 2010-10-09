@@ -12,6 +12,7 @@
 typedef struct file file_t;
 typedef struct version version_t;
 typedef struct tag tag_t;
+typedef struct fixup_ver fixup_ver_t;
 
 struct file {
     const char * path;
@@ -112,6 +113,10 @@ struct tag {
     changeset_t changeset;              ///< Tag emission changeset.
 
     changeset_t * last;           ///< The last changeset output on this branch.
+
+    fixup_ver_t * fixups;               ///< Array of required fixups.
+    fixup_ver_t * fixups_end;
+    fixup_ver_t * fixups_curr;          ///< Current position in fixups.
 };
 
 

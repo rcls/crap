@@ -46,6 +46,8 @@ void tag_init (tag_t * tag, const char * name)
     tag->tags_end = NULL;
     tag->fixup = false;
     tag->parent = NULL;
+    tag->fixups = NULL;
+    tag->fixups_end = NULL;
 }
 
 

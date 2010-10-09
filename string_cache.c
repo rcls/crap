@@ -129,7 +129,7 @@ unsigned long string_hash_get (const char * s)
 unsigned long string_hash_func (const char * str, size_t len)
 {
     unsigned long hash = 0;
-    for (int i = 0; i != len; ++i)
+    for (size_t i = 0; i != len; ++i)
         hash = hash * 31 + str[i];
     return hash;
 }

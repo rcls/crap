@@ -20,6 +20,23 @@
 
 static long mark_counter;
 
+// FIXME - assumes signed time_t!
+#define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
+#define TIME_MAX (sizeof(time_t) == sizeof(int) ? INT_MAX : LONG_MAX)
+
+/// Record the data for a file-version in a fixup-commit.
+struct fixup_ver {
+    const file_t * file;                ///< NULL if already done.
+    version_t * version;                ///< Maybe NULL.
+    time_t time;                        ///< Timestamp of fix-up.
+};
+
+static void print_fixups(const database_t * db,
+                         version_t ** base_versions,
+                         tag_t * tag, time_t time,
+                         cvs_connection_t * s);
+
+
 static const char * format_date (const time_t * time)
 {
     struct tm dtm;
@@ -371,6 +388,20 @@ static void print_commit (const database_t * db, changeset_t * cs,
 }
 
 
+static int compare_fixup_by_time (const void * AA, const void * BB)
+{
+    const fixup_ver_t * A = AA;
+    const fixup_ver_t * B = BB;
+    if (A->time < B->time)
+        return -1;
+
+    if (A->time > B->time)
+        return 1;
+
+    return 0;
+}
+
+
 static void print_tag (const database_t * db, tag_t * tag,
                        cvs_connection_t * s)
 {
@@ -405,6 +436,98 @@ static void print_tag (const database_t * db, tag_t * tag,
 
     // Go through the current versions on the branch and note any version
     // fix-ups required.
+    assert (tag->fixups == NULL);
+    assert (tag->fixups_end == NULL);
+
+    version_t ** tf = tag->tag_files;
+    for (file_t * i = db->files; i != db->files_end; ++i) {
+        version_t * bv = branch ? version_normalise (
+            branch->branch_versions[i - db->files]) : NULL;
+        version_t * tv = NULL;
+        if (tf != tag->tag_files_end && (*tf)->file == i)
+            tv = version_normalise (*tf++);
+
+        version_t * bvl = bv == NULL || bv->dead ? NULL : bv;
+        version_t * tvl = tv == NULL || tv->dead ? NULL : tv;
+
+        if (bvl == tvl)
+            continue;
+
+        assert (TIME_MIN < 0);
+        assert (TIME_MAX > 0);
+
+        // FIXME need to worry about forcing version out before its successors!
+        time_t fix_time;
+        if (tv != NULL)
+            fix_time = tv->time;
+        else
+            fix_time = TIME_MIN;
+
+        ARRAY_APPEND (tag->fixups, ((fixup_ver_t) {
+                    .file = i, .version = tvl, .time = fix_time }));
+    }
+
+    tag->fixups_curr = tag->fixups;
+
+    // Sort fix-ups by date.
+    qsort (tag->fixups, tag->fixups_end - tag->fixups, sizeof (fixup_ver_t),
+           compare_fixup_by_time);
+
+    // If the tag is a branch, then rewind the current versions to the parent
+    // versions.  The fix-up commits will restore things.  FIXME - we should
+    // just initialise the branch correctly!
+    if (tag->branch_versions) {
+        size_t bytes = sizeof (branch->branch_versions[0])
+            * (db->files_end - db->files);
+        if (branch)
+            memcpy (tag->branch_versions, branch->branch_versions, bytes);
+        else
+            memset (tag->branch_versions, 0, bytes);
+    }
+
+    // For now, just force out all the fixups.
+    print_fixups (db, branch ? branch->branch_versions : NULL,
+                  tag, TIME_MAX, s);
+}
+
+
+static int compare_fixup_by_file (const void * AA, const void * BB)
+{
+    const fixup_ver_t * A = AA;
+    const fixup_ver_t * B = BB;
+    if (A->file < B->file)
+        return -1;
+
+    if (A->file > B->file)
+        return 1;
+
+    return 0;
+}
+
+
+/// Output the fixups that must be done before the given time.  If none, then no
+/// commit is created.
+void print_fixups (const database_t * db,
+                   version_t ** base_versions,
+                   tag_t * tag, time_t time,
+                   cvs_connection_t * s)
+{
+    fixup_ver_t * fixups = NULL;
+    fixup_ver_t * fixups_end = NULL;
+
+    for (; tag->fixups_curr != tag->fixups_end
+             && tag->fixups_curr->time <= time;
+         ++tag->fixups_curr)
+        ARRAY_APPEND (fixups, *tag->fixups_curr);
+
+    if (fixups == fixups_end)
+        return;
+
+    // Sort the fixups by file...
+    qsort (fixups, fixups_end - fixups, sizeof (fixups[0]),
+           compare_fixup_by_file);
+
+    // Generate stats.
     size_t keep = 0;
     size_t added = 0;
     size_t deleted = 0;
@@ -413,13 +536,15 @@ static void print_tag (const database_t * db, tag_t * tag,
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
 
-    version_t ** tf = tag->tag_files;
+    fixup_ver_t * ffv = fixups;
     for (file_t * i = db->files; i != db->files_end; ++i) {
-        version_t * bv = branch
-            ? version_live (branch->branch_versions[i - db->files]) : NULL;
-        version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->file == i)
-            tv = version_live (*tf++);
+        version_t * bv = base_versions ?
+            version_live (base_versions[i - db->files]) : NULL;
+        version_t * tv;
+        if (ffv != fixups_end && ffv->file == i)
+            tv = ffv++->version;
+        else
+            tv = bv;
 
         if (bv == tv) {
             if (bv != NULL)
@@ -441,10 +566,7 @@ static void print_tag (const database_t * db, tag_t * tag,
             ++modified;
     }
 
-    if (added == 0 && deleted == 0 && modified == 0) {
-        assert (fetch == NULL);
-        return;                         // Nothing to do.
-    }
+    assert (added + deleted + modified == fixups_end - fixups);
 
     // FIXME - grab_versions assumes that all versions are on the same branch!
     // We should pass in the tag rather than guessing it!
@@ -454,6 +576,7 @@ static void print_tag (const database_t * db, tag_t * tag,
     tag->fixup = true;
     tag->changeset.mark = ++mark_counter;
 
+    // Generate the commit comment.
     const char ** list = NULL;
     const char ** list_end = NULL;
 
@@ -462,13 +585,15 @@ static void print_tag (const database_t * db, tag_t * tag,
                             "(~%zu +%zu -%zu =%zu)\n",
                             modified, added, deleted, keep));
 
-    tf = tag->tag_files;
+    ffv = fixups;
     for (file_t * i = db->files; i != db->files_end; ++i) {
-        version_t * bv = branch
-            ? version_live (branch->branch_versions[i - db->files]) : NULL;
+        version_t * bv = base_versions ?
+            version_live (base_versions[i - db->files]) : NULL;
         version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->file == i)
-            tv = version_live (*tf++);
+        if (ffv != fixups_end && ffv->file == i)
+            tv = ffv++->version;
+        else
+            tv = bv;
 
         if (bv == tv) {
             if (bv != NULL && keep <= deleted)
@@ -491,6 +616,7 @@ static void print_tag (const database_t * db, tag_t * tag,
             tag->branch_versions ? "heads" : "tags",
             *tag->tag ? tag->tag : "cvs_master");
     printf ("mark :%lu\n", tag->changeset.mark);
+    // FIXME - what timestamp to use?
     printf ("committer crap <crap> %ld +0000\n", tag->changeset.time);
     printf ("data %zu\n", log_len);
     for (const char ** i = list; i != list_end; ++i) {
@@ -499,13 +625,14 @@ static void print_tag (const database_t * db, tag_t * tag,
     }
     xfree (list);
 
-    tf = tag->tag_files;
-    for (file_t * i = db->files; i != db->files_end; ++i) {
-        version_t * bv = branch
-            ? version_live (branch->branch_versions[i - db->files]) : NULL;
-        version_t * tv = NULL;
-        if (tf != tag->tag_files_end && (*tf)->file == i)
-            tv = version_live (*tf++);
+    ffv = fixups;
+    for (file_t * i = db->files; ffv != fixups_end && i != db->files_end; ++i) {
+        if (ffv->file != i)
+            continue;
+
+        version_t * bv = base_versions ?
+            version_live (base_versions[i - db->files]) : NULL;
+        version_t * tv = ffv++->version;
 
         if (tv != bv) {
             if (tv == NULL)
@@ -514,7 +641,12 @@ static void print_tag (const database_t * db, tag_t * tag,
                 printf ("M %s :%zu %s\n",
                         tv->exec ? "755" : "644", tv->mark, tv->file->path);
         }
+
+        if (tag->branch_versions)
+            tag->branch_versions[i - db->files] = tv;
     }
+
+    xfree (fixups);
 }
 
 

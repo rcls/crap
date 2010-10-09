@@ -5,8 +5,6 @@
 
 #include <stdint.h>
 
-struct version;
-
 typedef struct database {
     struct file * files;
     struct file * files_end;
