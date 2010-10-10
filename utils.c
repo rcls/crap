@@ -8,7 +8,8 @@
 
 void * xmalloc (size_t size)
 {
-    void * r = malloc (size);
+    // Round up to keep valgrind v. strlen happy.
+    void * r = malloc ((size + 3) & ~3);
     if (r == NULL)
         fatal ("Failed to malloc %zu bytes.\n", size);
 
