@@ -136,7 +136,7 @@ static bool valid_version (const char * s)
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for ( ; *s >= '0' && *s <= '9'; ++s);
+        for (; *s >= '0' && *s <= '9'; ++s);
 
         if (*s != '.')
             return false;               // Bogus.
@@ -146,7 +146,7 @@ static bool valid_version (const char * s)
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for ( ; *s >= '0' && *s <= '9'; ++s);
+        for (; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
             return true;                // Done.
@@ -197,7 +197,7 @@ static bool normalise_tag_version (char * s)
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for ( ; *s >= '0' && *s <= '9'; ++s);
+        for (; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
             return true;                // x.y.z style branch.
@@ -205,7 +205,7 @@ static bool normalise_tag_version (char * s)
         if (*s++ != '.' || *s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for ( ; *s >= '0' && *s <= '9'; ++s);
+        for (; *s >= '0' && *s <= '9'; ++s);
 
         if (*s == 0)
             return true;                // Done.
@@ -221,7 +221,7 @@ static bool normalise_tag_version (char * s)
     if (*++s != '.' || *++s < '1' || *s > '9')
         return false;
 
-    for ( ; *s >= '0' && *s <= '9'; ++s);
+    for (; *s >= '0' && *s <= '9'; ++s);
 
     if (*s != 0)
         return false;                   // Bogus.
