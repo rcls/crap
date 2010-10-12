@@ -6,13 +6,6 @@ struct database;
 struct heap;
 struct version;
 
-void changeset_release (struct database * db, struct changeset * cs);
-
-/// Mark a version as ready to be emitted.
-void version_release (struct database * db,
-                      struct heap * ready_versions,
-                      struct version * version);
-
 /// Record that a changeset has been emitted; release child versions and
 /// changesets.  @c ready_versions may be NULL if not in use.
 void changeset_emitted (struct database * db, struct heap * ready_versions,

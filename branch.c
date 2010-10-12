@@ -210,7 +210,7 @@ static void branch_graph (database_t * db,
 
 static bool better_than (tag_t * new, tag_t * old)
 {
-    // FIXME - for equal rank, deterministicly order tags.
+    // FIXME - for equal rank, deterministically order tags.
     return new->rank > old->rank;
 }
 

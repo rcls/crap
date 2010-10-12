@@ -10,7 +10,7 @@
 #include <string.h>
 
 
-void changeset_release (database_t * db, changeset_t * cs)
+static void changeset_release (database_t * db, changeset_t * cs)
 {
     assert (cs->unready_count != 0);
 
@@ -18,8 +18,8 @@ void changeset_release (database_t * db, changeset_t * cs)
         heap_insert (&db->ready_changesets, cs);
 }
 
-void version_release (database_t * db, heap_t * version_heap,
-                      version_t * version)
+static void version_release (database_t * db, heap_t * version_heap,
+                             version_t * version)
 {
     if (version_heap)
         heap_insert (version_heap, version);
@@ -102,7 +102,7 @@ static void cycle_split (database_t * db, changeset_t * cs)
 {
     fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");
-    // We split the changeset into to.  We leave all the blocked versions
+    // We split the changeset into two.  We leave all the blocked versions
     // in cs, and put the ready-to-emit into nw.
 
     changeset_t * new = database_new_changeset (db);
@@ -179,6 +179,11 @@ void prepare_for_emission (database_t * db, heap_t * ready_versions)
 {
     // Re-do the changeset unready counts.
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
+        // FIXME - when we make fix-up commits explicit we will need to
+        // not count those?
+        for (version_t ** v = (*i)->versions; v != (*i)->versions_end; ++v) {
+            assert ((*v)->commit == *i);
+        }
         (*i)->unready_count += (*i)->versions_end - (*i)->versions;
 
         for (changeset_t ** j = (*i)->children; j != (*i)->children_end; ++j)
