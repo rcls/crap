@@ -588,7 +588,10 @@ static void read_file_version (file_t * file, cvs_connection_t * s)
 
     version_t * version = file_new_version (file);
 
-    version->version = cache_string (s->line + 11);
+    const char * vstr = s->line + 11;
+    char * tab = strchr (vstr, '\t');
+
+    version->version = cache_string_n (vstr, tab ? tab - vstr : strlen (vstr));
     if (!valid_version (version->version))
         fatal ("Log (%s) has malformed version %s\n",
                file->rcs_path, version->version);
@@ -687,7 +690,8 @@ static void read_file_versions (database_t * db,
     while (starts_with (s->line, "M head:") ||
            starts_with (s->line, "M branch:") ||
            starts_with (s->line, "M locks:") ||
-           starts_with (s->line, "M access list:"));
+           starts_with (s->line, "M access list:") ||
+           starts_with (s->line, "M \t"));
 
     if (!starts_with (s->line, "M symbolic names:"))
         fatal ("Log (%s) did not have expected tag list: %s\n",
