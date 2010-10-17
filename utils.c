@@ -10,7 +10,7 @@ void * xmalloc (size_t size)
 {
     // Round up to keep valgrind v. strlen happy.
     void * r = malloc ((size + 3) & ~3);
-    if (r == NULL)
+    if (r == NULL && size != 0)
         fatal ("Failed to malloc %zu bytes.\n", size);
 
     return r;
@@ -20,7 +20,7 @@ void * xmalloc (size_t size)
 void * xrealloc (void * old, size_t size)
 {
     void * r = realloc (old, size);
-    if (r == NULL)
+    if (r == NULL && size != 0)
         fatal ("Failed to realloc %zu bytes.\n", size);
 
     return r;
@@ -30,7 +30,7 @@ void * xrealloc (void * old, size_t size)
 void * xcalloc (size_t size)
 {
     void * r = calloc (size, 1);
-    if (r == NULL)
+    if (r == NULL && size != 0)
         fatal ("Failed to malloc %zu bytes.\n", size);
 
     return r;

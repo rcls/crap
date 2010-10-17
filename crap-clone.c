@@ -286,7 +286,6 @@ static void grab_versions (const database_t * db,
         return;
     }
 
-    bool tried_date = false;
     time_t dmin = fetch[0]->time;
     time_t dmax = fetch[0]->time;
     for (version_t ** i = fetch + 1; i != fetch_end; ++i)
@@ -296,11 +295,8 @@ static void grab_versions (const database_t * db,
             dmax = (*i)->time;
 
     if (dmax - dmin < 300 && fetch[0]->branch) {
-        tried_date = true;
-
         // Format the date.
         struct tm tm;
-//            ++last;                     // Add a second...
         gmtime_r (&dmax, &tm);
         char date[64];
         if (strftime (date, 64, "%d %b %Y %H:%M:%S -0000", &tm) == 0)
@@ -310,15 +306,16 @@ static void grab_versions (const database_t * db,
                         fetch[0]->branch->tag[0] ? fetch[0]->branch->tag : NULL,
                         format_date (&dmax),
                         fetch, fetch_end);
+
+        for (version_t ** i = fetch; i != fetch_end; ++i)
+            if ((*i)->mark == SIZE_MAX)
+                fprintf (stderr, "Missed first time round: %s %s\n",
+                         (*i)->file->path, (*i)->version);
     }
 
     for (version_t ** i = fetch; i != fetch_end; ++i)
-        if ((*i)->mark == SIZE_MAX) {
-            if (tried_date > 1)
-                fprintf (stderr, "Missed first time round: %s %s\n",
-                         (*i)->file->path, (*i)->version);
+        if ((*i)->mark == SIZE_MAX)
             grab_version (db, s, *i);
-        }
 }
 
 
