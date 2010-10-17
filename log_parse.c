@@ -769,6 +769,48 @@ static int compare_tag (const void * AA, const void * BB)
 }
 
 
+static bool is_dead_branch_addition (tag_t * branch, version_t * version)
+{
+    if (version->dead)
+        return false;
+
+    version_t * child = version->children;
+    for (;; child = child->sibling) {
+        if (child == NULL)
+            return false;
+        if (child->branch == branch)
+            break;
+    }
+
+    if (!child->dead || !starts_with (child->log, "file "))
+        return false;
+
+    const char * filename = strrchr (version->file->path, '/');
+    if (filename)
+        ++filename;
+    else
+        filename = version->file->path;
+
+    char * log = xasprintf ("file %s was added on branch %s on ",
+                            filename, branch->tag);
+    bool result = starts_with (child->log, log);
+    xfree (log);
+    return result;
+}
+
+
+static void trim_dead_branch_additions (tag_t * branch)
+{
+    version_t ** p = branch->tag_files;
+
+    for (version_t ** i = branch->tag_files; i != branch->tag_files_end; ++i)
+        if (!is_dead_branch_addition (branch, *i))
+            *p++ = *i;
+
+    branch->tag_files_end = p;
+}
+
+
 void read_files_versions (database_t * db, cvs_connection_t * s)
 {
     database_init (db);
@@ -819,6 +861,11 @@ void read_files_versions (database_t * db, cvs_connection_t * s)
 
     // Sort the tag version lists.  Set the initial branch version lists.
     for (tag_t * i = db->tags; i != db->tags_end; ++i) {
+        // On a branch, remove initial versions if they appear to be dead
+        // revisions created for subsequent branch additions.
+        if (i->branch_versions)
+            trim_dead_branch_additions (i);
+
         ARRAY_TRIM (i->tag_files);
         ARRAY_SORT (i->tag_files, compare_versionp);
         if (i->branch_versions) {
