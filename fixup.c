@@ -78,6 +78,81 @@ void create_fixups(const database_t * db,
 }
 
 
+static int compare_fixup_by_file (const void * AA, const void * BB)
+{
+    const fixup_ver_t * A = AA;
+    const fixup_ver_t * B = BB;
+    if (A->file < B->file)
+        return -1;
+
+    if (A->file > B->file)
+        return 1;
+
+    return 0;
+}
+
+
+static int compare_file_version (const void * KK, const void * VV)
+{
+    const file_t * K = KK;
+    const version_t * const * V = VV;
+    if (K < (*V)->file)
+        return -1;
+    if (K > (*V)->file)
+        return 1;
+    return 0;
+}
+
+
+static version_t * changeset_find_file (const changeset_t * cs,
+                                        const file_t * file)
+{
+    return bsearch (file, cs->versions, cs->versions_end - cs->versions,
+                    sizeof (*cs->versions), compare_file_version);
+}
+
+
+void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
+                 tag_t * tag, const changeset_t * cs)
+{
+    *fixups = NULL;
+    *fixups_end = NULL;
+
+    time_t time = TIME_MAX;
+    if (cs != NULL)
+        time = cs->time;
+
+    for (; tag->fixups_curr != tag->fixups_end
+             && tag->fixups_curr->time <= time;
+         ++tag->fixups_curr)
+        if (tag->fixups_curr->file != NULL) {
+            ARRAY_APPEND (*fixups, *tag->fixups_curr);
+            tag->fixups_curr->file = NULL;
+        }
+
+    bool done = true;
+    for (fixup_ver_t * i = tag->fixups_curr; i != tag->fixups_end; ++i)
+        if (i->file == NULL)
+            ;
+        else if (changeset_find_file (cs, i->file)) {
+            ARRAY_APPEND (*fixups, *tag->fixups_curr);
+            tag->fixups_curr->file = NULL;
+        }
+        else
+            done = false;
+
+    if (done) {
+        xfree (tag->fixups);
+        tag->fixups = NULL;
+        tag->fixups_end = NULL;
+        tag->fixups_curr = NULL;
+    }
+
+    // Sort the fixups by file...
+    ARRAY_SORT (*fixups, compare_fixup_by_file);
+}
+
+
 char * fixup_commit_comment (const database_t * db,
                              version_t * const * base_versions, tag_t * tag,
                              fixup_ver_t * fixups,

@@ -95,6 +95,19 @@ static int version_compare_heap (const void * AA, const void * BB)
 }
 
 
+static int compare_version_by_file (const void * AA, const void * BB)
+{
+    const version_t * const * A = AA;
+    const version_t * const * B = BB;
+
+    if ((*A)->file < (*B)->file)
+        return -1;
+    if ((*A)->file > (*B)->file)
+        return 1;
+    return 0;
+}
+
+
 void create_changesets (database_t * db)
 {
     size_t total_versions = 0;
@@ -150,6 +163,10 @@ void create_changesets (database_t * db)
         changeset_emitted (db, &ready_versions, changeset);
         ++emitted_changesets;
     }
+
+    // Sort the changeset version lists by file.
+    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
+        ARRAY_SORT ((*i)->versions, compare_version_by_file);
 
     assert (heap_empty (&ready_versions));
     assert (heap_empty (&db->ready_changesets));

@@ -3,6 +3,7 @@
 
 #include <time.h>
 
+struct changeset;
 struct database;
 struct tag;
 struct version;
@@ -14,9 +15,14 @@ typedef struct fixup_ver {
     time_t time;                        ///< Timestamp of fix-up.
 } fixup_ver_t;
 
+/// Create the fixups for a tag (or branch).
 void create_fixups(const struct database * db,
                    struct version * const * branch_versions,
                    struct tag * tag);
+
+/// Populate the fix-up list to be done before the changeset (or all if NULL).
+void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
+                 tag_t * t, const struct changeset * cs);
 
 char * fixup_commit_comment (const struct database * db,
                              struct version * const * base_versions,

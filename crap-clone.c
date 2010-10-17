@@ -27,7 +27,7 @@ static long mark_counter;
 
 static void print_fixups(const database_t * db,
                          version_t ** base_versions,
-                         tag_t * tag, time_t time,
+                         tag_t * tag, const changeset_t * cs,
                          cvs_connection_t * s);
 
 
@@ -327,6 +327,9 @@ static void print_commit (const database_t * db, changeset_t * cs,
 {
     version_t * v = cs->versions[0];
 
+    // Before doing the commit proper, output any branch-fixups that need doing.
+    print_fixups (db, v->branch->branch_versions, v->branch, cs, s);
+
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
 
@@ -427,23 +430,10 @@ static void print_tag (const database_t * db, tag_t * tag,
             memset (tag->branch_versions, 0, bytes);
     }
 
-    // For now, just force out all the fixups.
-    print_fixups (db, branch ? branch->branch_versions : NULL,
-                  tag, TIME_MAX, s);
-}
-
-
-static int compare_fixup_by_file (const void * AA, const void * BB)
-{
-    const fixup_ver_t * A = AA;
-    const fixup_ver_t * B = BB;
-    if (A->file < B->file)
-        return -1;
-
-    if (A->file > B->file)
-        return 1;
-
-    return 0;
+    if (tag->branch_versions == NULL)
+        // For a tag, just force out all the fixups immediately.
+        print_fixups (db, branch ? branch->branch_versions : NULL,
+                      tag, NULL, s);
 }
 
 
@@ -451,22 +441,16 @@ static int compare_fixup_by_file (const void * AA, const void * BB)
 /// commit is created.
 void print_fixups (const database_t * db,
                    version_t ** base_versions,
-                   tag_t * tag, time_t time,
+                   tag_t * tag, const changeset_t * cs,
                    cvs_connection_t * s)
 {
-    fixup_ver_t * fixups = NULL;
-    fixup_ver_t * fixups_end = NULL;
+    fixup_ver_t * fixups;
+    fixup_ver_t * fixups_end;
 
-    for (; tag->fixups_curr != tag->fixups_end
-             && tag->fixups_curr->time <= time;
-         ++tag->fixups_curr)
-        ARRAY_APPEND (fixups, *tag->fixups_curr);
+    fixup_list (&fixups, &fixups_end, tag, cs);
 
     if (fixups == fixups_end)
         return;
-
-    // Sort the fixups by file...
-    ARRAY_SORT (fixups, compare_fixup_by_file);
 
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
@@ -487,8 +471,10 @@ void print_fixups (const database_t * db,
             tag->branch_versions ? "heads" : "tags",
             *tag->tag ? tag->tag : "cvs_master");
     printf ("mark :%lu\n", tag->changeset.mark);
-    // FIXME - what timestamp to use?
-    printf ("committer crap <crap> %ld +0000\n", tag->changeset.time);
+
+    printf ("committer crap <crap> %ld +0000\n",
+            tag->branch_versions && tag->last
+            ? tag->last->time : tag->changeset.time);
     const char * comment = fixup_commit_comment (
         db, base_versions, tag, fixups, fixups_end);
     printf ("data %zu\n", strlen (comment));
@@ -630,6 +616,11 @@ int main (int argc, char * const argv[])
 
         changeset_emitted (&db, NULL, changeset);
     }
+
+    // Final fixups.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
+        if (i->branch_versions)
+            print_fixups (&db, i->branch_versions, i, NULL, &stream);
 
     fflush (NULL);
     fprintf (stderr,
