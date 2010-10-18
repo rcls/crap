@@ -60,7 +60,6 @@ void create_fixups(const database_t * db,
         assert (TIME_MAX > 0);
         assert (TIME_MIN == (time_t) ((unsigned long long) TIME_MAX + 1));
 
-        // FIXME need to worry about forcing version out before its successors!
         time_t fix_time;
         if (tv != NULL)
             fix_time = tv->time;
@@ -130,7 +129,7 @@ void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
             tag->fixups_curr->file = NULL;
         }
 
-    bool done = true;
+    int remaining = 0;
     for (fixup_ver_t * i = tag->fixups_curr; i != tag->fixups_end; ++i)
         if (i->file == NULL)
             ;
@@ -139,17 +138,33 @@ void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
             i->file = NULL;
         }
         else
-            done = false;
-
-    if (done) {
-        xfree (tag->fixups);
-        tag->fixups = NULL;
-        tag->fixups_end = NULL;
-        tag->fixups_curr = NULL;
-    }
+            ++remaining;
 
     // Sort the fixups by file...
     ARRAY_SORT (*fixups, compare_fixup_by_file);
+
+    if (remaining > (tag->fixups_end - tag->fixups) / 2)
+        return;
+
+    if (remaining == 0) {
+        if (tag->fixups != NULL) {
+            xfree (tag->fixups);
+            tag->fixups = NULL;
+            tag->fixups_end = NULL;
+            tag->fixups_curr = NULL;
+        }
+        return;
+    }
+
+    // Repack the array.
+    fixup_ver_t * j = tag->fixups;
+    for (fixup_ver_t * i = tag->fixups_curr; i != tag->fixups_end; ++i)
+        if (i->file != NULL)
+            *j++ = *i;
+
+    tag->fixups_end = j;
+    ARRAY_TRIM(tag->fixups);
+    tag->fixups_curr = tag->fixups;
 }
 
 
@@ -163,9 +178,6 @@ char * fixup_commit_comment (const database_t * db,
     size_t added = 0;
     size_t deleted = 0;
     size_t modified = 0;
-
-    //version_t ** fetch = NULL;
-    //version_t ** fetch_end = NULL;
 
     fixup_ver_t * ffv = fixups;
     for (file_t * i = db->files; i != db->files_end; ++i) {
@@ -188,24 +200,13 @@ char * fixup_commit_comment (const database_t * db,
             continue;
         }
 
-        //if (tv->mark == SIZE_MAX)
-        //ARRAY_APPEND (fetch, tv);
-
         if (bv == NULL)
             ++added;
         else
             ++modified;
     }
 
-    assert (added + deleted + modified == fixups_end - fixups);
-
-    // FIXME - grab_versions assumes that all versions are on the same branch!
-    // We should pass in the tag rather than guessing it!
-    //grab_versions (db, s, fetch, fetch_end);
-    //xfree (fetch);
-
-    //tag->fixup = true;
-    //tag->changeset.mark = ++mark_counter;
+    assert (ffv == fixups_end);
 
     // Generate the commit comment.
     char * result;
