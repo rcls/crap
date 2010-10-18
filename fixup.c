@@ -135,8 +135,8 @@ void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
         if (i->file == NULL)
             ;
         else if (changeset_find_file (cs, i->file)) {
-            ARRAY_APPEND (*fixups, *tag->fixups_curr);
-            tag->fixups_curr->file = NULL;
+            ARRAY_APPEND (*fixups, *i);
+            i->file = NULL;
         }
         else
             done = false;
