@@ -42,6 +42,10 @@ void create_fixups(const database_t * db,
     assert (tag->fixups == NULL);
     assert (tag->fixups_end == NULL);
 
+    assert (TIME_MIN < 0);
+    assert (TIME_MAX > 0);
+    assert (TIME_MIN == (time_t) ((unsigned long long) TIME_MAX + 1));
+
     version_t ** tf = tag->tag_files;
     for (file_t * i = db->files; i != db->files_end; ++i) {
         version_t * bv = branch_versions ? version_normalise (
@@ -56,12 +60,11 @@ void create_fixups(const database_t * db,
         if (bvl == tvl)
             continue;
 
-        assert (TIME_MIN < 0);
-        assert (TIME_MAX > 0);
-        assert (TIME_MIN == (time_t) ((unsigned long long) TIME_MAX + 1));
-
+        // The only fixups we defer are files that spontaneously appear on
+        // the tag.  Everything else we assume was there from the start.
         time_t fix_time;
-        if (tv != NULL)
+        if (tv != NULL && branch_versions
+            && branch_versions[i - db->files] == NULL)
             fix_time = tv->time;
         else
             fix_time = TIME_MIN;
