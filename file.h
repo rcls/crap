@@ -105,6 +105,8 @@ struct tag {
 
     bool fixup;                         ///< Did we need a fix-up changeset?
 
+    bool dummy;                       ///< Dummy branch, server doesn't know us.
+
     unsigned rank;
 
     changeset_t * parent;               ///< Changeset we leach off.

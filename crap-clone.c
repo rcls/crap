@@ -294,7 +294,7 @@ static void grab_versions (const database_t * db,
         else if ((*i)->time > dmax)
             dmax = (*i)->time;
 
-    if (dmax - dmin < 300 && fetch[0]->branch) {
+    if (dmax - dmin < 300 && fetch[0]->branch && !fetch[0]->branch->dummy) {
         // Format the date.
         struct tm tm;
         gmtime_r (&dmax, &tm);

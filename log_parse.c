@@ -316,6 +316,7 @@ static tag_t * find_branch (const file_t * f,
     tag_t * branch = get_tag (tags, cache_string (br));
     static version_t * dummy_pointer;
     branch->branch_versions = &dummy_pointer;
+    branch->dummy = true;
 
     // Record a branch point if not already done.
     if (branch->tag_files_end != branch->tag_files
@@ -720,7 +721,7 @@ static void read_file_versions (database_t * db,
         file_tags_end[-1].version = cache_string (colon);
 
         len = next_line (s);
-    };
+    }
 
     while (starts_with (s->line, "M keyword substitution:") ||
            starts_with (s->line, "M total revisions:"))
