@@ -71,12 +71,12 @@ char * xasprintf (const char * format, ...)
 void * find_string (const void * array, size_t count, size_t size,
                     size_t position, const char * needle)
 {
-    const char * base = array;
+    const char * base = array + position;
 
     while (count) {
         size_t mid = count >> 1;
         const char * midp = base + mid * size;
-        int c = strcmp (* (const char * const *) (midp + position), needle);
+        int c = strcmp (* (const char * const *) midp, needle);
         if (c < 0) {
             base = midp + size;
             count -= mid + 1;
@@ -84,7 +84,7 @@ void * find_string (const void * array, size_t count, size_t size,
         else if (c > 0)
             count = mid;
         else
-            return (void *) midp;
+            return (void *) (midp - position);
     }
 
     return NULL;

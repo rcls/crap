@@ -12,6 +12,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
 #include <stdint.h>
@@ -542,6 +543,18 @@ void process_opts (int argc, char * const argv[])
 
 int main (int argc, char * const argv[])
 {
+    // Make sure stdin/stdout/stderr are valid FDs.
+    int f;
+    do {
+        f = open ("/dev/null", O_RDWR);
+        if (f < 0)
+            fatal("open /dev/null failed: %s\n", strerror(errno));
+    }
+    while (f < 2);
+
+    if (f > 2)
+        close (f);
+
     process_opts (argc, argv);
     if (argc != optind + 2)
         usage (argv[0], stderr, EXIT_FAILURE);

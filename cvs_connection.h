@@ -29,6 +29,8 @@ typedef struct cvs_connection {
     FILE * log_in;                      ///< Log of data to cvs server.
     FILE * log_out;                     ///< Log of data from cvs server.
 
+    struct pipeline * pipeline;
+
     bool compress;                      ///< Are we compressing?
 
     z_stream deflater;                ///< State for compressing data to server.

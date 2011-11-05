@@ -1,18 +1,17 @@
 
-LD=gcc
+LD=$(CC)
 
 all: crap-clone rlog_parse
 
 %: %.o
-	$(LD) $(LDFLAGS) -o $@ $+
+	$(LD) $(LDFLAGS) -o $@ $+ $($*_LIBS)
 
 %: %.c
 
-vpath lib%.so
-vpath lib%.so /usr/lib64
-
-crap-clone: libcrap.a -lm -lz
-rlog_parse: libcrap.a -lm -lz
+crap-clone: libcrap.a
+crap-clone_LIBS=-lpipeline -lz -lm
+rlog_parse: libcrap.a
+rlog_parse_LIBS=-lpipeline -lz -lm
 
 libcrap.a: branch.o changeset.o cvs_connection.o database.o emission.o file.o \
 	fixup.o heap.o log.o log_parse.o string_cache.o utils.o

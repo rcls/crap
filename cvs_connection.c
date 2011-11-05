@@ -4,8 +4,10 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <netdb.h>
+#include <pipeline.h>
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -122,7 +124,8 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
         fatal ("Could not look-up server %s:%s: %s\n",
                host, port, gai_strerror (r));
 
-    conn->socket = socket (ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+    conn->socket = socket (ai->ai_family,
+                           ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol);
     if (conn->socket == -1)
         fatal ("Count not create socket for server %s:%s: %s\n",
                host, port, strerror (errno));
@@ -150,41 +153,41 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
 }
 
 
-static int connect_to_program (const char * program, const char * const argv[])
+static void connect_to_program (cvs_connection_t * restrict conn,
+                                const char * name, ...) PIPELINE_ATTR_SENTINEL;
+static void connect_to_program (cvs_connection_t * restrict conn,
+                                const char * name, ...)
 {
     int sockets[2];
-    if (socketpair (AF_UNIX, SOCK_STREAM, 0, sockets) != 0)
+    if (socketpair (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets) != 0)
         fatal ("socketpair failed: %s\n", strerror (errno));
 
-    int pid = fork();
-    if (pid < 0)
-        fatal ("fork() failed: %s\n", strerror (errno));
+    // libpipeline doesn't cope with an FD being used twice.  So dup it.
+    int sdup = open("/dev/null", O_RDONLY|O_CLOEXEC);
+    if (sdup < 0)
+        fatal ("open /dev/null failed: %s\n", strerror (errno));
+    if (dup3(sockets[1], sdup, O_CLOEXEC) < 0)
+        fatal ("dup3 failed: %s\n", strerror (errno));
 
-    if (pid != 0) {
-        // The parent
-        close (sockets[1]);
-        return sockets[0];
-    }
+    va_list argv;
+    va_start (argv, name);
+    conn->pipeline = pipeline_new_command_argv (name, argv);
+    va_end (argv);
+    pipeline_ignore_signals (conn->pipeline, false);
+    pipeline_want_in (conn->pipeline, sockets[1]);
+    pipeline_want_out (conn->pipeline, sdup);
+    pipeline_dump (conn->pipeline, stderr);
+    pipeline_start (conn->pipeline);
+    pipeline_dump (conn->pipeline, stderr);
 
-    // The child.
-    close (sockets[0]);
-    if (dup2 (sockets[1], 0) < 0)
-        fatal ("dup2 failed: %s\n", strerror (errno));
-    if (dup2 (sockets[1], 1) < 0)
-        fatal ("dup2 failed: %s\n", strerror (errno));
-    if (sockets[1] > 1)
-        close (sockets[1]);
-
-    execvp (program, (char * const *) argv);
-    fatal ("exec failed: %s\n", strerror (errno));
+    conn->socket = sockets[0];
 }
 
 
 static void connect_to_fork (cvs_connection_t * conn, const char * path)
 {
-    static const char * const argv[] = { "cvs", "server", NULL };
     conn->remote_root = path;
-    conn->socket = connect_to_program ("cvs", argv);
+    connect_to_program (conn, "cvs", "server", NULL);
 }
 
 
@@ -202,8 +205,7 @@ void connect_to_ext (cvs_connection_t * conn,
         fatal ("Root '%s' has no remote root.\n", root);
     const char * host = strndup (path, conn->remote_root - path);
     ++conn->remote_root;
-    const char * const argv[] = { program, host, "cvs", "server", NULL };
-    conn->socket = connect_to_program (program, argv);
+    connect_to_program (conn, program, host, "cvs", "server", NULL);
     xfree (host);
 }
 
@@ -221,8 +223,7 @@ static void connect_to_fake (cvs_connection_t * conn, const char * root)
     conn->remote_root = colon2 + 1;
     program = strndup (program, colon1 - program);
     const char * argument = strndup (colon1 + 1, colon2 - colon1 - 1);
-    const char * const argv[] = { program, argument, NULL };
-    conn->socket = connect_to_program (program, argv);
+    connect_to_program (conn, program, argument, NULL);
     xfree (program);
     xfree (argument);
 }
@@ -234,6 +235,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
     conn->count_transactions = 0;
     conn->log_in = NULL;
     conn->log_out = NULL;
+    conn->pipeline = NULL;
     conn->compress = false;
 
     const char * client_log = getenv ("CVS_CLIENT_LOG");
@@ -506,6 +508,7 @@ void cvs_connection_destroy (cvs_connection_t * s)
         fclose (s->log_in);
     if (s->log_out)
         fclose (s->log_out);
+    pipeline_free (s->pipeline);
 
     if (s->compress) {
         deflateEnd (&s->deflater);

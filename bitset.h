@@ -3,19 +3,19 @@
 
 #include "utils.h"
 
-// A bitset that maintains a number of set bits.
+#include <limits.h>
+
+/// A bitset that maintains a number of set bits.
 typedef struct bitset {
     unsigned long * bits;
     size_t count;
 } bitset_t;
 
 
-#define ULONG_BITS (sizeof (unsigned long) * 8)
-
 static inline void bitset_init (bitset_t * bs, size_t size)
 {
     bs->bits = ARRAY_CALLOC (unsigned long,
-                             (size + ULONG_BITS - 1) / ULONG_BITS);
+                             (size + LONG_BIT - 1) / LONG_BIT);
     bs->count = 0;
 }
 
@@ -28,9 +28,9 @@ static inline void bitset_destroy (bitset_t * bs)
 
 static inline void bitset_set (bitset_t * bs, size_t bit)
 {
-    unsigned long * word = bs->bits + bit / ULONG_BITS;
+    unsigned long * word = bs->bits + bit / LONG_BIT;
     unsigned long old = *word;
-    *word |= 1ul << bit % ULONG_BITS;
+    *word |= 1ul << bit % LONG_BIT;
     if (old != *word)
         ++bs->count;
 }
@@ -38,9 +38,9 @@ static inline void bitset_set (bitset_t * bs, size_t bit)
 
 static inline void bitset_reset (bitset_t * bs, size_t bit)
 {
-    unsigned long * word = bs->bits + bit / ULONG_BITS;
+    unsigned long * word = bs->bits + bit / LONG_BIT;
     unsigned long old = *word;
-    *word &= ~(1ul << bit % ULONG_BITS);
+    *word &= ~(1ul << bit % LONG_BIT);
     if (old != *word)
         --bs->count;
 }
