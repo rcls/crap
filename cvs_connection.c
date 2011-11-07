@@ -124,15 +124,12 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
         fatal ("Could not look-up server %s:%s: %s\n",
                host, port, gai_strerror (r));
 
-    conn->socket = socket (ai->ai_family,
-                           ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol);
-    if (conn->socket == -1)
-        fatal ("Count not create socket for server %s:%s: %s\n",
-               host, port, strerror (errno));
+    conn->socket = check (
+        socket (ai->ai_family, ai->ai_socktype | SOCK_CLOEXEC, ai->ai_protocol),
+        "socket for server %s:%s", host, port);
 
-    if (connect (conn->socket, ai->ai_addr, ai->ai_addrlen) < 0)
-        fatal ("Count not connect to server %s:%s: %s\n",
-               host, port, strerror (errno));
+    check (connect (conn->socket, ai->ai_addr, ai->ai_addrlen),
+           "Connect to server %s:%s", host, port);
 
     xfree (host);
     xfree (port);
@@ -159,15 +156,12 @@ static void connect_to_program (cvs_connection_t * restrict conn,
                                 const char * name, ...)
 {
     int sockets[2];
-    if (socketpair (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets) != 0)
-        fatal ("socketpair failed: %s\n", strerror (errno));
+    check (socketpair (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets),
+           "socketpair failed");
 
     // libpipeline doesn't cope with an FD being used twice.  So dup it.
-    int sdup = open("/dev/null", O_RDONLY|O_CLOEXEC);
-    if (sdup < 0)
-        fatal ("open /dev/null failed: %s\n", strerror (errno));
-    if (dup3(sockets[1], sdup, O_CLOEXEC) < 0)
-        fatal ("dup3 failed: %s\n", strerror (errno));
+    int sdup = check(open("/dev/null", O_RDONLY|O_CLOEXEC), "open /dev/null");
+    check(dup3(sockets[1], sdup, O_CLOEXEC), "dup3");
 
     va_list argv;
     va_start (argv, name);
@@ -176,9 +170,7 @@ static void connect_to_program (cvs_connection_t * restrict conn,
     pipeline_ignore_signals (conn->pipeline, false);
     pipeline_want_in (conn->pipeline, sockets[1]);
     pipeline_want_out (conn->pipeline, sdup);
-    pipeline_dump (conn->pipeline, stderr);
     pipeline_start (conn->pipeline);
-    pipeline_dump (conn->pipeline, stderr);
 
     conn->socket = sockets[0];
 }
@@ -305,13 +297,10 @@ static const char * file_error (FILE * f)
 
 static size_t checked_read (cvs_connection_t * s, void * buf, size_t count)
 {
-    size_t r = read (s->socket, buf, count);
-    if (r > 0)
-        return r;
+    size_t r = check(read (s->socket, buf, count), "Reading from CVS server");
     if (r == 0)
         fatal ("Unexpected EOF from CVS server.\n");
-
-    fatal ("Error reading from CVS server: %s\n", strerror (errno));
+    return r;
 }
 
 
@@ -392,15 +381,12 @@ static void do_write (cvs_connection_t * s,
                       const unsigned char * data, size_t length)
 {
     while (length) {
-        ssize_t r = write (s->socket, data, length);
-        if (r > 0) {
-            data += r;
-            length -= r;
-        }
-        else if (r == 0)
+        ssize_t r = check(write (s->socket, data, length),
+                          "Write to CVS server");
+        if (r == 0)
             fatal ("Huh?  Write to CVS returns 0\n");
-        else
-            fatal ("Write to CVS server failed: %s\n", strerror (errno));
+        data += r;
+        length -= r;
     }
 }
 
@@ -468,9 +454,7 @@ static void cvs_do_printf (cvs_connection_t * s, int flush,
 
     // FIXME - this takes an extra copy of the data.
     char * string;
-    int len = vasprintf (&string, format, args);
-    if (len < 0)
-        fatal ("Failed to format a string; %s\n", strerror (errno));
+    int len = check(vasprintf (&string, format, args), "Formatting string");
 
     cvs_send (s, (const unsigned char *) string, len, flush);
     free (string);
@@ -508,7 +492,14 @@ void cvs_connection_destroy (cvs_connection_t * s)
         fclose (s->log_in);
     if (s->log_out)
         fclose (s->log_out);
-    pipeline_free (s->pipeline);
+
+    if (s->pipeline != NULL) {
+        int code = pipeline_wait (s->pipeline);
+        if (code != 0)
+            fatal ("CVS connection exit status is non-zero: %i\n", code);
+
+        pipeline_free (s->pipeline);
+    }
 
     if (s->compress) {
         deflateEnd (&s->deflater);

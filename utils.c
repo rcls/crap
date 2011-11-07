@@ -1,10 +1,8 @@
 #include "log.h"
 #include "utils.h"
 
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 void * xmalloc (size_t size)
 {
@@ -59,8 +57,7 @@ char * xasprintf (const char * format, ...)
     va_start (args, format);
 
     char * result;
-    if (vasprintf (&result, format, args) < 0)
-        fatal ("Failed to format a string: %s\n", strerror (errno));
+    check (vasprintf (&result, format, args), "Formatting a string");
 
     va_end (args);
 

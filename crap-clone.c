@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <limits.h>
+#include <pipeline.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,7 +27,7 @@ static long mark_counter;
 #define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
 #define TIME_MAX (sizeof(time_t) == sizeof(int) ? INT_MAX : LONG_MAX)
 
-static void print_fixups(const database_t * db,
+static void print_fixups(FILE * out, const database_t * db,
                          version_t ** base_versions,
                          tag_t * tag, const changeset_t * cs,
                          cvs_connection_t * s);
@@ -47,7 +48,8 @@ static const char * format_date (const time_t * time)
 }
 
 
-static void read_version (const database_t * db, cvs_connection_t * s)
+static void read_version (FILE * out,
+                          const database_t * db, cvs_connection_t * s)
 {
     if (starts_with (s->line, "Removed ")) {
         // Removed line; we got the date a bit silly, just ignore it.
@@ -125,20 +127,18 @@ static void read_version (const database_t * db, cvs_connection_t * s)
         fatal ("cvs checkout %s %s - got unexpected file length '%s'\n",
                version->version, version->file->path, s->line);
 
-    FILE * out = version->mark == SIZE_MAX ? stdout : NULL;
-    if (out) {
+    if (version->mark == SIZE_MAX) {
         version->mark = ++mark_counter;
-        printf ("blob\nmark :%zu\ndata %lu\n", version->mark, len);
+        fprintf (out, "blob\nmark :%zu\ndata %lu\n", version->mark, len);
+        cvs_read_block (s, out, len);
+        fprintf (out, "\n");
     }
-    else
+    else {
         warning ("cvs checkout %s %s - version is duplicate\n", path, vers);
-
-    cvs_read_block (s, out, len);
+        cvs_read_block (s, NULL, len);
+    }
 
     ++s->count_versions;
-
-    if (out)
-        printf ("\n");
 
     xfree (d);
     xfree (path);
@@ -146,7 +146,8 @@ static void read_version (const database_t * db, cvs_connection_t * s)
 }
 
 
-static void read_versions (const database_t * db, cvs_connection_t * s)
+static void read_versions (FILE * out,
+                           const database_t * db, cvs_connection_t * s)
 {
     ++s->count_transactions;
     while (1) {
@@ -157,12 +158,12 @@ static void read_versions (const database_t * db, cvs_connection_t * s)
         if (strcmp (s->line, "ok") == 0)
             return;
 
-        read_version (db, s);
+        read_version (out, db, s);
     }
 }
 
 
-static void grab_version (const database_t * db,
+static void grab_version (FILE * out, const database_t * db,
                           cvs_connection_t * s, version_t * version)
 {
     if (version == NULL || version->mark != SIZE_MAX)
@@ -189,7 +190,7 @@ static void grab_version (const database_t * db,
                  "Argument %s\nupdate\n",
                  version->version, version->file->path);
 
-    read_versions (db, s);
+    read_versions (out, db, s);
 
     if (version->mark == SIZE_MAX)
         fatal ("cvs checkout - failed to get %s %s\n",
@@ -197,7 +198,8 @@ static void grab_version (const database_t * db,
 }
 
 
-static void grab_by_option (const database_t * db,
+static void grab_by_option (FILE * out,
+                            const database_t * db,
                             cvs_connection_t * s,
                             const char * r_arg,
                             const char * D_arg,
@@ -258,11 +260,11 @@ static void grab_by_option (const database_t * db,
 
     cvs_printff (s, "update\n");
 
-    read_versions (db, s);
+    read_versions (out, db, s);
 }
 
 
-static void grab_versions (const database_t * db,
+static void grab_versions (FILE * out, const database_t * db,
                            cvs_connection_t * s,
                            version_t ** fetch, version_t ** fetch_end)
 {
@@ -270,7 +272,7 @@ static void grab_versions (const database_t * db,
         return;
 
     if (fetch_end == fetch + 1) {
-        grab_version (db, s, *fetch);
+        grab_version (out, db, s, *fetch);
         return;
     }
 
@@ -281,7 +283,7 @@ static void grab_versions (const database_t * db,
             break;
         }
     if (idver) {
-        grab_by_option (db, s,
+        grab_by_option (out, db, s,
                         fetch[0]->version, NULL,
                         fetch, fetch_end);
         return;
@@ -303,7 +305,7 @@ static void grab_versions (const database_t * db,
         if (strftime (date, 64, "%d %b %Y %H:%M:%S -0000", &tm) == 0)
             fatal ("strftime failed\n");
 
-        grab_by_option (db, s,
+        grab_by_option (out, db, s,
                         fetch[0]->branch->tag[0] ? fetch[0]->branch->tag : NULL,
                         format_date (&dmax),
                         fetch, fetch_end);
@@ -316,17 +318,17 @@ static void grab_versions (const database_t * db,
 
     for (version_t ** i = fetch; i != fetch_end; ++i)
         if ((*i)->mark == SIZE_MAX)
-            grab_version (db, s, *i);
+            grab_version (out, db, s, *i);
 }
 
 
-static void print_commit (const database_t * db, changeset_t * cs,
+static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
                           cvs_connection_t * s)
 {
     version_t * v = cs->versions[0];
 
     // Before doing the commit proper, output any branch-fixups that need doing.
-    print_fixups (db, v->branch->branch_versions, v->branch, cs, s);
+    print_fixups (out, db, v->branch->branch_versions, v->branch, cs, s);
 
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
@@ -356,25 +358,26 @@ static void print_commit (const database_t * db, changeset_t * cs,
     fprintf (stderr, "%s COMMIT", format_date (&cs->time));
 
     // Get the versions.
-    grab_versions (db, s, fetch, fetch_end);
+    grab_versions (out, db, s, fetch, fetch_end);
     xfree (fetch);
 
     v->branch->last = cs;
     cs->mark = ++mark_counter;
 
-    printf ("commit refs/heads/%s\n",
-            *v->branch->tag ? v->branch->tag : "cvs_master");
-    printf ("mark :%lu\n", cs->mark);
-    printf ("committer %s <%s> %ld +0000\n", v->author, v->author, cs->time);
-    printf ("data %zu\n%s\n", strlen (v->log), v->log);
+    fprintf (out, "commit refs/heads/%s\n",
+             *v->branch->tag ? v->branch->tag : "cvs_master");
+    fprintf (out, "mark :%lu\n", cs->mark);
+    fprintf (out, "committer %s <%s> %ld +0000\n",
+             v->author, v->author, cs->time);
+    fprintf (out, "data %zu\n%s\n", strlen (v->log), v->log);
 
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
         if ((*i)->used) {
             version_t * vv = version_normalise (*i);
             if (vv->dead)
-                printf ("D %s\n", vv->file->path);
+                fprintf (out, "D %s\n", vv->file->path);
             else
-                printf ("M %s :%zu %s\n",
+                fprintf (out, "M %s :%zu %s\n",
                         vv->exec ? "755" : "644", vv->mark, vv->file->path);
         }
 
@@ -382,7 +385,7 @@ static void print_commit (const database_t * db, changeset_t * cs,
 }
 
 
-static void print_tag (const database_t * db, tag_t * tag,
+static void print_tag (FILE * out, const database_t * db, tag_t * tag,
                        cvs_connection_t * s)
 {
     fprintf (stderr, "%s %s %s\n",
@@ -400,9 +403,9 @@ static void print_tag (const database_t * db, tag_t * tag,
 
     assert (tag->parent == NULL || (branch && branch->last == tag->parent));
 
-    printf ("reset refs/%s/%s\n",
-            tag->branch_versions ? "heads" : "tags",
-            *tag->tag ? tag->tag : "cvs_master");
+    fprintf (out, "reset refs/%s/%s\n",
+             tag->branch_versions ? "heads" : "tags",
+             *tag->tag ? tag->tag : "cvs_master");
 
     if (tag->parent)
         tag->changeset.mark = tag->parent->mark;
@@ -410,7 +413,7 @@ static void print_tag (const database_t * db, tag_t * tag,
         tag->changeset.mark = 0;
 
     if (tag->changeset.mark != 0)
-        printf ("from :%lu\n\n", tag->changeset.mark);
+        fprintf (out, "from :%lu\n\n", tag->changeset.mark);
 
     tag->last = &tag->changeset;
 
@@ -430,14 +433,14 @@ static void print_tag (const database_t * db, tag_t * tag,
 
     if (tag->branch_versions == NULL)
         // For a tag, just force out all the fixups immediately.
-        print_fixups (db, branch ? branch->branch_versions : NULL,
+        print_fixups (out, db, branch ? branch->branch_versions : NULL,
                       tag, NULL, s);
 }
 
 
 /// Output the fixups that must be done before the given time.  If none, then no
 /// commit is created.
-void print_fixups (const database_t * db,
+void print_fixups (FILE * out, const database_t * db,
                    version_t ** base_versions,
                    tag_t * tag, const changeset_t * cs,
                    cvs_connection_t * s)
@@ -459,24 +462,23 @@ void print_fixups (const database_t * db,
 
     // FIXME - grab_versions assumes that all versions are on the same branch!
     // We should pass in the tag rather than guessing it!
-    grab_versions (db, s, fetch, fetch_end);
+    grab_versions (out, db, s, fetch, fetch_end);
     xfree (fetch);
 
     tag->fixup = true;
     tag->changeset.mark = ++mark_counter;
 
-    printf ("commit refs/%s/%s\n",
-            tag->branch_versions ? "heads" : "tags",
-            *tag->tag ? tag->tag : "cvs_master");
-    printf ("mark :%lu\n", tag->changeset.mark);
+    fprintf (out, "commit refs/%s/%s\n",
+             tag->branch_versions ? "heads" : "tags",
+             *tag->tag ? tag->tag : "cvs_master");
+    fprintf (out, "mark :%lu\n", tag->changeset.mark);
 
-    printf ("committer crap <crap> %ld +0000\n",
-            tag->branch_versions && tag->last
-            ? tag->last->time : tag->changeset.time);
+    fprintf (out, "committer crap <crap> %ld +0000\n",
+             tag->branch_versions && tag->last
+             ? tag->last->time : tag->changeset.time);
     const char * comment = fixup_commit_comment (
         db, base_versions, tag, fixups, fixups_end);
-    printf ("data %zu\n", strlen (comment));
-    fputs (comment, stdout);
+    fprintf (out, "data %zu\n%s", strlen (comment), comment);
     xfree (comment);
 
     for (fixup_ver_t * ffv = fixups; ffv != fixups_end; ++ffv) {
@@ -487,10 +489,10 @@ void print_fixups (const database_t * db,
         assert (tv != bv);
         if (tv != bv) {
             if (tv == NULL)
-                printf ("D %s\n", bv->file->path);
+                fprintf (out, "D %s\n", bv->file->path);
             else
-                printf ("M %s :%zu %s\n",
-                        tv->exec ? "755" : "644", tv->mark, tv->file->path);
+                fprintf (out, "M %s :%zu %s\n",
+                         tv->exec ? "755" : "644", tv->mark, tv->file->path);
         }
 
         if (tag->branch_versions)
@@ -506,28 +508,34 @@ static void usage (const char * prog, FILE * stream, int code)
 static void usage (const char * prog, FILE * stream, int code)
 {
     fprintf (stream,
-             "Usage: %s [-z <0--9>] <root> <repo>\n", prog);
+             "Usage: %s [-z <0--9>] [-o <PATH>] <ROOT> <REPO>\n", prog);
     exit (code);
 }
 
 static struct option opts[] = {
     { "compress", required_argument, NULL, 'z' },
     { "help", required_argument, NULL, 'h' },
+    { "output", required_argument, NULL, 'o' },
     { NULL, 0, NULL, 0 }
 };
 
 
 static unsigned long zlevel = 0;
+static const char * output_path = "|git fast-import";
+
 
 void process_opts (int argc, char * const argv[])
 {
     int longindex;
     while (1)
-        switch (getopt_long (argc, argv, "hz:", opts, &longindex)) {
+        switch (getopt_long (argc, argv, "hz:o:", opts, &longindex)) {
         case 'z':
             zlevel = strtoul (optarg, NULL, 10);
             if (zlevel > 9)
                 usage (argv[0], stderr, EXIT_FAILURE);
+            break;
+        case 'o':
+            output_path = optarg;
             break;
         case 'h':
             usage (argv[0], stdout, EXIT_SUCCESS);
@@ -558,6 +566,22 @@ int main (int argc, char * const argv[])
     process_opts (argc, argv);
     if (argc != optind + 2)
         usage (argv[0], stderr, EXIT_FAILURE);
+
+    // Start the output.
+    pipeline * pipeline = NULL;
+    FILE * out;
+    if (output_path[0] == '|') {
+        pipeline = pipeline_new();
+        pipeline_command_argstr(pipeline, output_path + 1);
+        pipeline_want_in(pipeline, -1);
+        pipeline_start(pipeline);
+        out = pipeline_get_infile(pipeline);
+    }
+    else {
+        out = fopen(output_path, "w");
+        if (out == NULL)
+            fatal("open %s failed: %s\n", output_path, strerror(errno));
+    }
 
     cvs_connection_t stream;
     connect_to_cvs (&stream, argv[optind]);
@@ -615,13 +639,13 @@ int main (int argc, char * const argv[])
     while ((changeset = next_changeset (&db))) {
         if (changeset->type == ct_commit) {
             ++emitted_commits;
-            print_commit (&db, changeset, &stream);
+            print_commit (out, &db, changeset, &stream);
             changeset_update_branch_versions (&db, changeset);
         }
         else {
             tag_t * tag = as_tag (changeset);
             tag->is_released = true;
-            print_tag (&db, tag, &stream);
+            print_tag (out, &db, tag, &stream);
         }
 
         changeset_emitted (&db, NULL, changeset);
@@ -630,7 +654,7 @@ int main (int argc, char * const argv[])
     // Final fixups.
     for (tag_t * i = db.tags; i != db.tags_end; ++i)
         if (i->branch_versions)
-            print_fixups (&db, i->branch_versions, i, NULL, &stream);
+            print_fixups (out, &db, i->branch_versions, i, NULL, &stream);
 
     fflush (NULL);
     fprintf (stderr,
@@ -669,7 +693,19 @@ int main (int argc, char * const argv[])
 
     string_cache_stats (stderr);
 
-    printf ("progress done\n");
+    fprintf (out, "progress done\n");
+    fflush(out);
+    if (ferror(out))
+        fatal("Writing output failed.\n");
+    if (pipeline != NULL) {
+        int status = pipeline_wait(pipeline);
+        if (status != 0)
+            fatal("Import command exited with %i.\n", status);
+        pipeline_free(pipeline);
+    }
+    else {
+        fclose (out);
+    }
 
     cvs_connection_destroy (&stream);
 
