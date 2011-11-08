@@ -21,6 +21,18 @@
 #include <stdlib.h>
 #include <time.h>
 
+static struct option opts[] = {
+    { "compress", required_argument, NULL, 'z' },
+    { "help", required_argument, NULL, 'h' },
+    { "output", required_argument, NULL, 'o' },
+    { "entries", required_argument, NULL, 'e' },
+    { NULL, 0, NULL, 0 }
+};
+
+static unsigned long zlevel = 0;
+static const char * output_path = "|git fast-import";
+static const char * entries_name = NULL;
+
 static long mark_counter;
 
 // FIXME - assumes signed time_t!
@@ -322,37 +334,92 @@ static void grab_versions (FILE * out, const database_t * db,
 }
 
 
+static bool same_directory (const char * A, const char * B)
+{
+    const char * sA = strrchr(A, '/');
+    const char * sB = strrchr(B, '/');
+    if (sA == NULL)
+        return sB == NULL;
+    return sB != NULL  &&  sA - A == sB - B  &&  memcmp (A, B, sA - A) == 0;
+}
+
+
+static int path_dirlen (const char * p)
+{
+    const char * s = strrchr(p, '/');
+    if (s == NULL)
+        return 0;
+    else
+        return s - p + 1;
+}
+
+
+static const char * path_filename (const char * p)
+{
+    const char * s = strrchr(p, '/');
+    if (s == NULL)
+        return p;
+    else
+        return s + 1;
+}
+
+
+static const char * output_entries_list (FILE * out,
+                                         const database_t * db,
+                                         const version_t * v,
+                                         const char * last_path)
+{
+    if (entries_name == NULL || *entries_name == 0)
+        return last_path;
+
+    if (last_path != NULL && same_directory (last_path, v->file->path))
+        return last_path;
+
+    last_path = v->file->path;
+    // FIXME - slow!!!
+    bool directory_is_live = false;
+    for (const file_t * f = db->files; f != db->files_end; ++f)
+        if (same_directory (f->path, last_path)
+            && version_live (v->branch->branch_versions[f - db->files])) {
+            directory_is_live = true;
+            break;
+        }
+    if (!directory_is_live) {
+        fprintf (out, "D %.*s%s\n",
+                 path_dirlen (last_path), last_path, entries_name);
+        return last_path;
+    }
+    fprintf (out, "M 644 inline %.*s%s\n",
+             path_dirlen (last_path), last_path, entries_name);
+    fprintf (out, "data <<EOF\n");
+    for (const file_t * f = db->files; f != db->files_end; ++f)
+        if (same_directory (f->path, last_path)
+            && version_live (v->branch->branch_versions[f - db->files]))
+            fprintf (
+                out, "%s %s\n",
+                v->branch->branch_versions[f - db->files]->version,
+                path_filename(f->path));
+    fprintf (out, "EOF\n");
+    return last_path;
+}
+
+
 static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
                           cvs_connection_t * s)
 {
     version_t * v = cs->versions[0];
 
-    // Before doing the commit proper, output any branch-fixups that need doing.
-    print_fixups (out, db, v->branch->branch_versions, v->branch, cs, s);
-
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
 
-    // Check to see if this commit actually does anything...
-    bool nil = true;
+    // Get the list of versions to fetch.
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i) {
         if (!(*i)->used)
             continue;
 
         version_t * cv = version_live (*i);
-        if (cv == version_live (
-                v->branch->branch_versions[(*i)->file - db->files]))
-            continue;
-
-        nil = false;
         if (cv != NULL && cv->mark == SIZE_MAX)
             ARRAY_APPEND (fetch, cv);
-    }
-
-    if (nil) {
-        cs->mark = v->branch->last->mark;
-        v->branch->last = cs;
-        return;
     }
 
     fprintf (stderr, "%s COMMIT", format_date (&cs->time));
@@ -371,6 +438,7 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
              v->author, v->author, cs->time);
     fprintf (out, "data %zu\n%s\n", strlen (v->log), v->log);
 
+    const char * last_path = NULL;
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
         if ((*i)->used) {
             version_t * vv = version_normalise (*i);
@@ -378,7 +446,8 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
                 fprintf (out, "D %s\n", vv->file->path);
             else
                 fprintf (out, "M %s :%zu %s\n",
-                        vv->exec ? "755" : "644", vv->mark, vv->file->path);
+                         vv->exec ? "755" : "644", vv->mark, vv->file->path);
+            last_path = output_entries_list (out, db, vv, last_path);
         }
 
     fprintf (stderr, "\n");
@@ -512,30 +581,22 @@ static void usage (const char * prog, FILE * stream, int code)
     exit (code);
 }
 
-static struct option opts[] = {
-    { "compress", required_argument, NULL, 'z' },
-    { "help", required_argument, NULL, 'h' },
-    { "output", required_argument, NULL, 'o' },
-    { NULL, 0, NULL, 0 }
-};
-
-
-static unsigned long zlevel = 0;
-static const char * output_path = "|git fast-import";
-
 
 void process_opts (int argc, char * const argv[])
 {
     int longindex;
     while (1)
-        switch (getopt_long (argc, argv, "hz:o:", opts, &longindex)) {
+        switch (getopt_long (argc, argv, "e:hz:o:", opts, &longindex)) {
+        case 'e':
+            entries_name = optarg;
+            break;
+        case 'o':
+            output_path = optarg;
+            break;
         case 'z':
             zlevel = strtoul (optarg, NULL, 10);
             if (zlevel > 9)
                 usage (argv[0], stderr, EXIT_FAILURE);
-            break;
-        case 'o':
-            output_path = optarg;
             break;
         case 'h':
             usage (argv[0], stdout, EXIT_SUCCESS);
@@ -567,7 +628,7 @@ int main (int argc, char * const argv[])
     if (argc != optind + 2)
         usage (argv[0], stderr, EXIT_FAILURE);
 
-    // Start the output.
+    // Start the output to git-fast-import.
     pipeline * pipeline = NULL;
     FILE * out;
     if (output_path[0] == '|') {
@@ -582,6 +643,8 @@ int main (int argc, char * const argv[])
         if (out == NULL)
             fatal("open %s failed: %s\n", output_path, strerror(errno));
     }
+
+    fprintf(out, "feature done\n");
 
     cvs_connection_t stream;
     connect_to_cvs (&stream, argv[optind]);
@@ -639,8 +702,18 @@ int main (int argc, char * const argv[])
     while ((changeset = next_changeset (&db))) {
         if (changeset->type == ct_commit) {
             ++emitted_commits;
-            print_commit (out, &db, changeset, &stream);
-            changeset_update_branch_versions (&db, changeset);
+
+            // Before doing the commit proper, output any branch-fixups that
+            // need doing.
+            version_t * v = changeset->versions[0];
+            print_fixups (out, &db, v->branch->branch_versions, v->branch,
+                          changeset, &stream);
+            if (changeset_update_branch_versions (&db, changeset) != 0)
+                print_commit (out, &db, changeset, &stream);
+            else {
+                changeset->mark = v->branch->last->mark;
+                v->branch->last = changeset;
+            }
         }
         else {
             tag_t * tag = as_tag (changeset);
@@ -693,7 +766,7 @@ int main (int argc, char * const argv[])
 
     string_cache_stats (stderr);
 
-    fprintf (out, "progress done\n");
+    fprintf (out, "done\n");
     fflush(out);
     if (ferror(out))
         fatal("Writing output failed.\n");
