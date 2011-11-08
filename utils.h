@@ -30,6 +30,10 @@ char * xstrdup (const char * s)
 char * xasprintf (const char * format, ...)
     __attribute__ ((malloc, warn_unused_result, format (printf, 1, 2)));
 
+/// Directory-aware string compare; this puts all paths in the same directory
+/// together.
+int compare_paths (const char * A, const char * B);
+
 /// Binary search for the string @c needle in an @c array of @c count items of
 /// @c size bytes each, with a string pointer at offset @c position.
 void * find_string (const void * array, size_t count, size_t size,

@@ -116,6 +116,22 @@ changeset_t * database_new_changeset (database_t * db)
 
 file_t * database_find_file (const database_t * db, const char * path)
 {
-    return find_string (db->files, db->files_end - db->files,
-                        sizeof (file_t), offsetof (file_t, path), path);
+    // We maintain the invariants:  All items below index low are before path.
+    // All items at or above index high are after path.  If path is present,
+    // then its index is between low (inclusive) and high (exclusive).
+    ssize_t low = 0;
+    ssize_t high = db->files_end - db->files;
+
+    while (high > low) {
+        ssize_t mid = (low + high) >> 1;
+        int c = compare_paths (db->files[mid].path, path);
+        if (c == 0)
+            return db->files + mid;
+        if (c < 0)
+            low = mid + 1;
+        else
+            high = mid;
+    }
+
+    return NULL;
 }

@@ -65,6 +65,19 @@ char * xasprintf (const char * format, ...)
 }
 
 
+int compare_paths (const char * A, const char * B)
+{
+    for (; *A && *A == *B; ++A, ++B);
+    if (*A == *B)
+        return 0;                       // Equal.
+    if (*A == '/')
+        return -1;
+    if (*B == '/')
+        return 1;
+    return *A < *B ? -1 : 1;
+}
+
+
 void * find_string (const void * array, size_t count, size_t size,
                     size_t position, const char * needle)
 {

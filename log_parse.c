@@ -757,16 +757,8 @@ static void read_file_versions (database_t * db,
 // Compare paths; we are careful to put files in the same directory together.
 static int compare_file (const void * AA, const void * BB)
 {
-    const char * A = ((const file_t *) AA)->path;
-    const char * B = ((const file_t *) BB)->path;
-    for (; *A && *A == *B; ++A, ++B);
-    if (*A == *B)
-        return 0;                       // Equal.
-    if (*A == '/')
-        return -1;
-    if (*B == '/')
-        return 1;
-    return *A < *B ? -1 : 1;
+    return compare_paths (
+        ((const file_t *) AA)->path, ((const file_t *) BB)->path);
 }
 
 
