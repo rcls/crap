@@ -376,14 +376,22 @@ static const char * output_entries_list (FILE * out,
     if (last_path != NULL && same_directory (last_path, f->path))
         return last_path;
 
-    // FIXME - slow!!!
+    // Find the range of files in the same directory.
     bool directory_is_live = false;
-    for (const file_t * f = db->files; f != db->files_end; ++f)
-        if (same_directory (f->path, f->path)
-            && version_live (vv[f - db->files])) {
-            directory_is_live = true;
-            break;
-        }
+    const file_t * start = f;
+    while (start != db->files && same_directory(start[-1].path, f->path)) {
+        --start;
+        directory_is_live = directory_is_live
+            || version_live (vv[start - db->files]);
+    }
+    const file_t * end = f;
+    do {
+        directory_is_live = directory_is_live
+            || version_live (vv[end - db->files]);
+        ++end;
+    }
+    while (end != db->files_end && same_directory(end->path, f->path));
+
     if (!directory_is_live) {
         fprintf (out, "D %.*s%s\n",
                  path_dirlen (f->path), f->path, entries_name);
@@ -392,13 +400,10 @@ static const char * output_entries_list (FILE * out,
     fprintf (out, "M 644 inline %.*s%s\n",
              path_dirlen (f->path), f->path, entries_name);
     fprintf (out, "data <<EOF\n");
-    for (const file_t * f = db->files; f != db->files_end; ++f)
-        if (same_directory (f->path, f->path)
-            && version_live (vv[f - db->files]))
-            fprintf (
-                out, "%s %s\n",
-                vv[f - db->files]->version,
-                path_filename(f->path));
+    for (const file_t * f = start; f != end; ++f)
+        if (version_live (vv[f - db->files]))
+            fprintf (out, "%s %s\n",
+                     vv[f - db->files]->version, path_filename(f->path));
     fprintf (out, "EOF\n");
     return f->path;
 }
@@ -585,7 +590,7 @@ void print_fixups (FILE * out, const database_t * db,
             fprintf (out, "D %s\n", ffv->file->path);
         else
             fprintf (out, "M %s :%zu %s\n",
-                     tv->exec ? "755" : "644", tv->mark, ffv->file->path);
+                     tv->exec ? "755" : "644", tv->mark, tv->file->path);
 
         last_path = output_entries_list (
             out, db, updated_versions, ffv->file, last_path);
