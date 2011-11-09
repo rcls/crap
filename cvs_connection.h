@@ -26,8 +26,7 @@ typedef struct cvs_connection {
     unsigned long count_versions;
     unsigned long count_transactions;
 
-    FILE * log_in;                      ///< Log of data to cvs server.
-    FILE * log_out;                     ///< Log of data from cvs server.
+    FILE * log;                         ///< Log of comms with cvs server.
 
     struct pipeline * pipeline;
 

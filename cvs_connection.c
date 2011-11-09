@@ -225,23 +225,13 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 {
     conn->count_versions = 0;
     conn->count_transactions = 0;
-    conn->log_in = NULL;
-    conn->log_out = NULL;
+    conn->log = NULL;
     conn->pipeline = NULL;
     conn->compress = false;
 
     const char * client_log = getenv ("CVS_CLIENT_LOG");
-    if (client_log) {
-//        client_log += strlen ("CVS_CLIENT_LOG=");
-        char path[strlen (client_log) + 5];
-        strcpy (path, client_log);
-        strcat (path, ".in");
-        conn->log_in = fopen (path, "w");
-
-        strcpy (path, client_log);
-        strcat (path, ".out");
-        conn->log_out = fopen (path, "w");
-    }
+    if (client_log)
+        conn->log = fopen (client_log, "w");
 
     conn->in_next = conn->in;
     conn->in_end = conn->in;
@@ -365,11 +355,11 @@ size_t next_line (cvs_connection_t * s)
 {
     while (1) {
         ssize_t len = next_line_raw (s);
-        if (s->log_out)
-            fprintf (s->log_out, "%s\n", s->line);
+        if (s->log)
+            fprintf (s->log, " %s\n", s->line);
         if (s->line[0] == 'E' && s->line[1] == ' ')
             fprintf (stderr, "cvs: %s\n", s->line + 2);
-        else if (s->line[0] == 'F' && s->line[2] == 0)
+        else if (s->line[0] == 'F' && s->line[1] == 0)
             fflush (stderr);
         else
             return len;
@@ -445,10 +435,10 @@ static void cvs_send (cvs_connection_t * s, const unsigned char * data,
 static void cvs_do_printf (cvs_connection_t * s, int flush,
                            const char * format, va_list args)
 {
-    if (s->log_in) {
+    if (s->log) {
         va_list copy;
         va_copy (copy, args);
-        vfprintf (s->log_in, format, args); // Ignore errors.
+        vfprintf (s->log, format, copy); // Ignore errors.
         va_end (copy);
     }
 
@@ -488,10 +478,8 @@ void cvs_connection_destroy (cvs_connection_t * s)
     xfree (s->prefix);
 
     close (s->socket);
-    if (s->log_in)
-        fclose (s->log_in);
-    if (s->log_out)
-        fclose (s->log_out);
+    if (s->log)
+        fclose (s->log);
 
     if (s->pipeline != NULL) {
         int code = pipeline_wait (s->pipeline);
@@ -533,8 +521,8 @@ void cvs_read_block (cvs_connection_t * s, FILE * f, size_t bytes)
         do_read (s);
     }
 
-    if (s->log_out)
-        fprintf (s->log_out, "[%zu bytes of data]\n", bytes);
+    if (s->log)
+        fprintf (s->log, "[%zu bytes of data]\n", bytes);
 }
 
 
