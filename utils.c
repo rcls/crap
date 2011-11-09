@@ -67,14 +67,16 @@ char * xasprintf (const char * format, ...)
 
 int compare_paths (const char * A, const char * B)
 {
-    for (; *A && *A == *B; ++A, ++B);
-    if (*A == *B)
-        return 0;                       // Equal.
-    if (*A == '/')
-        return -1;
-    if (*B == '/')
-        return 1;
-    return *A < *B ? -1 : 1;
+    const char * sA = strrchr(A, '/');
+    const char * sB = strrchr(B, '/');
+    size_t lA = sA ? sA - A + 1 : 0;
+    size_t lB = sB ? sB - B + 1 : 0;
+    int r = memcmp(A, B, lA < lB ? lA : lB);
+    if (r != 0)
+        return r;
+    if (lA != lB)
+        return lA < lB ? -1 : 1;
+    return strcmp(A + lA, B + lB);
 }
 
 
