@@ -366,41 +366,41 @@ static const char * path_filename (const char * p)
 
 static const char * output_entries_list (FILE * out,
                                          const database_t * db,
-                                         const version_t * v,
+                                         version_t * const * vv,
+                                         const file_t * f,
                                          const char * last_path)
 {
     if (entries_name == NULL || *entries_name == 0)
         return last_path;
 
-    if (last_path != NULL && same_directory (last_path, v->file->path))
+    if (last_path != NULL && same_directory (last_path, f->path))
         return last_path;
 
-    last_path = v->file->path;
     // FIXME - slow!!!
     bool directory_is_live = false;
     for (const file_t * f = db->files; f != db->files_end; ++f)
-        if (same_directory (f->path, last_path)
-            && version_live (v->branch->branch_versions[f - db->files])) {
+        if (same_directory (f->path, f->path)
+            && version_live (vv[f - db->files])) {
             directory_is_live = true;
             break;
         }
     if (!directory_is_live) {
         fprintf (out, "D %.*s%s\n",
-                 path_dirlen (last_path), last_path, entries_name);
-        return last_path;
+                 path_dirlen (f->path), f->path, entries_name);
+        return f->path;
     }
     fprintf (out, "M 644 inline %.*s%s\n",
-             path_dirlen (last_path), last_path, entries_name);
+             path_dirlen (f->path), f->path, entries_name);
     fprintf (out, "data <<EOF\n");
     for (const file_t * f = db->files; f != db->files_end; ++f)
-        if (same_directory (f->path, last_path)
-            && version_live (v->branch->branch_versions[f - db->files]))
+        if (same_directory (f->path, f->path)
+            && version_live (vv[f - db->files]))
             fprintf (
                 out, "%s %s\n",
-                v->branch->branch_versions[f - db->files]->version,
+                vv[f - db->files]->version,
                 path_filename(f->path));
     fprintf (out, "EOF\n");
-    return last_path;
+    return f->path;
 }
 
 
@@ -447,7 +447,8 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
             else
                 fprintf (out, "M %s :%zu %s\n",
                          vv->exec ? "755" : "644", vv->mark, vv->file->path);
-            last_path = output_entries_list (out, db, vv, last_path);
+            last_path = output_entries_list (
+                out, db, v->branch->branch_versions, vv->file, last_path);
         }
 
     fprintf (stderr, "\n");
@@ -522,6 +523,15 @@ void print_fixups (FILE * out, const database_t * db,
     if (fixups == fixups_end)
         return;
 
+    // base_versions should only be NULL for starting the trunk.  But that
+    // should never need fixups.
+    assert (base_versions != NULL);
+
+    // If we're doing fixups for a branch, then the base_versions should be
+    // the branch version.
+    assert (tag->branch_versions == NULL
+            || base_versions == tag->branch_versions);
+
     version_t ** fetch = NULL;
     version_t ** fetch_end = NULL;
     for (fixup_ver_t * ffv = fixups; ffv != fixups_end; ++ffv)
@@ -550,23 +560,39 @@ void print_fixups (FILE * out, const database_t * db,
     fprintf (out, "data %zu\n%s", strlen (comment), comment);
     xfree (comment);
 
+    // We need a list of versions for updating the entries files.  If we are
+    // working on a branch, then we need to update that anyway.  Else take a
+    // temporary list.
+    version_t ** updated_versions = tag->branch_versions;
+    if (updated_versions == NULL) {
+        size_t bytes = (db->files_end - db->files) * sizeof (version_t *);
+        updated_versions = xmalloc (bytes);
+        memcpy (updated_versions, base_versions, bytes);
+    }
+
     for (fixup_ver_t * ffv = fixups; ffv != fixups_end; ++ffv) {
         int i = ffv->file - db->files;
-        version_t * bv = base_versions ? version_live (base_versions[i]) : NULL;
+        version_t * tv = ffv->version;
+        assert (tv != version_live (updated_versions[i]));
+        updated_versions[i] = tv;
+    }
+
+    const char * last_path = NULL;
+    for (fixup_ver_t * ffv = fixups; ffv != fixups_end; ++ffv) {
         version_t * tv = ffv->version;
 
-        assert (tv != bv);
-        if (tv != bv) {
-            if (tv == NULL)
-                fprintf (out, "D %s\n", bv->file->path);
-            else
-                fprintf (out, "M %s :%zu %s\n",
-                         tv->exec ? "755" : "644", tv->mark, tv->file->path);
-        }
+        if (tv == NULL)
+            fprintf (out, "D %s\n", ffv->file->path);
+        else
+            fprintf (out, "M %s :%zu %s\n",
+                     tv->exec ? "755" : "644", tv->mark, ffv->file->path);
 
-        if (tag->branch_versions)
-            tag->branch_versions[i] = tv;
+        last_path = output_entries_list (
+            out, db, updated_versions, ffv->file, last_path);
     }
+
+    if (tag->branch_versions == NULL)
+        xfree (updated_versions);
 
     xfree (fixups);
 }
