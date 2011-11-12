@@ -42,10 +42,10 @@ static long mark_counter;
 #define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
 #define TIME_MAX (sizeof(time_t) == sizeof(int) ? INT_MAX : LONG_MAX)
 
-static void print_fixups(FILE * out, const database_t * db,
-                         version_t ** base_versions,
-                         tag_t * tag, const changeset_t * cs,
-                         cvs_connection_t * s);
+static void print_fixups (FILE * out, const database_t * db,
+                          version_t ** base_versions,
+                          tag_t * tag, const changeset_t * cs,
+                          cvs_connection_t * s);
 
 
 static const char * format_date (const time_t * time)
@@ -339,8 +339,8 @@ static void grab_versions (FILE * out, const database_t * db,
 
 static bool same_directory (const char * A, const char * B)
 {
-    const char * sA = strrchr(A, '/');
-    const char * sB = strrchr(B, '/');
+    const char * sA = strrchr (A, '/');
+    const char * sB = strrchr (B, '/');
     if (sA == NULL)
         return sB == NULL;
     return sB != NULL  &&  sA - A == sB - B  &&  memcmp (A, B, sA - A) == 0;
@@ -349,7 +349,7 @@ static bool same_directory (const char * A, const char * B)
 
 static int path_dirlen (const char * p)
 {
-    const char * s = strrchr(p, '/');
+    const char * s = strrchr (p, '/');
     if (s == NULL)
         return 0;
     else
@@ -359,7 +359,7 @@ static int path_dirlen (const char * p)
 
 static const char * path_filename (const char * p)
 {
-    const char * s = strrchr(p, '/');
+    const char * s = strrchr (p, '/');
     if (s == NULL)
         return p;
     else
@@ -382,7 +382,7 @@ static const char * output_entries_list (FILE * out,
     // Find the range of files in the same directory.
     bool directory_is_live = false;
     const file_t * start = f;
-    while (start != db->files && same_directory(start[-1].path, f->path)) {
+    while (start != db->files && same_directory (start[-1].path, f->path)) {
         --start;
         directory_is_live = directory_is_live
             || version_live (vv[start - db->files]);
@@ -393,7 +393,7 @@ static const char * output_entries_list (FILE * out,
             || version_live (vv[end - db->files]);
         ++end;
     }
-    while (end != db->files_end && same_directory(end->path, f->path));
+    while (end != db->files_end && same_directory (end->path, f->path));
 
     if (!directory_is_live) {
         fprintf (out, "D %.*s%s\n",
@@ -406,7 +406,7 @@ static const char * output_entries_list (FILE * out,
     for (const file_t * f = start; f != end; ++f)
         if (version_live (vv[f - db->files]))
             fprintf (out, "%s %s\n",
-                     vv[f - db->files]->version, path_filename(f->path));
+                     vv[f - db->files]->version, path_filename (f->path));
     fprintf (out, "EOF\n");
     return f->path;
 }
@@ -661,7 +661,7 @@ int main (int argc, char * const argv[])
     do {
         f = open ("/dev/null", O_RDWR);
         if (f < 0)
-            fatal("open /dev/null failed: %s\n", strerror(errno));
+            fatal ("open /dev/null failed: %s\n", strerror (errno));
     }
     while (f < 2);
 
@@ -676,19 +676,19 @@ int main (int argc, char * const argv[])
     pipeline * pipeline = NULL;
     FILE * out;
     if (output_path[0] == '|') {
-        pipeline = pipeline_new();
-        pipeline_command_argstr(pipeline, output_path + 1);
-        pipeline_want_in(pipeline, -1);
-        pipeline_start(pipeline);
-        out = pipeline_get_infile(pipeline);
+        pipeline = pipeline_new ();
+        pipeline_command_argstr (pipeline, output_path + 1);
+        pipeline_want_in (pipeline, -1);
+        pipeline_start (pipeline);
+        out = pipeline_get_infile (pipeline);
     }
     else {
-        out = fopen(output_path, "w");
+        out = fopen (output_path, "w");
         if (out == NULL)
-            fatal("open %s failed: %s\n", output_path, strerror(errno));
+            fatal ("open %s failed: %s\n", output_path, strerror (errno));
     }
 
-    fprintf(out, "feature done\n");
+    fprintf (out, "feature done\n");
 
     cvs_connection_t stream;
     connect_to_cvs (&stream, argv[optind]);

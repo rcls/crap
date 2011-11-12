@@ -98,7 +98,7 @@ static void filter_input (database_t * db, FILE * in)
             *ref2++ = 0;
             changeset_t * cs1 = ref_lookup (db, ref1);
             changeset_t * cs2 = ref_lookup (db, ref2);
-            ARRAY_APPEND(cs1->merge, cs2);
+            ARRAY_APPEND (cs1->merge, cs2);
         }
         else
             fatal ("Unknown line from filter: '%s'\n", line);

@@ -160,8 +160,8 @@ static void connect_to_program (cvs_connection_t * restrict conn,
            "socketpair failed");
 
     // libpipeline doesn't cope with an FD being used twice.  So dup it.
-    int sdup = check(open("/dev/null", O_RDONLY|O_CLOEXEC), "open /dev/null");
-    check(dup3(sockets[1], sdup, O_CLOEXEC), "dup3");
+    int sdup = check (open ("/dev/null", O_RDONLY|O_CLOEXEC), "open /dev/null");
+    check (dup3 (sockets[1], sdup, O_CLOEXEC), "dup3");
 
     va_list argv;
     va_start (argv, name);
@@ -287,7 +287,7 @@ static const char * file_error (FILE * f)
 
 static size_t checked_read (cvs_connection_t * s, void * buf, size_t count)
 {
-    size_t r = check(read (s->socket, buf, count), "Reading from CVS server");
+    size_t r = check (read (s->socket, buf, count), "Reading from CVS server");
     if (r == 0)
         fatal ("Unexpected EOF from CVS server.\n");
     return r;
@@ -371,8 +371,8 @@ static void do_write (cvs_connection_t * s,
                       const unsigned char * data, size_t length)
 {
     while (length) {
-        ssize_t r = check(write (s->socket, data, length),
-                          "Write to CVS server");
+        ssize_t r = check (write (s->socket, data, length),
+                           "Write to CVS server");
         if (r == 0)
             fatal ("Huh?  Write to CVS returns 0\n");
         data += r;
@@ -444,7 +444,7 @@ static void cvs_do_printf (cvs_connection_t * s, int flush,
 
     // FIXME - this takes an extra copy of the data.
     char * string;
-    int len = check(vasprintf (&string, format, args), "Formatting string");
+    int len = check (vasprintf (&string, format, args), "Formatting string");
 
     cvs_send (s, (const unsigned char *) string, len, flush);
     free (string);

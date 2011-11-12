@@ -16,8 +16,8 @@
 #include <stdlib.h>
 
 // FIXME - assumes signed time_t!
-#define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
-#define TIME_MAX (sizeof(time_t) == sizeof(int) ? INT_MAX : LONG_MAX)
+#define TIME_MIN (sizeof (time_t) == sizeof (int) ? INT_MIN : LONG_MIN)
+#define TIME_MAX (sizeof (time_t) == sizeof (int) ? INT_MAX : LONG_MAX)
 
 
 static int compare_fixup_by_time (const void * AA, const void * BB)
