@@ -38,6 +38,11 @@ struct changeset {
     ///  - tag/branch off a branch.
     changeset_t ** children;
     changeset_t ** children_end;
+
+    /// Merge list.  These changesets are recorded as ancestors of the
+    /// changeset.
+    changeset_t ** merge;
+    changeset_t ** merge_end;
 };
 
 

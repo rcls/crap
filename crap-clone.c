@@ -4,6 +4,7 @@
 #include "database.h"
 #include "emission.h"
 #include "file.h"
+#include "filter.h"
 #include "fixup.h"
 #include "log.h"
 #include "log_parse.h"
@@ -23,15 +24,17 @@
 
 static struct option opts[] = {
     { "compress", required_argument, NULL, 'z' },
-    { "help", required_argument, NULL, 'h' },
+    { "help", no_argument, NULL, 'h' },
     { "output", required_argument, NULL, 'o' },
     { "entries", required_argument, NULL, 'e' },
+    { "filter", required_argument, NULL, 'f' },
     { NULL, 0, NULL, 0 }
 };
 
 static unsigned long zlevel = 0;
 static const char * output_path = "|git fast-import";
 static const char * entries_name = NULL;
+static const char * filter_command = NULL;
 
 static long mark_counter;
 
@@ -442,6 +445,13 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
     fprintf (out, "committer %s <%s> %ld +0000\n",
              v->author, v->author, cs->time);
     fprintf (out, "data %zu\n%s\n", strlen (v->log), v->log);
+    for (changeset_t ** i = cs->merge; i != cs->merge_end; ++i)
+        if ((*i)->mark == 0)
+            fprintf (stderr, "Whoops, out of order!\n");
+        else if ((*i)->mark == mark_counter)
+            fprintf (stderr, "Whoops, self-ref\n");
+        else
+            fprintf (out, "merge :%lu\n", (*i)->mark);
 
     const char * last_path = NULL;
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
@@ -617,9 +627,12 @@ void process_opts (int argc, char * const argv[])
 {
     int longindex;
     while (1)
-        switch (getopt_long (argc, argv, "e:hz:o:", opts, &longindex)) {
+        switch (getopt_long (argc, argv, "e:f:hz:o:", opts, &longindex)) {
         case 'e':
             entries_name = optarg;
+            break;
+        case 'f':
+            filter_command = optarg;
             break;
         case 'o':
             output_path = optarg;
@@ -700,16 +713,14 @@ int main (int argc, char * const argv[])
 
     branch_analyse (&db);
 
-    // Prepare for the real changeset emission.  This time the tags go through
-    // the the usual emission process, and branches block revisions on the
-    // branch.
+    // Prepare for the ultimate changeset emission.  This time the tags go
+    // through the the usual emission process, and branches block revisions on
+    // the branch.
 
-    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
-        i->is_released = false;
+    for (tag_t * i = db.tags; i != db.tags_end; ++i)
         for (changeset_t ** j = i->changeset.children;
              j != i->changeset.children_end; ++j)
             ++(*j)->unready_count;
-    }
 
     // Re-do the version->changeset unready counts.
     prepare_for_emission (&db, NULL);
@@ -727,33 +738,73 @@ int main (int argc, char * const argv[])
         }
     }
 
-    // Emit the changesets for real.
-    size_t emitted_commits = 0;
-    changeset_t * changeset;
-    while ((changeset = next_changeset (&db))) {
-        if (changeset->type == ct_commit) {
-            ++emitted_commits;
+    // Now do the changeset emission that creates the ultimate changeset order.
+    // FIXME - it would be better to store the order for each branch separately,
+    // so that filter_output can re-order between branches.
+    changeset_t ** serial = NULL;
+    changeset_t ** serial_end = NULL;
+    for (changeset_t * changeset; (changeset = next_changeset (&db)); ) {
+        ARRAY_APPEND (serial, changeset);
+        if (changeset->type == ct_commit)
+            // FIXME - account for fixups?
+            changeset_update_branch_versions (&db, changeset);
+        changeset_emitted (&db, NULL, changeset);
+    }
 
-            // Before doing the commit proper, output any branch-fixups that
-            // need doing.
-            version_t * v = changeset->versions[0];
-            print_fixups (out, &db, v->branch->branch_versions, v->branch,
-                          changeset, &stream);
-            if (changeset_update_branch_versions (&db, changeset) != 0)
-                print_commit (out, &db, changeset, &stream);
-            else {
-                changeset->mark = v->branch->last->mark;
-                v->branch->last = changeset;
-            }
+    if (filter_command != NULL)
+        filter_changesets (&db, serial, serial_end, filter_command);
+
+    // Reset all branches to their initial versions.
+    for (tag_t * i = db.tags; i != db.tags_end; ++i) {
+        i->is_released = false;
+        if (i->branch_versions) {
+            memset (i->branch_versions, 0,
+                    sizeof (version_t *) * (db.files_end - db.files));
+            for (version_t ** j = i->tag_files; j != i->tag_files_end; ++j)
+                i->branch_versions[(*j)->file - db.files] = *j;
         }
-        else {
+    }
+
+    // Output the changesets to git-filter-branch.
+    size_t emitted_commits = 0;
+    for (changeset_t ** p = serial; p != serial_end; ++p) {
+        changeset_t * changeset = *p;
+        if (changeset->type == ct_tag) {
             tag_t * tag = as_tag (changeset);
             tag->is_released = true;
             print_tag (out, &db, tag, &stream);
+            continue;
         }
 
-        changeset_emitted (&db, NULL, changeset);
+        ++emitted_commits;
+
+        // Before doing the commit proper, output any branch-fixups that need
+        // doing.
+        tag_t * branch = changeset->versions[0]->branch;
+        print_fixups (out, &db, branch->branch_versions, branch,
+                      changeset, &stream);
+
+        bool live = false;
+        for (version_t ** i = changeset->versions;
+             i != changeset->versions_end; ++i)
+            if ((*i)->used) {
+                version_t ** bv
+                    = &branch->branch_versions[(*i)->file - db.files];
+                if (version_live (*bv) != version_live (*i))
+                    live = true;
+                // Keep dead versions, like we do elsewhere...
+                *bv = *i;
+            }
+
+        if (live) {
+            print_commit (out, &db, changeset, &stream);
+        }
+        else {
+            changeset->mark = branch->last->mark;
+            branch->last = changeset;
+        }
     }
+    free (serial);
 
     // Final fixups.
     for (tag_t * i = db.tags; i != db.tags_end; ++i)

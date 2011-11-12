@@ -22,6 +22,8 @@ void changeset_init (changeset_t * cs)
     cs->children_end = NULL;
     cs->versions = NULL;
     cs->versions_end = NULL;
+    cs->merge = NULL;
+    cs->merge_end = NULL;
 }
 
 

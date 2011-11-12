@@ -78,11 +78,13 @@ void database_destroy (database_t * db)
         free (i->tags);
         free (i->parents);
         free (i->changeset.children);
+        free (i->changeset.merge);
     }
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
         free ((*i)->children);
         free ((*i)->versions);
+        free ((*i)->merge);
         free (*i);
     }
 
@@ -134,4 +136,11 @@ file_t * database_find_file (const database_t * db, const char * path)
     }
 
     return NULL;
+}
+
+
+tag_t * database_find_tag (const database_t * db, const char * name)
+{
+    return find_string (db->tags, db->tags_end - db->tags,
+                        sizeof (tag_t), offsetof (tag_t, tag), name);
 }
