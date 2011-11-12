@@ -17,6 +17,7 @@
 void changeset_init (changeset_t * cs)
 {
     cs->ready_index = SIZE_MAX;
+    cs->mark = 0;
     cs->unready_count = 0;
     cs->children = NULL;
     cs->children_end = NULL;
