@@ -23,7 +23,6 @@ void fatal (const char * f, ...)
     vfprintf (stderr, f, l);
     va_end (l);
 
-    fflush (NULL);
     exit (EXIT_FAILURE);
 }
 
@@ -41,6 +40,5 @@ ssize_t check (ssize_t val, const char * f, ...)
     va_end (l);
     fprintf (stderr, " failed: %s\n", e);
 
-    fflush (NULL);
     exit (EXIT_FAILURE);
 }

@@ -120,6 +120,7 @@ void filter_changesets (database_t * db,
     pipeline_command_argstr (pl, filter_command);
     pipeline_want_out (pl, -1);
 
+    fflush (NULL);                      // We're forking...
     pipeline_start (pl);
 
     filter_input (db, pipeline_get_outfile (pl));

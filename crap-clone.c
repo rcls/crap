@@ -811,7 +811,6 @@ int main (int argc, char * const argv[])
         if (i->branch_versions)
             print_fixups (out, &db, i->branch_versions, i, NULL, &stream);
 
-    fflush (NULL);
     fprintf (stderr,
              "Emitted %zu commits (%s total %zu).\n",
              emitted_commits,
@@ -849,14 +848,14 @@ int main (int argc, char * const argv[])
     string_cache_stats (stderr);
 
     fprintf (out, "done\n");
-    fflush(out);
-    if (ferror(out))
-        fatal("Writing output failed.\n");
+    fflush (out);
+    if (ferror (out))
+        fatal ("Writing output failed.\n");
     if (pipeline != NULL) {
-        int status = pipeline_wait(pipeline);
+        int status = pipeline_wait (pipeline);
         if (status != 0)
-            fatal("Import command exited with %i.\n", status);
-        pipeline_free(pipeline);
+            fatal ("Import command exited with %i.\n", status);
+        pipeline_free (pipeline);
     }
     else {
         fclose (out);

@@ -100,7 +100,6 @@ static const version_t * preceed (const changeset_t * cs)
 
 static void cycle_split (database_t * db, changeset_t * cs)
 {
-    fflush (NULL);
     fprintf (stderr, "*********** CYCLE **********\n");
     // We split the changeset into two.  We leave all the blocked versions
     // in cs, and put the ready-to-emit into nw.
