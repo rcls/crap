@@ -40,12 +40,6 @@ static void filter_output (void * data)
 }
 
 
-static void delete_tag (tag_t * tag)
-{
-    // FIXME - NYI.
-}
-
-
 static changeset_t * ref_lookup (const database_t * db, const char * ref)
 {
     switch (*ref) {
@@ -88,7 +82,7 @@ static void filter_input (database_t * db, FILE * in)
                 fatal ("Unknown tag from filter: %s\n", line);
             if (tag->branch_versions != NULL)
                 fatal ("Filter attempts to delete branch: %s\n", line);
-            delete_tag (tag);
+            tag->deleted = true;
         }
         else if (starts_with (line, "MERGE ")) {
             char * ref1 = line + 6;
@@ -116,7 +110,7 @@ void filter_changesets (database_t * db,
     pipeline * pl = pipeline_new();
     pipeline_command (
         pl,
-        pipecmd_new_function("filter source", filter_output, NULL, &context));
+        pipecmd_new_function ("filter source", filter_output, NULL, &context));
     pipeline_command_argstr (pl, filter_command);
     pipeline_want_out (pl, -1);
 

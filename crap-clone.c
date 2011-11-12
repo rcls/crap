@@ -488,18 +488,6 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
 
     assert (tag->parent == NULL || (branch && branch->last == tag->parent));
 
-    fprintf (out, "reset refs/%s/%s\n",
-             tag->branch_versions ? "heads" : "tags",
-             *tag->tag ? tag->tag : "cvs_master");
-
-    if (tag->parent)
-        tag->changeset.mark = tag->parent->mark;
-    else
-        tag->changeset.mark = 0;
-
-    if (tag->changeset.mark != 0)
-        fprintf (out, "from :%lu\n\n", tag->changeset.mark);
-
     tag->last = &tag->changeset;
 
     create_fixups (db, branch ? branch->branch_versions : NULL, tag);
@@ -515,6 +503,25 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
         else
             memset (tag->branch_versions, 0, bytes);
     }
+
+    if (tag->parent)
+        tag->changeset.mark = tag->parent->mark;
+    else
+        tag->changeset.mark = 0;
+
+    // FIXME - what say tag is deleted but we still have a merge ref to it?
+    // We should output the fixup anyway?
+    if (tag->deleted) {
+        assert (tag->branch_versions == NULL);
+        return;
+    }
+
+    fprintf (out, "reset refs/%s/%s\n",
+             tag->branch_versions ? "heads" : "tags",
+             *tag->tag ? tag->tag : "cvs_master");
+
+    if (tag->changeset.mark != 0)
+        fprintf (out, "from :%lu\n\n", tag->changeset.mark);
 
     if (tag->branch_versions == NULL)
         // For a tag, just force out all the fixups immediately.

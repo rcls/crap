@@ -107,6 +107,8 @@ struct tag {
 
     bool dummy;                       ///< Dummy branch, server doesn't know us.
 
+    bool deleted;                       ///< Merge filter asked for deletion.
+
     unsigned rank;
 
     changeset_t * parent;               ///< Changeset we leach off.
