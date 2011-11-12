@@ -79,6 +79,7 @@ void database_destroy (database_t * db)
         free (i->parents);
         free (i->changeset.children);
         free (i->changeset.merge);
+        free (i->fixups);
     }
 
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i) {
