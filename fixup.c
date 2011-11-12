@@ -34,8 +34,8 @@ static int compare_fixup_by_time (const void * AA, const void * BB)
 }
 
 
-void create_fixups(const database_t * db,
-                   version_t * const * branch_versions, tag_t * tag)
+void create_fixups (const database_t * db,
+                    version_t * const * branch_versions, tag_t * tag)
 {
     // Go through the current versions on the branch and note any version
     // fix-ups required.
@@ -166,7 +166,7 @@ void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
             *j++ = *i;
 
     tag->fixups_end = j;
-    ARRAY_TRIM(tag->fixups);
+    ARRAY_TRIM (tag->fixups);
     tag->fixups_curr = tag->fixups;
 }
 
@@ -215,7 +215,7 @@ char * fixup_commit_comment (const database_t * db,
     char * result;
     size_t res_size;
 
-    FILE * f = open_memstream(&result, &res_size);
+    FILE * f = open_memstream (&result, &res_size);
     if (f == NULL)
         fatal ("open_memstream failed: %s\n", strerror (errno));
 

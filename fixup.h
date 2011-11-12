@@ -18,9 +18,9 @@ typedef struct fixup_ver {
 /// Create the fixups for a tag (or branch).  @p branch_versions is a list of
 /// versions, and versions that differ on the @p tag are noted in the @p
 /// tag->fixup list.
-void create_fixups(const struct database * db,
-                   struct version * const * branch_versions,
-                   struct tag * tag);
+void create_fixups (const struct database * db,
+                    struct version * const * branch_versions,
+                    struct tag * tag);
 
 /// Select from the @p tag->fixups the list of @p fixups to be done before the
 /// @p changeset (or all if NULL).

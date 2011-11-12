@@ -32,7 +32,7 @@ ssize_t check (ssize_t val, const char * f, ...)
     if (val >= 0)
         return val;
 
-    const char * e = strerror(errno);
+    const char * e = strerror (errno);
 
     va_list l;
     va_start (l, f);
