@@ -30,8 +30,7 @@ static void filter_output (void * data)
         }
 
         tag_t * tag = as_tag (*p);
-        // FIXME E/I flag.
-        printf ("%s E %zu %s\n",
+        printf ("%s %zu %s\n",
                 tag->branch_versions ? "BRANCH" : "TAG",
                 ++seq,                // FIXME - should refer to commit.
                 tag->tag);
@@ -48,12 +47,12 @@ static changeset_t * ref_lookup (const database_t * db, const char * ref)
         extern void abort();
         abort();                        // NYI.
     case '-':
-    case '.': ;
+    case '=': ;
         tag_t * tag = database_find_tag (db, ref + 1);
         if (tag == NULL)
             fatal ("Unknown tag reference from filter: %s\n", ref);
         // FIXME - if no fixups, then '-' should take changeset also?
-        if (*ref == '.')
+        if (*ref == '=')
             return &tag->changeset;
         if (tag->parent == NULL)
             fatal ("Unknown tag reference from filter: %s\n", ref);
@@ -92,6 +91,8 @@ static void filter_input (database_t * db, FILE * in)
             *ref2++ = 0;
             changeset_t * cs1 = ref_lookup (db, ref1);
             changeset_t * cs2 = ref_lookup (db, ref2);
+            if (cs2->type == ct_tag)
+                as_tag (cs2)->merge_source = true;
             ARRAY_APPEND (cs1->merge, cs2);
         }
         else

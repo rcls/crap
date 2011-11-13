@@ -509,12 +509,14 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
     else
         tag->changeset.mark = 0;
 
-    // FIXME - what say tag is deleted but we still have a merge ref to it?
-    // We should output the fixup anyway?
-    if (tag->deleted) {
+    if (tag->deleted
+        && (!tag->merge_source || tag->fixups == tag->fixups_end)) {
         assert (tag->branch_versions == NULL);
         return;
     }
+
+    if (tag->deleted)
+        fprintf (stderr, "ZOMBIE %s\n", tag->tag);
 
     fprintf (out, "reset refs/%s/%s\n",
              tag->branch_versions ? "heads" : "tags",
@@ -572,6 +574,7 @@ void print_fixups (FILE * out, const database_t * db,
     fprintf (out, "commit refs/%s/%s\n",
              tag->branch_versions ? "heads" : "tags",
              *tag->tag ? tag->tag : "cvs_master");
+
     fprintf (out, "mark :%lu\n", tag->changeset.mark);
 
     fprintf (out, "committer crap <crap> %ld +0000\n",

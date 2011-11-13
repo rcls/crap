@@ -25,6 +25,10 @@ CC=gcc
 	@mkdir -p .deps
 	$(COMPILE.c) -o $@ -c $<
 
+%.s: %.c
+	@mkdir -p .deps
+	$(COMPILE.c:-g3=) -o $@ -S $<
+
 .PHONY: all clean
 clean:
 	rm -f *.a *.o core.* vgcore.*

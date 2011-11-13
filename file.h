@@ -103,11 +103,12 @@ struct tag {
     /// an exact match in the tag hash.
     bool is_released;
 
-    bool fixup;                         ///< Did we need a fix-up changeset?
+    bool fixup : 1;                     ///< Did we need a fix-up changeset?
 
-    bool dummy;                       ///< Dummy branch, server doesn't know us.
+    bool dummy : 1;                   ///< Dummy branch, server doesn't know us.
 
-    bool deleted;                       ///< Merge filter asked for deletion.
+    bool deleted : 1;                   ///< Merge filter asked for deletion.
+    bool merge_source : 1;              ///< Merge filter merged from us.
 
     unsigned rank;
 
