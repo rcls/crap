@@ -640,9 +640,8 @@ static void usage (const char * prog, FILE * stream, int code)
 
 void process_opts (int argc, char * const argv[])
 {
-    int longindex;
     while (1)
-        switch (getopt_long (argc, argv, "e:f:hz:o:", opts, &longindex)) {
+        switch (getopt_long (argc, argv, "e:f:hz:o:", opts, NULL)) {
         case 'e':
             entries_name = optarg;
             break;
