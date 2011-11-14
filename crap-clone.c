@@ -438,6 +438,7 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
 
     v->branch->last = cs;
     cs->mark = ++mark_counter;
+    v->branch->changeset.mark = cs->mark;
 
     fprintf (out, "commit refs/heads/%s\n",
              *v->branch->tag ? v->branch->tag : "cvs_master");
@@ -515,15 +516,13 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
         return;
     }
 
-    if (tag->deleted)
-        fprintf (stderr, "ZOMBIE %s\n", tag->tag);
-
-    fprintf (out, "reset refs/%s/%s\n",
-             tag->branch_versions ? "heads" : "tags",
-             *tag->tag ? tag->tag : "cvs_master");
-
-    if (tag->changeset.mark != 0)
-        fprintf (out, "from :%lu\n\n", tag->changeset.mark);
+    if (!tag->deleted) {
+        fprintf (out, "reset refs/%s/%s\n",
+                 tag->branch_versions ? "heads" : "tags",
+                 *tag->tag ? tag->tag : "cvs_master");
+        if (tag->changeset.mark != 0)
+            fprintf (out, "from :%lu\n", tag->changeset.mark);
+    }
 
     if (tag->branch_versions == NULL)
         // For a tag, just force out all the fixups immediately.
@@ -569,11 +568,15 @@ void print_fixups (FILE * out, const database_t * db,
     xfree (fetch);
 
     tag->fixup = true;
+    unsigned long from = tag->changeset.mark;
     tag->changeset.mark = ++mark_counter;
 
-    fprintf (out, "commit refs/%s/%s\n",
-             tag->branch_versions ? "heads" : "tags",
-             *tag->tag ? tag->tag : "cvs_master");
+    if (tag->deleted)
+        fprintf (out, "commit _crap_zombie\n");
+    else
+        fprintf (out, "commit refs/%s/%s\n",
+                 tag->branch_versions ? "heads" : "tags",
+                 *tag->tag ? tag->tag : "cvs_master");
 
     fprintf (out, "mark :%lu\n", tag->changeset.mark);
 
@@ -584,6 +587,8 @@ void print_fixups (FILE * out, const database_t * db,
         db, base_versions, tag, fixups, fixups_end);
     fprintf (out, "data %zu\n%s", strlen (comment), comment);
     xfree (comment);
+    if (tag->deleted)
+        fprintf (out, "from :%lu\n", from);
 
     // We need a list of versions for updating the entries files.  If we are
     // working on a branch, then we need to update that anyway.  Else take a
