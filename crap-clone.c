@@ -836,18 +836,30 @@ int main (int argc, char * const argv[])
     size_t fixup_branches = 0;
     size_t exact_tags = 0;
     size_t fixup_tags = 0;
+    bool deleted_fixup = false;
     for (tag_t * i = db.tags; i != db.tags_end; ++i) {
         assert (i->is_released);
-        if (i->branch_versions)
-            if (i->fixup)
+        if (i->fixup) {
+            if (i->deleted)
+                deleted_fixup = true;
+            if (i->branch_versions)
                 ++fixup_branches;
             else
-                ++exact_branches;
-        else
-            if (i->fixup)
                 ++fixup_tags;
+        }
+        else
+            if (i->branch_versions)
+                ++exact_branches;
             else
                 ++exact_tags;
+    }
+
+    if (deleted_fixup) {
+        int ret = pipeline_run (
+                pipeline_new_command_args (
+                    "git", "update-ref", "-d", "_crap_dummy", NULL));
+        if (ret != 0)
+            fatal ("Deleting dummy ref failed: %i\n", ret);
     }
 
     fprintf (stderr,
