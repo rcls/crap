@@ -19,6 +19,8 @@ struct file {
 
     version_t * versions;
     version_t * versions_end;
+
+    version_t * server_last;            ///< Last rev from server.
 };
 
 version_t * file_new_version (file_t * f);

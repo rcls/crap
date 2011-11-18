@@ -287,10 +287,15 @@ static const char * file_error (FILE * f)
 
 static size_t checked_read (cvs_connection_t * s, void * buf, size_t count)
 {
-    size_t r = check (read (s->socket, buf, count), "Reading from CVS server");
-    if (r == 0)
-        fatal ("Unexpected EOF from CVS server.\n");
-    return r;
+    while (true) {
+        ssize_t r = read (s->socket, buf, count);
+        if (r > 0)
+            return r;
+        if (r == 0)
+            fatal ("Unexpected EOF from CVS server.\n");
+        if (errno != EINTR)
+            fatal ("Reading from CVS server failed: %s\n", strerror (errno));
+    }
 }
 
 
@@ -357,8 +362,11 @@ size_t next_line (cvs_connection_t * s)
         ssize_t len = next_line_raw (s);
         if (s->log)
             fprintf (s->log, " %s\n", s->line);
-        if (s->line[0] == 'E' && s->line[1] == ' ')
+        if (s->line[0] == 'E' && s->line[1] == ' ') {
             fprintf (stderr, "cvs: %s\n", s->line + 2);
+            if (strstr (s->line, "conflicts during merge"))
+                sleep(5);
+        }
         else if (s->line[0] == 'F' && s->line[1] == 0)
             fflush (stderr);
         else
@@ -371,12 +379,15 @@ static void do_write (cvs_connection_t * s,
                       const unsigned char * data, size_t length)
 {
     while (length) {
-        ssize_t r = check (write (s->socket, data, length),
-                           "Write to CVS server");
-        if (r == 0)
+        ssize_t r = write (s->socket, data, length);
+        if (r > 0) {
+            data += r;
+            length -= r;
+        }
+        else if (r == 0)
             fatal ("Huh?  Write to CVS returns 0\n");
-        data += r;
-        length -= r;
+        else if (errno != EINTR)
+            fatal ("Write to CVS server failed: %s\n", strerror (errno));
     }
 }
 

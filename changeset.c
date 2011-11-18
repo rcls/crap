@@ -171,6 +171,13 @@ void create_changesets (database_t * db)
     for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
         ARRAY_SORT ((*i)->versions, compare_version_by_file);
 
+    // Test...
+    for (changeset_t ** i = db->changesets; i != db->changesets_end; ++i)
+        for (version_t ** j = (*i)->versions; j != (*i)->versions_end; ++j)
+            if (j != (*i)->versions
+                && compare_paths (j[-1]->file->path, j[0]->file->path) >= 0)
+                abort();
+
     assert (heap_empty (&ready_versions));
     assert (heap_empty (&db->ready_changesets));
     assert (emitted_changesets == db->changesets_end - db->changesets);

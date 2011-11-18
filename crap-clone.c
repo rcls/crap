@@ -63,6 +63,36 @@ static const char * format_date (const time_t * time)
 }
 
 
+static bool same_directory (const char * A, const char * B)
+{
+    const char * sA = strrchr (A, '/');
+    const char * sB = strrchr (B, '/');
+    if (sA == NULL)
+        return sB == NULL;
+    return sB != NULL  &&  sA - A == sB - B  &&  memcmp (A, B, sA - A) == 0;
+}
+
+
+static int path_dirlen (const char * p)
+{
+    const char * s = strrchr (p, '/');
+    if (s == NULL)
+        return 0;
+    else
+        return s - p + 1;
+}
+
+
+static const char * path_filename (const char * p)
+{
+    const char * s = strrchr (p, '/');
+    if (s == NULL)
+        return p;
+    else
+        return s + 1;
+}
+
+
 static void read_version (FILE * out,
                           const database_t * db, cvs_connection_t * s)
 {
@@ -81,8 +111,21 @@ static void read_version (FILE * out,
         return;
     }
 
+    if (starts_with (s->line, "Copy-file ")) {
+        // FIXME - workout how to stop getting these!
+        next_line (s);
+        next_line (s);
+        return;
+    }
+
+    if (starts_with (s->line, "Checksum "))
+        // FIXME - we should check the checksum!
+        next_line (s);
+
     if (!starts_with (s->line, "Created ") &&
+        !starts_with (s->line, "Rcs-diff ") &&
         !starts_with (s->line, "Update-existing ") &&
+        !starts_with (s->line, "Merged ") &&
         !starts_with (s->line, "Updated "))
         fatal ("Did not get Update line: '%s'\n", s->line);
 
@@ -142,6 +185,8 @@ static void read_version (FILE * out,
         fatal ("cvs checkout %s %s - got unexpected file length '%s'\n",
                version->version, version->file->path, s->line);
 
+    version->file->server_last = version;
+
     if (version->mark == SIZE_MAX) {
         version->mark = ++mark_counter;
         fprintf (out, "blob\nmark :%zu\ndata %lu\n", version->mark, len);
@@ -193,14 +238,21 @@ static void grab_version (FILE * out, const database_t * db,
                     s->module, (int) (slash - path), path,
                     s->prefix, (int) (slash - path), path);
 
+    if (version->file->server_last) {
+        cvs_printf (s, "Entry /%s/%s//-kk/\n",
+                    path_filename (path), version->file->server_last->version);
+        cvs_printf (s, "Unchanged %s\n", path_filename (path));
+    }
+
     // Go to the main directory.
     cvs_printf (s,
                 "Directory %s\n%.*s\n", s->module,
                 (int) strlen (s->prefix) - 1, s->prefix);
 
     cvs_printff (s,
-                 "Argument -kk\n"
+                 //"Argument -kk\n"
                  "Argument -r%s\n"
+                 "Argument -u\n"
                  "Argument --\n"
                  "Argument %s\nupdate\n",
                  version->version, version->file->path);
@@ -218,45 +270,39 @@ static void grab_by_option (FILE * out,
                             cvs_connection_t * s,
                             const char * r_arg,
                             const char * D_arg,
-                            version_t ** fetch, version_t ** fetch_end)
+                            version_t ** fetch,
+                            version_t ** fetch_end)
 {
-    // Build an array of the paths that we're getting.  FIXME - if changeset
-    // versions were sorted we wouldn't need this.
-    const char ** paths = NULL;
-    const char ** paths_end = NULL;
+    // Build an array of the paths that we're getting.
+    const char * d = NULL;
 
     for (version_t ** i = fetch; i != fetch_end; ++i) {
-        version_t * v = version_live (*i);
-        assert (v && v->used && v->mark == SIZE_MAX);
-        ARRAY_APPEND (paths, v->file->path);
-    }
-
-    assert (paths != paths_end);
-
-    ARRAY_SORT (paths, (int(*)(const void *, const void *)) strcmp);
-
-    const char * d = NULL;
-    size_t d_len = SIZE_MAX;
-
-    for (const char ** i = paths; i != paths_end; ++i) {
-        const char * slash = strrchr (*i, '/');
-        if (slash == NULL)
+        const char * path = (*i)->file->path;
+        assert(!(*i)->implicit_merge);
+        if (!version_live (*i))
             continue;
-        if (slash - *i == d_len && memcmp (*i, d, d_len) == 0)
-            continue;
-        // Tell the server about this directory.
-        d = *i;
-        d_len = slash - d;
-        cvs_printf (s,
-                    "Directory %s/%.*s\n"
-                    "%s%.*s\n",
-                    s->module, (int) d_len, d,
-                    s->prefix, (int) d_len, d);
+        if (d == NULL || !same_directory (d, path)) {
+            // Tell the server about this directory.
+            d = path;
+            const char * slash = strrchr (path, '/');
+            int d_len = slash ? slash - d : 0;
+            const char * sl = slash ? "/" : "";
+            cvs_printf (s, "Directory %s%s%.*s\n" "%s%.*s\n",
+                        s->module, sl, (int) d_len, d,
+                        s->prefix, (int) d_len, d);
+        }
+//#if 0
+        // Tell the server about the previous version of this file.
+        if ((*i)->file->server_last) {
+            cvs_printf (s, "Entry /%s/%s//-kk/\n",
+                        path_filename (path), (*i)->file->server_last->version);
+            cvs_printf (s, "Unchanged %s\n", path_filename (path));
+        }
+//#endif
     }
 
     // Go to the main directory.
-    cvs_printf (s,
-                "Directory %s\n%.*s\n", s->module,
+    cvs_printf (s, "Directory %s\n%.*s\n", s->module,
                 (int) (strlen (s->prefix) - 1), s->prefix);
 
     // Update args:
@@ -266,12 +312,10 @@ static void grab_by_option (FILE * out,
     if (D_arg)
         cvs_printf (s, "Argument -D%s\n", D_arg);
 
-    cvs_printf (s, "Argument -kk\n" "Argument --\n");
+    cvs_printf (s, "Argument -kk\n" "Argument -u\n" "Argument --\n");
 
-    for (const char ** i = paths; i != paths_end; ++i)
-        cvs_printf (s, "Argument %s\n", *i);
-
-    xfree (paths);
+    for (version_t ** i = fetch; i != fetch_end; ++i)
+        cvs_printf (s, "Argument %s\n", (*i)->file->path);
 
     cvs_printff (s, "update\n");
 
@@ -334,36 +378,6 @@ static void grab_versions (FILE * out, const database_t * db,
     for (version_t ** i = fetch; i != fetch_end; ++i)
         if ((*i)->mark == SIZE_MAX)
             grab_version (out, db, s, *i);
-}
-
-
-static bool same_directory (const char * A, const char * B)
-{
-    const char * sA = strrchr (A, '/');
-    const char * sB = strrchr (B, '/');
-    if (sA == NULL)
-        return sB == NULL;
-    return sB != NULL  &&  sA - A == sB - B  &&  memcmp (A, B, sA - A) == 0;
-}
-
-
-static int path_dirlen (const char * p)
-{
-    const char * s = strrchr (p, '/');
-    if (s == NULL)
-        return 0;
-    else
-        return s - p + 1;
-}
-
-
-static const char * path_filename (const char * p)
-{
-    const char * s = strrchr (p, '/');
-    if (s == NULL)
-        return p;
-    else
-        return s + 1;
 }
 
 

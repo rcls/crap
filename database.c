@@ -102,6 +102,7 @@ file_t * database_new_file (database_t * db)
     file_t * result = &db->files_end[-1];
     result->versions = NULL;
     result->versions_end = NULL;
+    result->server_last = NULL;
     return result;
 }
 
