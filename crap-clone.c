@@ -853,14 +853,6 @@ int main (int argc, char * const argv[])
                 ++exact_tags;
     }
 
-    if (deleted_fixup) {
-        int ret = pipeline_run (
-                pipeline_new_command_args (
-                    "git", "update-ref", "-d", "_crap_dummy", NULL));
-        if (ret != 0)
-            fatal ("Deleting dummy ref failed: %i\n", ret);
-    }
-
     fprintf (stderr,
              "Exact %5zu + %5zu = %5zu branches + tags.\n"
              "Fixup %5zu + %5zu = %5zu branches + tags.\n",
@@ -885,6 +877,14 @@ int main (int argc, char * const argv[])
     }
     else {
         fclose (out);
+    }
+
+    if (deleted_fixup) {
+        int ret = pipeline_run (
+                pipeline_new_command_args (
+                    "git", "update-ref", "-d", "_crap_zombie", NULL));
+        if (ret != 0)
+            fatal ("Deleting dummy ref failed: %i\n", ret);
     }
 
     cvs_connection_destroy (&stream);
