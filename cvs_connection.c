@@ -95,11 +95,9 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
     const char * user;
     size_t user_len;
     if (at == NULL) {
-        host = root;
         user = getenv ("USER");
         if (user == NULL)
             fatal ("Cannot determine user-name for '%s'\n", root);
-        user += 5;
         user_len = strlen (user);
     }
     else {
