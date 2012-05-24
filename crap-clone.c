@@ -638,7 +638,7 @@ static void usage (const char * prog, FILE * stream, int code)
 }
 
 
-void process_opts (int argc, char * const argv[])
+static void process_opts (int argc, char * const argv[])
 {
     int longindex;
     while (1)
