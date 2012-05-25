@@ -167,7 +167,6 @@ static void connect_to_program (cvs_connection_t * restrict conn,
     va_start (argv, name);
     conn->pipeline = pipeline_new_command_argv (name, argv);
     va_end (argv);
-    pipeline_ignore_signals (conn->pipeline, false);
     pipeline_want_in (conn->pipeline, sockets[1]);
     pipeline_want_out (conn->pipeline, sdup);
     pipeline_start (conn->pipeline);
@@ -189,8 +188,6 @@ void connect_to_ext (cvs_connection_t * conn,
     const char * program = getenv ("CVS_RSH");
     if (program == NULL)
         program = "ssh";
-    else
-        program += strlen ("CVS_RSH=");
 
     conn->remote_root = strchr (path, '/');
     if (conn->remote_root == NULL)
