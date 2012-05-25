@@ -28,15 +28,19 @@ static struct option opts[] = {
     { "output", required_argument, NULL, 'o' },
     { "entries", required_argument, NULL, 'e' },
     { "filter", required_argument, NULL, 'f' },
+    { "cache", required_argument, NULL, 'c' },
     { NULL, 0, NULL, 0 }
 };
 
 static unsigned long zlevel = 0;
-static const char * output_path = "|git fast-import";
+static const char * output_path =
+    "|git fast-import --import-marks=.crap.marks.txt --export-marks=.crap.marks.txt";
 static const char * entries_name = NULL;
 static const char * filter_command = NULL;
+static const char * cache_path = "cached-versions";
 
 static long mark_counter;
+static long cached_marks;
 
 // FIXME - assumes signed time_t!
 #define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
@@ -188,7 +192,9 @@ static void grab_version (FILE * out, const database_t * db,
     const char * slash = strrchr (path, '/');
     // Make sure we have the directory.
     if (slash != NULL
-        && (version->parent == NULL || version->parent->mark == SIZE_MAX))
+        && (version->parent == NULL
+            || version->parent->mark == SIZE_MAX
+            || version->parent->mark <= cached_marks))
         cvs_printf (s, "Directory %s/%.*s\n" "%s%.*s\n",
                     s->module, (int) (slash - path), path,
                     s->prefix, (int) (slash - path), path);
@@ -628,6 +634,122 @@ void print_fixups (FILE * out, const database_t * db,
 }
 
 
+/// Read in our version-sha file and generate marks.
+static void initial_process_marks (const database_t * db)
+{
+    // FIXME - error handling.
+    FILE * output_marks = fopen (".crap.marks.txt", "w");
+    if (output_marks == NULL)
+        fatal ("open .crap.marks.txt failed: %s\n", strerror (errno));
+
+    FILE * cache = fopen (cache_path, "r");
+    if (cache == NULL) {
+        warning ("open %s failed: %s\n", cache_path, strerror (errno));
+        fclose (output_marks);
+        return;
+    }
+
+    char * line = NULL;
+    size_t line_max = 0;
+
+    while (true) {
+        uint32_t sha[5];
+        char mode;
+        if (fscanf (cache, "%8x%8x%8x%8x%8x %c",
+                    &sha[0], &sha[1], &sha[2], &sha[3], &sha[4], &mode) < 6)
+            break;
+
+        if (mode != '-' && mode != 'x')
+            break;
+
+        ssize_t ll = getline (&line, &line_max, cache);
+        if (ll <= 0)
+            break;
+
+        if (line[ll - 1] == '\n')
+            line[ll - 1] = 0;
+
+        char * ver = line;
+        if (*ver == ' ')
+            ++ver;
+
+        char * path = strchr (ver, ' ');
+        if (path == NULL)
+            continue;
+
+        *path++ = 0;
+
+        // Attempt to find the path and version.
+        const file_t * f = database_find_file (db, path);
+        if (!f)
+            continue;
+
+        version_t * v = file_find_version (f, ver);
+        if (v) {
+            v->mark = ++mark_counter;
+            v->exec = mode == 'x';
+            fprintf (output_marks, ":%lu %08x%08x%08x%08x%08x\n",
+                     mark_counter, sha[0], sha[1], sha[2], sha[3], sha[4]);
+        }
+    }
+
+    cached_marks = mark_counter;
+
+    xfree (line);
+
+    fclose (cache);
+    fclose (output_marks);
+}
+
+
+/// Read in the marks file written by git-fast-import, and write out a file
+/// containing the id's in a form that is useful for us to re-read.
+static void final_process_marks (const database_t * db)
+{
+    FILE * marks = fopen (".crap.marks.txt", "r");
+    if (marks == NULL) {
+        warning ("open .crap.marks.txt failed: %s\n", strerror (errno));
+        return;
+    }
+    assert (sizeof (uint32_t) == 4);
+    assert (mark_counter < LONG_MAX / 20);
+    uint32_t * shas = xcalloc (mark_counter * 20 + 20);
+
+    while (true) {
+        long mark;
+        uint32_t sha[5];
+        if (fscanf (marks, ":%lu %8x%8x%8x%8x%8x\n",
+                    &mark, &sha[0], &sha[1], &sha[2], &sha[3], &sha[4]) < 6)
+            break;
+
+        if (mark >=0 && mark <= mark_counter)
+            memcpy (shas + mark * 5, sha, 20);
+    }
+
+    fclose (marks);
+
+    // FIXME - bounce via temporary.
+    marks = fopen (cache_path, "w");
+
+    for (const file_t * f = db->files; f != db->files_end; ++f)
+        for (const version_t * v = f->versions; v != f->versions_end; ++v) {
+            if (v->mark < 0 || v->mark > mark_counter)
+                continue;
+            const uint32_t * p = shas + 5 * v->mark;
+            if (p[0] | p[1] | p[2] | p[3] | p[4])
+                fprintf (marks, "%08x%08x%08x%08x%08x %c %s %s\n",
+                         p[0], p[1], p[2], p[3], p[4],
+                         v->exec ? 'x' : '-', v->version, f->path);
+        }
+
+    // FIXME - check errors on write...
+
+    fclose (marks);
+
+    free (shas);
+}
+
+
 static void usage (const char * prog, FILE * stream, int code)
     __attribute__ ((noreturn));
 static void usage (const char * prog, FILE * stream, int code)
@@ -638,10 +760,13 @@ static void usage (const char * prog, FILE * stream, int code)
 }
 
 
-void process_opts (int argc, char * const argv[])
+static void process_opts (int argc, char * const argv[])
 {
     while (1)
-        switch (getopt_long (argc, argv, "e:f:hz:o:", opts, NULL)) {
+        switch (getopt_long (argc, argv, "c:e:f:hz:o:", opts, NULL)) {
+        case 'c':
+            cache_path = optarg;
+            break;
         case 'e':
             entries_name = optarg;
             break;
@@ -685,24 +810,6 @@ int main (int argc, char * const argv[])
     process_opts (argc, argv);
     if (argc != optind + 2)
         usage (argv[0], stderr, EXIT_FAILURE);
-
-    // Start the output to git-fast-import.
-    pipeline * pipeline = NULL;
-    FILE * out;
-    if (output_path[0] == '|') {
-        pipeline = pipeline_new ();
-        pipeline_command_argstr (pipeline, output_path + 1);
-        pipeline_want_in (pipeline, -1);
-        pipeline_start (pipeline);
-        out = pipeline_get_infile (pipeline);
-    }
-    else {
-        out = fopen (output_path, "w");
-        if (out == NULL)
-            fatal ("open %s failed: %s\n", output_path, strerror (errno));
-    }
-
-    fprintf (out, "feature done\n");
 
     cvs_connection_t stream;
     connect_to_cvs (&stream, argv[optind]);
@@ -778,6 +885,27 @@ int main (int argc, char * const argv[])
                 i->branch_versions[(*j)->file - db.files] = *j;
         }
     }
+
+    // Read in any cached version sha's.
+    initial_process_marks (&db);
+
+    // Start the output to git-fast-import.
+    pipeline * pipeline = NULL;
+    FILE * out;
+    if (output_path[0] == '|') {
+        pipeline = pipeline_new();
+        pipeline_command_argstr (pipeline, output_path + 1);
+        pipeline_want_in (pipeline, -1);
+        pipeline_start (pipeline);
+        out = pipeline_get_infile (pipeline);
+    }
+    else {
+        out = fopen (output_path, "w");
+        if (out == NULL)
+            fatal ("open %s failed: %s\n", output_path, strerror (errno));
+    }
+
+    fprintf (out, "feature done\n");
 
     // Output the changesets to git-filter-branch.
     size_t emitted_commits = 0;
@@ -874,6 +1002,7 @@ int main (int argc, char * const argv[])
         if (status != 0)
             fatal ("Import command exited with %i.\n", status);
         pipeline_free (pipeline);
+        final_process_marks (&db);
     }
     else {
         fclose (out);
