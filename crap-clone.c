@@ -754,8 +754,21 @@ static void usage (const char * prog, FILE * stream, int code)
     __attribute__ ((noreturn));
 static void usage (const char * prog, FILE * stream, int code)
 {
-    fprintf (stream,
-             "Usage: %s [-z <0--9>] [-o <PATH>] <ROOT> <REPO>\n", prog);
+    fprintf (stream, "Usage: %s [options] <ROOT> <MODULE>\n\
+  -z, --compress=[0-9]   Compress the CVS network traffic.\n\
+  -h, --help             This message.\n\
+  -o, --output=FILE      Send output to a file instead of git-fast-import.\n\
+                         If FILE starts with '|' then pipe to the command.\n\
+  -f, --filter=COMMAND   Use COMMAND as a filter on the version/branch/tag\n\
+                         information, to detect merges etc.\n\
+  -c, --cache=FILE       Read/write FILE for the version-cache information,\n\
+                         instead of the default './version-cache'.\n\
+  -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
+                         in the git repository.\n\
+  <ROOT>                 The CVS repository to access.\n\
+  <MODULE>               The relative path within the CVS repository.\n",
+             prog);
+
     exit (code);
 }
 
