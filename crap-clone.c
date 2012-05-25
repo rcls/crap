@@ -40,6 +40,7 @@ static const char * filter_command = NULL;
 static const char * cache_path = "cached-versions";
 
 static long mark_counter;
+static long cached_marks;
 
 // FIXME - assumes signed time_t!
 #define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
@@ -191,7 +192,9 @@ static void grab_version (FILE * out, const database_t * db,
     const char * slash = strrchr (path, '/');
     // Make sure we have the directory.
     if (slash != NULL
-        && (version->parent == NULL || version->parent->mark == SIZE_MAX))
+        && (version->parent == NULL
+            || version->parent->mark == SIZE_MAX
+            || version->parent->mark <= cached_marks))
         cvs_printf (s, "Directory %s/%.*s\n" "%s%.*s\n",
                     s->module, (int) (slash - path), path,
                     s->prefix, (int) (slash - path), path);
@@ -689,6 +692,8 @@ static void initial_process_marks (const database_t * db)
                      mark_counter, sha[0], sha[1], sha[2], sha[3], sha[4]);
         }
     }
+
+    cached_marks = mark_counter;
 
     xfree (line);
 
