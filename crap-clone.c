@@ -22,22 +22,24 @@
 #include <stdlib.h>
 #include <time.h>
 
-static struct option opts[] = {
+static const struct option opts[] = {
     { "compress", required_argument, NULL, 'z' },
     { "help", no_argument, NULL, 'h' },
     { "output", required_argument, NULL, 'o' },
     { "entries", required_argument, NULL, 'e' },
-    { "filter", required_argument, NULL, 'f' },
+    { "filter", required_argument, NULL, 'F' },
+    { "force", required_argument, NULL, 'f' },
     { "cache", required_argument, NULL, 'c' },
     { NULL, 0, NULL, 0 }
 };
 
-static unsigned long zlevel = 0;
-static const char * output_path =
-    "|git fast-import --import-marks=.crap.marks.txt --export-marks=.crap.marks.txt";
-static const char * entries_name = NULL;
-static const char * filter_command = NULL;
+static unsigned long zlevel;
+static const char * output_path = NULL;
+static const char * entries_name;
+static const char * filter_command;
 static const char * cache_path = "cached-versions";
+
+static bool force;
 
 static long mark_counter;
 static long cached_marks;
@@ -758,9 +760,10 @@ static void usage (const char * prog, FILE * stream, int code)
   -z, --compress=[0-9]   Compress the CVS network traffic.\n\
   -h, --help             This message.\n\
   -o, --output=FILE      Send output to a file instead of git-fast-import.\n\
-                         If FILE starts with '|' then pipe to the command.\n\
-  -f, --filter=COMMAND   Use COMMAND as a filter on the version/branch/tag\n\
+                         If FILE starts with '|' then pipe to a command.\n\
+  -F, --filter=COMMAND   Use COMMAND as a filter on the version/branch/tag\n\
                          information, to detect merges etc.\n\
+  -f, --force            Pass --force to git-fast-import.\n\
   -c, --cache=FILE       Read/write FILE for the version-cache information,\n\
                          instead of the default './version-cache'.\n\
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
@@ -776,15 +779,18 @@ static void usage (const char * prog, FILE * stream, int code)
 static void process_opts (int argc, char * const argv[])
 {
     while (1)
-        switch (getopt_long (argc, argv, "c:e:f:hz:o:", opts, NULL)) {
+        switch (getopt_long (argc, argv, "c:e:F:fhz:o:", opts, NULL)) {
         case 'c':
             cache_path = optarg;
             break;
         case 'e':
             entries_name = optarg;
             break;
-        case 'f':
+        case 'F':
             filter_command = optarg;
+            break;
+        case 'f':
+            force = true;
             break;
         case 'o':
             output_path = optarg;
@@ -905,6 +911,15 @@ int main (int argc, char * const argv[])
     // Start the output to git-fast-import.
     pipeline * pipeline = NULL;
     FILE * out;
+    if (output_path == NULL) {
+        if (force)
+            output_path = "|git fast-import --import-marks=.crap.marks.txt "
+                "--export-marks=.crap.marks.txt --force";
+        else
+            output_path = "|git fast-import --import-marks=.crap.marks.txt "
+                "--export-marks=.crap.marks.txt";
+    }
+
     if (output_path[0] == '|') {
         pipeline = pipeline_new();
         pipeline_command_argstr (pipeline, output_path + 1);

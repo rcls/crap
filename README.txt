@@ -182,9 +182,8 @@ subdirectories from those, if you wanted.
 
 The reconstructed CVS history has changed for some reason; because we use
 heuristics to reconstruct lots of information that CVS does not maintain
-explicitly, this can happen occassionally.  Use the '-o' option to pass the
-'--force' parameter to git-fast-import.  [This should be done in a more friendly
-manner!].
+explicitly, this can happen occassionally.  Use the --force option (which gets
+passed through to git-fast-import).
 
 
 * crap-clone [or cvs or git-fast-import] core-dumped / aborted / failed.
@@ -254,6 +253,8 @@ crap-clone currently downloads each file version completely, the network traffic
 may be huge.  For an initial import over a wide-area network, you are better
 off rsync'ing the cvs repo to local disk and running everything locally.
 
+Use the --compress option to compress the network traffic.
+
 
 Bugs
 ====
@@ -269,7 +270,7 @@ other than 1.x are not supported at all.
 The use of CVS modules to stich together different parts of the cvs repo are not
 supported.
 
-We just drop "zombie" versions where a ,v file is in the Attic but the last
+We just drop "zombie" versions --- where a ,v file is in the Attic but the last
 version on the trunk is not marked as deleted.  This matches the CVS checkout
 behaviour, but we could be smarter by keeping the last trunk version and then
 faking a delete commit.
