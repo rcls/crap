@@ -23,21 +23,23 @@
 #include <time.h>
 
 static const struct option opts[] = {
+    { "cache",    required_argument, NULL, 'c' },
     { "compress", required_argument, NULL, 'z' },
-    { "help", no_argument, NULL, 'h' },
-    { "output", required_argument, NULL, 'o' },
-    { "entries", required_argument, NULL, 'e' },
-    { "filter", required_argument, NULL, 'F' },
-    { "force", required_argument, NULL, 'f' },
-    { "cache", required_argument, NULL, 'c' },
+    { "entries",  required_argument, NULL, 'e' },
+    { "filter",   required_argument, NULL, 'F' },
+    { "force",    no_argument,       NULL, 'f' },
+    { "help",     no_argument,       NULL, 'h' },
+    { "output",   required_argument, NULL, 'o' },
+    { "prefix",   required_argument, NULL, 'p' },
     { NULL, 0, NULL, 0 }
 };
 
 static unsigned long zlevel;
-static const char * output_path = NULL;
+static const char * cache_path = "cached-versions";
 static const char * entries_name;
 static const char * filter_command;
-static const char * cache_path = "cached-versions";
+static const char * output_path;
+static const char * prefix = "refs";
 
 static bool force;
 
@@ -448,8 +450,8 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
     cs->mark = ++mark_counter;
     v->branch->changeset.mark = cs->mark;
 
-    fprintf (out, "commit refs/heads/%s\n",
-             *v->branch->tag ? v->branch->tag : "cvs_master");
+    fprintf (out, "commit %s/heads/%s\n",
+             prefix, *v->branch->tag ? v->branch->tag : "cvs_master");
     fprintf (out, "mark :%lu\n", cs->mark);
     fprintf (out, "committer %s <%s> %ld +0000\n",
              v->author, v->author, cs->time);
@@ -525,7 +527,7 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
     }
 
     if (!tag->deleted) {
-        fprintf (out, "reset refs/%s/%s\n",
+        fprintf (out, "reset %s/%s/%s\n", prefix,
                  tag->branch_versions ? "heads" : "tags",
                  *tag->tag ? tag->tag : "cvs_master");
         if (tag->changeset.mark != 0)
@@ -582,7 +584,7 @@ void print_fixups (FILE * out, const database_t * db,
     if (tag->deleted)
         fprintf (out, "commit _crap_zombie\n");
     else
-        fprintf (out, "commit refs/%s/%s\n",
+        fprintf (out, "commit %s/%s/%s\n", prefix,
                  tag->branch_versions ? "heads" : "tags",
                  *tag->tag ? tag->tag : "cvs_master");
 
@@ -768,6 +770,7 @@ static void usage (const char * prog, FILE * stream, int code)
                          instead of the default './version-cache'.\n\
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
                          in the git repository.\n\
+  -p, --prefix=PREFIX    Place the git refs under PREFIX instead of 'refs'.\n\
   <ROOT>                 The CVS repository to access.\n\
   <MODULE>               The relative path within the CVS repository.\n",
              prog);
@@ -779,7 +782,7 @@ static void usage (const char * prog, FILE * stream, int code)
 static void process_opts (int argc, char * const argv[])
 {
     while (1)
-        switch (getopt_long (argc, argv, "c:e:F:fhz:o:", opts, NULL)) {
+        switch (getopt_long (argc, argv, "c:e:F:fhz:o:p:", opts, NULL)) {
         case 'c':
             cache_path = optarg;
             break;
@@ -794,6 +797,9 @@ static void process_opts (int argc, char * const argv[])
             break;
         case 'o':
             output_path = optarg;
+            break;
+        case 'p':
+            prefix = optarg;
             break;
         case 'z':
             zlevel = strtoul (optarg, NULL, 10);
