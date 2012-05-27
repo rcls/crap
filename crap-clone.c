@@ -30,7 +30,8 @@ static const struct option opts[] = {
     { "force",    no_argument,       NULL, 'f' },
     { "help",     no_argument,       NULL, 'h' },
     { "output",   required_argument, NULL, 'o' },
-    { "prefix",   required_argument, NULL, 'p' },
+    { "branch-prefix", required_argument, NULL, 'b' },
+    { "tag-prefix", required_argument, NULL, 't' },
     { NULL, 0, NULL, 0 }
 };
 
@@ -39,7 +40,8 @@ static const char * cache_path = "cached-versions";
 static const char * entries_name;
 static const char * filter_command;
 static const char * output_path;
-static const char * prefix = "refs";
+static const char * branch_prefix = "refs/heads";
+static const char * tag_prefix = "refs/tags";
 
 static bool force;
 
@@ -450,8 +452,8 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
     cs->mark = ++mark_counter;
     v->branch->changeset.mark = cs->mark;
 
-    fprintf (out, "commit %s/heads/%s\n",
-             prefix, *v->branch->tag ? v->branch->tag : "cvs_master");
+    fprintf (out, "commit %s/%s\n",
+             branch_prefix, *v->branch->tag ? v->branch->tag : "cvs_master");
     fprintf (out, "mark :%lu\n", cs->mark);
     fprintf (out, "committer %s <%s> %ld +0000\n",
              v->author, v->author, cs->time);
@@ -527,8 +529,8 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
     }
 
     if (!tag->deleted) {
-        fprintf (out, "reset %s/%s/%s\n", prefix,
-                 tag->branch_versions ? "heads" : "tags",
+        fprintf (out, "reset %s/%s\n",
+                 tag->branch_versions ? branch_prefix : tag_prefix,
                  *tag->tag ? tag->tag : "cvs_master");
         if (tag->changeset.mark != 0)
             fprintf (out, "from :%lu\n", tag->changeset.mark);
@@ -584,8 +586,8 @@ void print_fixups (FILE * out, const database_t * db,
     if (tag->deleted)
         fprintf (out, "commit _crap_zombie\n");
     else
-        fprintf (out, "commit %s/%s/%s\n", prefix,
-                 tag->branch_versions ? "heads" : "tags",
+        fprintf (out, "commit %s/%s\n",
+                 tag->branch_versions ? branch_prefix : tag_prefix,
                  *tag->tag ? tag->tag : "cvs_master");
 
     fprintf (out, "mark :%lu\n", tag->changeset.mark);
@@ -770,7 +772,8 @@ static void usage (const char * prog, FILE * stream, int code)
                          instead of the default './version-cache'.\n\
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
                          in the git repository.\n\
-  -p, --prefix=PREFIX    Place the git refs under PREFIX instead of 'refs'.\n\
+  -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
+  -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
   <ROOT>                 The CVS repository to access.\n\
   <MODULE>               The relative path within the CVS repository.\n",
              prog);
@@ -782,7 +785,10 @@ static void usage (const char * prog, FILE * stream, int code)
 static void process_opts (int argc, char * const argv[])
 {
     while (1)
-        switch (getopt_long (argc, argv, "c:e:F:fhz:o:p:", opts, NULL)) {
+        switch (getopt_long (argc, argv, "b:c:e:F:fhz:o:t:", opts, NULL)) {
+        case 'b':
+            branch_prefix = optarg;
+            break;
         case 'c':
             cache_path = optarg;
             break;
@@ -798,8 +804,8 @@ static void process_opts (int argc, char * const argv[])
         case 'o':
             output_path = optarg;
             break;
-        case 'p':
-            prefix = optarg;
+        case 't':
+            tag_prefix = optarg;
             break;
         case 'z':
             zlevel = strtoul (optarg, NULL, 10);

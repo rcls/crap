@@ -95,7 +95,7 @@ contain hundreds of millions of file-tags.
 crap-clone limits the per-file-per-tag memory usage to one pointer (two for
 branches), so even a huge cvs repo can be comfortably processed on a machine
 with a GB or so of memory.  [I started developing crap-clone on a machine with
-192MB memory, so memory issue was a major issue then.  Less so now.]
+192MB memory, so memory usage was a major issue then.  Less so now.]
 
 
 Bottlenecks
@@ -265,7 +265,7 @@ The implicit merge from a 'cvs import' to the main branch is currently broken.
 [I think the code is there, it's just not working.]  Implicit merges to branches
 other than 1.x are not supported at all.
 
-The use of CVS modules to stich together different parts of the cvs repo are not
+The use of CVS modules to stich together different parts of the cvs repo is not
 supported.
 
 We just drop "zombie" versions --- where a ,v file is in the Attic but the last
