@@ -24,7 +24,6 @@
 
 static const struct option opts[] = {
     { "branch-prefix", required_argument, NULL, 'b' },
-    { "cache",    required_argument, NULL, 'c' },
     { "compress", required_argument, NULL, 'z' },
     { "entries",  required_argument, NULL, 'e' },
     { "filter",   required_argument, NULL, 'F' },
@@ -37,13 +36,13 @@ static const struct option opts[] = {
 };
 
 static unsigned long zlevel;
-static const char * cache_path = "cached-versions";
 static const char * entries_name;
 static const char * filter_command;
 static const char * output_path;
 static const char * branch_prefix = "refs/heads";
 static const char * tag_prefix = "refs/tags";
 static const char * master = "master";
+static const char * git_dir;
 
 static bool force;
 
@@ -645,18 +644,22 @@ void print_fixups (FILE * out, const database_t * db,
 /// Read in our version-sha file and generate marks.
 static void initial_process_marks (const database_t * db)
 {
-    // FIXME - error handling.
-    FILE * output_marks = fopen (".crap.marks.txt", "w");
+    const char * marks_path = xasprintf ("%s/crap-marks.txt", git_dir);
+    FILE * output_marks = fopen (marks_path, "w");
+    xfree (marks_path);
     if (output_marks == NULL)
-        fatal ("open .crap.marks.txt failed: %s\n", strerror (errno));
+        fatal ("opening marks file failed: %s\n", strerror (errno));
 
+    const char * cache_path = xasprintf ("%s/crap-version-cache.txt", git_dir);
     FILE * cache = fopen (cache_path, "r");
+    xfree (cache_path);
     if (cache == NULL) {
-        warning ("open %s failed: %s\n", cache_path, strerror (errno));
+        warning ("opening version cache failed: %s\n", strerror (errno));
         fclose (output_marks);
         return;
     }
 
+    // FIXME - error handling.
     char * line = NULL;
     size_t line_max = 0;
 
@@ -714,9 +717,11 @@ static void initial_process_marks (const database_t * db)
 /// containing the id's in a form that is useful for us to re-read.
 static void final_process_marks (const database_t * db)
 {
-    FILE * marks = fopen (".crap.marks.txt", "r");
+    const char * marks_path = xasprintf ("%s/crap-marks.txt", git_dir);
+    FILE * marks = fopen (marks_path, "r");
+    xfree (marks_path);
     if (marks == NULL) {
-        warning ("open .crap.marks.txt failed: %s\n", strerror (errno));
+        warning ("open crap-marks.txt failed: %s\n", strerror (errno));
         return;
     }
     assert (sizeof (uint32_t) == 4);
@@ -737,7 +742,13 @@ static void final_process_marks (const database_t * db)
     fclose (marks);
 
     // FIXME - bounce via temporary.
+    const char * cache_path = xasprintf ("%s/crap-version-cache.txt", git_dir);
     marks = fopen (cache_path, "w");
+    xfree (cache_path);
+    if (marks == NULL) {
+        warning ("opening version cache failed: %s\n", strerror (errno));
+        return;
+    }
 
     for (const file_t * f = db->files; f != db->files_end; ++f)
         for (const version_t * v = f->versions; v != f->versions_end; ++v) {
@@ -751,7 +762,6 @@ static void final_process_marks (const database_t * db)
         }
 
     // FIXME - check errors on write...
-
     fclose (marks);
 
     free (shas);
@@ -770,8 +780,6 @@ static void usage (const char * prog, FILE * stream, int code)
   -F, --filter=COMMAND   Use COMMAND as a filter on the version/branch/tag\n\
                          information, to detect merges etc.\n\
   -f, --force            Pass --force to git-fast-import.\n\
-  -c, --cache=FILE       Read/write FILE for the version-cache information,\n\
-                         instead of the default './version-cache'.\n\
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
                          in the git repository.\n\
   -m, --master=NAME      Use branch NAME for the cvs trunk instead of 'master'.\n\
@@ -791,9 +799,6 @@ static void process_opts (int argc, char * const argv[])
         switch (getopt_long (argc, argv, "b:c:e:F:fhz:m:o:t:", opts, NULL)) {
         case 'b':
             branch_prefix = optarg;
-            break;
-        case 'c':
-            cache_path = optarg;
             break;
         case 'e':
             entries_name = optarg;
@@ -847,6 +852,23 @@ int main (int argc, char * const argv[])
     process_opts (argc, argv);
     if (argc != optind + 2)
         usage (argv[0], stderr, EXIT_FAILURE);
+
+    // Set up git_dir.
+    {
+        pipeline * git_dir_pl = pipeline_new_command_args (
+            "git", "rev-parse", "--git-dir", NULL);
+        pipeline_want_infile (git_dir_pl, "/dev/null");
+        pipeline_want_out (git_dir_pl, -1);
+        pipeline_start (git_dir_pl);
+        size_t len = 4096;
+        const char * data = pipeline_read (git_dir_pl, &len);
+        if (len > 0 && data[len - 1] == '\n')
+            --len;
+        git_dir = cache_string_n (data, len);
+        if (pipeline_wait (git_dir_pl) != 0)
+            exit (EXIT_FAILURE);
+        pipeline_free (git_dir_pl);
+    }
 
     cvs_connection_t stream;
     connect_to_cvs (&stream, argv[optind]);
@@ -930,15 +952,17 @@ int main (int argc, char * const argv[])
     pipeline * pipeline = NULL;
     FILE * out;
     if (output_path == NULL) {
+        pipecmd * cmd = pipecmd_new_args ("git", "fast-import", NULL);
+        pipecmd_argf (cmd, "--import-marks=%s/crap-marks.txt", git_dir);
+        pipecmd_argf (cmd, "--export-marks=%s/crap-marks.txt", git_dir);
         if (force)
-            output_path = "|git fast-import --import-marks=.crap.marks.txt "
-                "--export-marks=.crap.marks.txt --force";
-        else
-            output_path = "|git fast-import --import-marks=.crap.marks.txt "
-                "--export-marks=.crap.marks.txt";
+            pipecmd_arg (cmd, "--force");
+        pipeline = pipeline_new_commands (cmd, NULL);
+        pipeline_want_in (pipeline, -1);
+        pipeline_start (pipeline);
+        out = pipeline_get_infile (pipeline);
     }
-
-    if (output_path[0] == '|') {
+    else if (output_path[0] == '|') {
         pipeline = pipeline_new();
         pipeline_command_argstr (pipeline, output_path + 1);
         pipeline_want_in (pipeline, -1);
