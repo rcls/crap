@@ -10,9 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-// FIXME - should be configurable.
-#define FUZZ_TIME 300
-
+int fuzz_span = 300;
+int fuzz_gap = 300;
 
 void changeset_init (changeset_t * cs)
 {
@@ -141,7 +140,8 @@ void create_changesets (database_t * db)
     for (size_t i = 1; i < total_versions; ++i) {
         version_t * next = version_list[i];
         if (!strings_match (*current->versions, next)
-            || next->time - current->time > FUZZ_TIME) {
+            || next->time - current->time > fuzz_span
+            || next->time - current->versions_end[-1]->time > fuzz_gap) {
             ARRAY_TRIM (current->versions);
             current = database_new_changeset (db);
             current->time = next->time;

@@ -52,4 +52,12 @@ void changeset_init (changeset_t * changeset);
 /// Create the commit and vendor-merge changesets.
 void create_changesets (struct database * db);
 
+/// The maximum difference between the timestamps of any two commits in a
+/// changeset.
+extern int fuzz_span;
+
+/// The maximum difference between the timestamps of two consecutive commits in
+/// a changeset.
+extern int fuzz_gap;
+
 #endif

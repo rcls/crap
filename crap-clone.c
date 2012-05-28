@@ -22,16 +22,23 @@
 #include <stdlib.h>
 #include <time.h>
 
+enum {
+    opt_fuzz_span = 256,
+    opt_fuzz_gap,
+};
+
 static const struct option opts[] = {
     { "branch-prefix", required_argument, NULL, 'b' },
-    { "compress", required_argument, NULL, 'z' },
-    { "entries",  required_argument, NULL, 'e' },
-    { "filter",   required_argument, NULL, 'F' },
-    { "force",    no_argument,       NULL, 'f' },
-    { "help",     no_argument,       NULL, 'h' },
-    { "master",   required_argument, NULL, 'm' },
-    { "output",   required_argument, NULL, 'o' },
-    { "tag-prefix", required_argument, NULL, 't' },
+    { "compress",      required_argument, NULL, 'z' },
+    { "entries",       required_argument, NULL, 'e' },
+    { "filter",        required_argument, NULL, 'F' },
+    { "force",         no_argument,       NULL, 'f' },
+    { "help",          no_argument,       NULL, 'h' },
+    { "master",        required_argument, NULL, 'm' },
+    { "output",        required_argument, NULL, 'o' },
+    { "tag-prefix",    required_argument, NULL, 't' },
+    { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
+    { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
     { NULL, 0, NULL, 0 }
 };
 
@@ -785,6 +792,10 @@ static void usage (const char * prog, FILE * stream, int code)
   -m, --master=NAME      Use branch NAME for the cvs trunk instead of 'master'.\n\
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
+      --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
+                         a changset (default 300 seconds).\n\
+      --fuzz-gap=SECONDS The maximum time between two consecutive commits of a\n\
+                         changset (default 300 seconds).\n\
   <ROOT>                 The CVS repository to access.\n\
   <MODULE>               The relative path within the CVS repository.\n",
              prog);
@@ -827,6 +838,12 @@ static void process_opts (int argc, char * const argv[])
             usage (argv[0], stdout, EXIT_SUCCESS);
         case '?':
             usage (argv[0], stderr, EXIT_FAILURE);
+        case opt_fuzz_span:
+            fuzz_span = strtoul (optarg, NULL, 10);
+            break;
+        case opt_fuzz_gap:
+            fuzz_gap = strtoul (optarg, NULL, 10);
+            break;
         case -1:
             return;
         default:
