@@ -32,7 +32,7 @@ static void filter_output (void * data)
         tag_t * tag = as_tag (*p);
         printf ("%s %zu %s\n",
                 tag->branch_versions ? "BRANCH" : "TAG",
-                ++seq,                // FIXME - should refer to commit.
+                ++seq,                  // FIXME - should refer to commit.
                 tag->tag);
     }
     fflush (stdout);

@@ -9,8 +9,8 @@ typedef struct changeset changeset_t;
 
 /// The possible types of changeset.
 typedef enum changeset_type {
-    ct_tag,                   ///< Tag / branch.
-    ct_commit,                ///< A normal commit.
+    ct_tag,                             ///< Tag / branch.
+    ct_commit,                          ///< A normal commit.
 } changeset_type_t;
 
 

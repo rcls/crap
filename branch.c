@@ -242,7 +242,7 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
          i != branch->changeset.children_end; ++i) {
         changeset_t * cs = *i;
         if (cs->type == ct_tag)
-            continue;               // Ignore child tags.
+            continue;                   // Ignore child tags.
         for (version_t ** j = cs->versions; j != cs->versions_end; ++j) {
             if (!(*j)->used)
                 continue;
