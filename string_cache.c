@@ -120,7 +120,7 @@ void string_cache_stats (FILE * f)
     fprintf (
         f, "String cache: %zu items, %zu/%zu buckets used, mean search %g\n",
         cache_entries, used, cache_num_buckets,
-        sumsq / (double) cache_entries);
+        sumsq / (double) cache_entries / 2 + 0.5);
 }
 
 
