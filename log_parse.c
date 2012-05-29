@@ -308,12 +308,7 @@ static tag_t * find_branch (const file_t * f,
 
     // Use a branch name 'unnamed-<vers>'.  It's not ideal but the best we can
     // do right here.
-    char br[8 + strlen (vers) + 1];
-    strcpy (br, "unnamed-");
-    strcat (br, vers);
-
-    // Get the tag and mark it as a branch.
-    tag_t * branch = get_tag (tags, cache_string (br));
+    tag_t * branch = get_tag (tags, cache_stringf ("unnamed-%s", vers));
     static version_t * dummy_pointer;
     branch->branch_versions = &dummy_pointer;
     branch->dummy = true;

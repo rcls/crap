@@ -12,6 +12,10 @@ const char * cache_string (const char * str);
 /// Cache unique copy of a string.
 const char * cache_string_n (const char * str, size_t len);
 
+/// Concatenate & cache some strings.
+const char * cache_stringf (const char * format, ...)
+    __attribute__ ((format (printf, 1, 2)));
+
 /// Hash function.
 unsigned long string_hash_func (const char * str, size_t len);
 

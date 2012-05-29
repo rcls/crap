@@ -1,3 +1,4 @@
+#include "log.h"
 #include "string_cache.h"
 #include "utils.h"
 
@@ -83,6 +84,20 @@ const char * cache_string_n (const char * s, size_t len)
 const char * cache_string (const char * s)
 {
     return cache_string_n (s, strlen (s));
+}
+
+
+const char * cache_stringf (const char * format, ...)
+{
+    va_list args;
+    va_start (args, format);
+    char * big;
+    int len = check (vasprintf (&big, format, args), "Formatting a string");
+    va_end (args);
+
+    const char * result = cache_string_n (big, len);
+    free (big);
+    return result;
 }
 
 

@@ -36,6 +36,7 @@ static const struct option opts[] = {
     { "help",          no_argument,       NULL, 'h' },
     { "master",        required_argument, NULL, 'm' },
     { "output",        required_argument, NULL, 'o' },
+    { "remote",        required_argument, NULL, 'r' },
     { "tag-prefix",    required_argument, NULL, 't' },
     { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
     { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
@@ -43,13 +44,14 @@ static const struct option opts[] = {
 };
 
 static unsigned long zlevel;
+static const char * branch_prefix = "refs/heads";
 static const char * entries_name;
 static const char * filter_command;
-static const char * output_path;
-static const char * branch_prefix = "refs/heads";
-static const char * tag_prefix = "refs/tags";
-static const char * master = "master";
 static const char * git_dir;
+static const char * master = "master";
+static const char * output_path;
+static const char * remote = "";
+static const char * tag_prefix = "refs/tags";
 
 static bool force;
 
@@ -651,13 +653,15 @@ void print_fixups (FILE * out, const database_t * db,
 /// Read in our version-sha file and generate marks.
 static void initial_process_marks (const database_t * db)
 {
-    const char * marks_path = xasprintf ("%s/crap-marks.txt", git_dir);
+    const char * marks_path = xasprintf (
+        "%s/crap-marks%s%s.txt", git_dir, *remote ? "." : "", remote);
     FILE * output_marks = fopen (marks_path, "w");
     xfree (marks_path);
     if (output_marks == NULL)
         fatal ("opening marks file failed: %s\n", strerror (errno));
 
-    const char * cache_path = xasprintf ("%s/crap-version-cache.txt", git_dir);
+    const char * cache_path = xasprintf ("%s/crap-version-cache%s%s.txt",
+                                         git_dir, *remote ? "." : "", remote);
     FILE * cache = fopen (cache_path, "r");
     xfree (cache_path);
     if (cache == NULL) {
@@ -724,7 +728,8 @@ static void initial_process_marks (const database_t * db)
 /// containing the id's in a form that is useful for us to re-read.
 static void final_process_marks (const database_t * db)
 {
-    const char * marks_path = xasprintf ("%s/crap-marks.txt", git_dir);
+    const char * marks_path = xasprintf ("%s/crap-marks%s%s.txt", git_dir,
+                                         *remote ? "." : "", remote);
     FILE * marks = fopen (marks_path, "r");
     xfree (marks_path);
     if (marks == NULL) {
@@ -749,7 +754,8 @@ static void final_process_marks (const database_t * db)
     fclose (marks);
 
     // FIXME - bounce via temporary.
-    const char * cache_path = xasprintf ("%s/crap-version-cache.txt", git_dir);
+    const char * cache_path = xasprintf (
+        "%s/crap-version-cache%s%s.txt", git_dir, *remote ? "." : "", remote);
     marks = fopen (cache_path, "w");
     xfree (cache_path);
     if (marks == NULL) {
@@ -790,6 +796,7 @@ static void usage (const char * prog, FILE * stream, int code)
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
                          in the git repository.\n\
   -m, --master=NAME      Use branch NAME for the cvs trunk instead of 'master'.\n\
+  -r, --remote=NAME      Import to remote NAME; implies approprite -b and -t.\n\
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
@@ -807,7 +814,7 @@ static void usage (const char * prog, FILE * stream, int code)
 static void process_opts (int argc, char * const argv[])
 {
     while (1)
-        switch (getopt_long (argc, argv, "b:c:e:F:fhz:m:o:t:", opts, NULL)) {
+        switch (getopt_long (argc, argv, "b:c:e:F:fhz:m:o:r:t:", opts, NULL)) {
         case 'b':
             branch_prefix = optarg;
             break;
@@ -825,6 +832,9 @@ static void process_opts (int argc, char * const argv[])
             break;
         case 'm':
             master = optarg;
+            break;
+        case 'r':
+            remote = optarg;
             break;
         case 't':
             tag_prefix = optarg;
@@ -869,6 +879,20 @@ int main (int argc, char * const argv[])
     process_opts (argc, argv);
     if (argc != optind + 2)
         usage (argv[0], stderr, EXIT_FAILURE);
+
+    if (branch_prefix == NULL) {
+        if (*remote)
+            branch_prefix = cache_stringf ("refs/remotes/%s", remote);
+        else
+            branch_prefix = "refs/heads";
+    }
+
+    if (tag_prefix == NULL) {
+        if (*remote)
+            tag_prefix = cache_stringf ("refs/remotes/tags/%s", remote);
+        else
+            tag_prefix = "refs/tags";
+    }
 
     // Set up git_dir.
     {
@@ -970,8 +994,10 @@ int main (int argc, char * const argv[])
     FILE * out;
     if (output_path == NULL) {
         pipecmd * cmd = pipecmd_new_args ("git", "fast-import", NULL);
-        pipecmd_argf (cmd, "--import-marks=%s/crap-marks.txt", git_dir);
-        pipecmd_argf (cmd, "--export-marks=%s/crap-marks.txt", git_dir);
+        pipecmd_argf (cmd, "--import-marks=%s/crap-marks%s%s.txt",
+                      git_dir, *remote ? "." : "", remote);
+        pipecmd_argf (cmd, "--export-marks=%s/crap-marks%s%s.txt",
+                      git_dir, *remote ? "." : "", remote);
         if (force)
             pipecmd_arg (cmd, "--force");
         pipeline = pipeline_new_commands (cmd, NULL);
