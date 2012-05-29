@@ -1013,7 +1013,7 @@ int main (int argc, char * const argv[])
         out = pipeline_get_infile (pipeline);
     }
     else {
-        out = fopen (output_path, "w");
+        out = fopen (output_path, "we");
         if (out == NULL)
             fatal ("open %s failed: %s\n", output_path, strerror (errno));
     }

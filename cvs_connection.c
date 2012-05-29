@@ -226,7 +226,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 
     const char * client_log = getenv ("CVS_CLIENT_LOG");
     if (client_log)
-        conn->log = fopen (client_log, "w");
+        conn->log = fopen (client_log, "we");
 
     conn->in_next = conn->in;
     conn->in_end = conn->in;
