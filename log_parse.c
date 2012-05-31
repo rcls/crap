@@ -7,7 +7,6 @@
 #include "utils.h"
 
 #include <assert.h>
-#include <ctype.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +30,13 @@ typedef struct file_tag {
 } file_tag_t;
 
 
+// Unlike isdigit, only ever ASCII.
+static inline bool is_digit (int x)
+{
+    return x >= '0' && x <= '9';
+}
+
+
 static tag_t * get_tag (string_hash_t * tags, const char * name)
 {
     bool n;
@@ -48,7 +54,7 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 {
     // We parse (YY|YYYY)[-/]MM[-/]DD HH:MM(:SS)?( (+|-)HH(MM?))?  This is just
     // like cvsps.  We are a little looser about the digit sequences.
-    if (!isdigit (date[0]) || !isdigit (date[1]))
+    if (!is_digit (date[0]) || !is_digit (date[1]))
         return false;
 
     struct tm dtm;
@@ -107,14 +113,14 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
     else
         return false;
 
-    if (!isdigit (d[1]) || !isdigit (d[2]))
+    if (!is_digit (d[1]) || !is_digit (d[2]))
         return false;
 
     time_t off = (d[1] - '0') * 36000 + (d[2] - '0') * 3600;
     d += 3;
 
     if (*d != 0) {
-        if (!isdigit (d[0]) || !isdigit (d[1]))
+        if (!is_digit (d[0]) || !is_digit (d[1]))
             return false;
         off += (d[0] - '0') * 600 + (d[1] - '0') * 60;
         d += 2;
@@ -136,7 +142,7 @@ static bool valid_version (const char * s)
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for (; *s >= '0' && *s <= '9'; ++s);
+        for (; is_digit(*s); ++s);
 
         if (*s != '.')
             return false;               // Bogus.
@@ -146,7 +152,7 @@ static bool valid_version (const char * s)
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for (; *s >= '0' && *s <= '9'; ++s);
+        for (; is_digit (*s); ++s);
 
         if (*s == 0)
             return true;                // Done.
@@ -178,7 +184,7 @@ static bool predecessor (char * s)
     while (*--p == '0')
         *p = '9';
 
-    assert (isdigit (*p));
+    assert (is_digit (*p));
     assert (p != s);
     if (--*p == '0' && p[-1] == '.') {
         // Rewrite 09999 to 9999 etc.
@@ -197,7 +203,7 @@ static bool normalise_tag_version (char * s)
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for (; *s >= '0' && *s <= '9'; ++s);
+        for (; is_digit (*s); ++s);
 
         if (*s == 0)
             return true;                // x.y.z style branch.
@@ -205,7 +211,7 @@ static bool normalise_tag_version (char * s)
         if (*s++ != '.' || *s < '1' || *s > '9')
             return false;               // Bogus.
 
-        for (; *s >= '0' && *s <= '9'; ++s);
+        for (; is_digit (*s); ++s);
 
         if (*s == 0)
             return true;                // Done.
@@ -221,7 +227,7 @@ static bool normalise_tag_version (char * s)
     if (*++s != '.' || *++s < '1' || *s > '9')
         return false;
 
-    for (; *s >= '0' && *s <= '9'; ++s);
+    for (; is_digit (*s); ++s);
 
     if (*s != 0)
         return false;                   // Bogus.
