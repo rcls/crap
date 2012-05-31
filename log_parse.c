@@ -91,7 +91,7 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
     if (*d == ':') {
         ++d;
         dtm.tm_sec = strtoul (d, &d, 10);
-        if (dtm.tm_sec < 0 || dtm.tm_sec > 61)
+        if (dtm.tm_sec < 0 || dtm.tm_sec > 60)
             return false;
     }
     else
