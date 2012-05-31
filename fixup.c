@@ -110,7 +110,7 @@ static version_t * changeset_find_file (const changeset_t * cs,
                                         const file_t * file)
 {
     return bsearch (file, cs->versions, cs->versions_end - cs->versions,
-                    sizeof (*cs->versions), compare_file_version);
+                    sizeof *cs->versions, compare_file_version);
 }
 
 

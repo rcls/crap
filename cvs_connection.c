@@ -15,13 +15,13 @@
 
 static inline unsigned char * in_max (cvs_connection_t * s)
 {
-    return s->in + sizeof (s->in);
+    return s->in + sizeof s->in;
 }
 
 
 static inline unsigned char * out_max (cvs_connection_t * s)
 {
-    return s->out + sizeof (s->out);
+    return s->out + sizeof s->out;
 }
 
 
@@ -322,7 +322,7 @@ static void do_read (cvs_connection_t * s)
 
         assert (s->inflater.avail_out != 0);
         assert (s->inflater.avail_in == 0);
-        s->inflater.avail_in = checked_read (s, s->zin, sizeof (s->zin));
+        s->inflater.avail_in = checked_read (s, s->zin, sizeof s->zin);
         s->inflater.next_in = s->zin;
     }
 }

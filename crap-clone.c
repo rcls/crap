@@ -59,8 +59,8 @@ static long mark_counter;
 static long cached_marks;
 
 // FIXME - assumes signed time_t!
-#define TIME_MIN (sizeof(time_t) == sizeof(int) ? INT_MIN : LONG_MIN)
-#define TIME_MAX (sizeof(time_t) == sizeof(int) ? INT_MAX : LONG_MAX)
+#define TIME_MIN (sizeof (time_t) == sizeof (int) ? INT_MIN : LONG_MIN)
+#define TIME_MAX (sizeof (time_t) == sizeof (int) ? INT_MAX : LONG_MAX)
 
 static void print_fixups (FILE * out, const database_t * db,
                           version_t ** base_versions,
@@ -519,7 +519,7 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
     // versions.  The fix-up commits will restore things.  FIXME - we should
     // just initialise the branch correctly!
     if (tag->branch_versions) {
-        size_t bytes = sizeof (branch->branch_versions[0])
+        size_t bytes = sizeof branch->branch_versions[0]
             * (db->files_end - db->files);
         if (branch)
             memcpy (tag->branch_versions, branch->branch_versions, bytes);
