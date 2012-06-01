@@ -45,14 +45,14 @@ static const struct option opts[] = {
 };
 
 static unsigned long zlevel;
-static const char * branch_prefix = "refs/heads";
+static const char * branch_prefix;
 static const char * entries_name;
 static const char * filter_command;
 static const char * git_dir;
 static const char * master = "master";
 static const char * output_path;
 static const char * remote = "";
-static const char * tag_prefix = "refs/tags";
+static const char * tag_prefix;
 
 static bool force;
 
@@ -802,7 +802,7 @@ static void usage (const char * prog, FILE * stream, int code)
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
                          in the git repository.\n\
   -m, --master=NAME      Use branch NAME for the cvs trunk instead of 'master'.\n\
-  -r, --remote=NAME      Import to remote NAME; implies approprite -b and -t.\n\
+  -r, --remote=NAME      Import to remote NAME; implies appropriate -b and -t.\n\
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
