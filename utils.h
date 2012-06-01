@@ -62,17 +62,17 @@ static inline bool ends_with (const char * haystack, const char * needle)
 #define ARRAY_CALLOC(T,N) ((T *) xcalloc (sizeof (T) * (N)))
 
 /// Re-size an array with realloc().
-#define ARRAY_REALLOC(P,N) ((__typeof__ (P)) xrealloc (P, sizeof (*P) * (N)))
+#define ARRAY_REALLOC(P,N) ((__typeof__ (P)) xrealloc (P, sizeof *(P) * (N)))
 
 /// Extend an array by one item.  P_end should be the end pointer.
-#define ARRAY_EXTEND(P) do {                            \
-        size_t ITEMS = P##_end - P;                     \
-        if (ITEMS & (ITEMS - 1)) {                      \
-            ++P##_end;                                  \
-            break;                                      \
-        }                                               \
-        P = ARRAY_REALLOC (P, ITEMS * 2 + (ITEMS ==0)); \
-        P##_end = P + ITEMS + 1;                        \
+#define ARRAY_EXTEND(P) do {                                    \
+        size_t ITEMS = P##_end - P;                             \
+        if (ITEMS & (ITEMS - 1)) {                              \
+            ++P##_end;                                          \
+            break;                                              \
+        }                                                       \
+        P = ARRAY_REALLOC (P, ITEMS * 2 + (ITEMS == 0));        \
+        P##_end = P + ITEMS + 1;                                \
     } while (0)
 
 /// Extend an array by one item.  P_end should be the end pointer.
@@ -94,6 +94,6 @@ static inline bool ends_with (const char * haystack, const char * needle)
         } } while (0)
 
 /// Sort an array using qsort.
-#define ARRAY_SORT(P, F) qsort (P, P##_end - P, sizeof(*(P)), F)
+#define ARRAY_SORT(P, F) qsort (P, P##_end - P, sizeof *(P), F)
 
 #endif

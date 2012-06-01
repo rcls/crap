@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include <time.h>
 
 enum {
@@ -653,14 +654,19 @@ void print_fixups (FILE * out, const database_t * db,
 /// Read in our version-sha file and generate marks.
 static void initial_process_marks (const database_t * db)
 {
+    const char * crap_dir = xasprintf ("%s/crap", git_dir);
+    // Ignore errors; we only care if we can end up using the directory.
+    mkdir (crap_dir, 0777);
+    xfree (crap_dir);
+
     const char * marks_path = xasprintf (
-        "%s/crap-marks%s%s.txt", git_dir, *remote ? "." : "", remote);
+        "%s/crap/marks%s%s.txt", git_dir, *remote ? "." : "", remote);
     FILE * output_marks = fopen (marks_path, "w");
     xfree (marks_path);
     if (output_marks == NULL)
         fatal ("opening marks file failed: %s\n", strerror (errno));
 
-    const char * cache_path = xasprintf ("%s/crap-version-cache%s%s.txt",
+    const char * cache_path = xasprintf ("%s/crap/version-cache%s%s.txt",
                                          git_dir, *remote ? "." : "", remote);
     FILE * cache = fopen (cache_path, "r");
     xfree (cache_path);
@@ -728,12 +734,12 @@ static void initial_process_marks (const database_t * db)
 /// containing the id's in a form that is useful for us to re-read.
 static void final_process_marks (const database_t * db)
 {
-    const char * marks_path = xasprintf ("%s/crap-marks%s%s.txt", git_dir,
+    const char * marks_path = xasprintf ("%s/crap/marks%s%s.txt", git_dir,
                                          *remote ? "." : "", remote);
     FILE * marks = fopen (marks_path, "r");
     xfree (marks_path);
     if (marks == NULL) {
-        warning ("open crap-marks.txt failed: %s\n", strerror (errno));
+        warning ("open crap/marks.txt failed: %s\n", strerror (errno));
         return;
     }
     assert (sizeof (uint32_t) == 4);
@@ -755,7 +761,7 @@ static void final_process_marks (const database_t * db)
 
     // FIXME - bounce via temporary.
     const char * cache_path = xasprintf (
-        "%s/crap-version-cache%s%s.txt", git_dir, *remote ? "." : "", remote);
+        "%s/crap/version-cache%s%s.txt", git_dir, *remote ? "." : "", remote);
     marks = fopen (cache_path, "w");
     xfree (cache_path);
     if (marks == NULL) {
@@ -994,9 +1000,9 @@ int main (int argc, char * const argv[])
     FILE * out;
     if (output_path == NULL) {
         pipecmd * cmd = pipecmd_new_args ("git", "fast-import", NULL);
-        pipecmd_argf (cmd, "--import-marks=%s/crap-marks%s%s.txt",
+        pipecmd_argf (cmd, "--import-marks=%s/crap/marks%s%s.txt",
                       git_dir, *remote ? "." : "", remote);
-        pipecmd_argf (cmd, "--export-marks=%s/crap-marks%s%s.txt",
+        pipecmd_argf (cmd, "--export-marks=%s/crap/marks%s%s.txt",
                       git_dir, *remote ? "." : "", remote);
         if (force)
             pipecmd_arg (cmd, "--force");
