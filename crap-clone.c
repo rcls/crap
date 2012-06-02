@@ -39,6 +39,7 @@ static const struct option opts[] = {
     { "output",        required_argument, NULL, 'o' },
     { "remote",        required_argument, NULL, 'r' },
     { "tag-prefix",    required_argument, NULL, 't' },
+    { "version-cache", required_argument, NULL, 'c' },
     { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
     { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
     { NULL, 0, NULL, 0 }
@@ -53,6 +54,7 @@ static const char * master = "master";
 static const char * output_path;
 static const char * remote = "";
 static const char * tag_prefix;
+static const char * version_cache_path;
 
 static bool force;
 
@@ -573,8 +575,8 @@ void print_fixups (FILE * out, const database_t * db,
     // should never need fixups.
     assert (base_versions != NULL);
 
-    // If we're doing fixups for a branch, then the base_versions should be
-    // the branch version.
+    // If we're doing fixups for a branch, then the base_versions should be the
+    // branch version.
     assert (tag->branch_versions == NULL
             || base_versions == tag->branch_versions);
 
@@ -666,12 +668,10 @@ static void initial_process_marks (const database_t * db)
     if (output_marks == NULL)
         fatal ("opening marks file failed: %s\n", strerror (errno));
 
-    const char * cache_path = xasprintf ("%s/crap/version-cache%s%s.txt",
-                                         git_dir, *remote ? "." : "", remote);
-    FILE * cache = fopen (cache_path, "r");
-    xfree (cache_path);
+    FILE * cache = fopen (version_cache_path, "r");
     if (cache == NULL) {
-        warning ("opening version cache failed: %s\n", strerror (errno));
+        warning ("opening %s failed: %s\n", version_cache_path,
+                 strerror (errno));
         fclose (output_marks);
         return;
     }
@@ -760,12 +760,10 @@ static void final_process_marks (const database_t * db)
     fclose (marks);
 
     // FIXME - bounce via temporary.
-    const char * cache_path = xasprintf (
-        "%s/crap/version-cache%s%s.txt", git_dir, *remote ? "." : "", remote);
-    marks = fopen (cache_path, "w");
-    xfree (cache_path);
+    marks = fopen (version_cache_path, "w");
     if (marks == NULL) {
-        warning ("opening version cache failed: %s\n", strerror (errno));
+        warning ("opening %s failed: %s\n",
+                 version_cache_path, strerror (errno));
         return;
     }
 
@@ -802,7 +800,9 @@ static void usage (const char * prog, FILE * stream, int code)
   -e, --entries=NAME     Add a file listing the CVS versions to each directory\n\
                          in the git repository.\n\
   -m, --master=NAME      Use branch NAME for the cvs trunk instead of 'master'.\n\
-  -r, --remote=NAME      Import to remote NAME; implies appropriate -b and -t.\n\
+  -r, --remote=NAME      Import to remote NAME; implies appropriate -b, -t\n\
+                         and -c.\n\
+  -c, --version-cache=PATH     File path for version cache.\n\
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
@@ -823,6 +823,9 @@ static void process_opts (int argc, char * const argv[])
         switch (getopt_long (argc, argv, "b:c:e:F:fhz:m:o:r:t:", opts, NULL)) {
         case 'b':
             branch_prefix = optarg;
+            break;
+        case 'c':
+            version_cache_path = optarg;
             break;
         case 'e':
             entries_name = optarg;
@@ -899,6 +902,11 @@ int main (int argc, char * const argv[])
         else
             tag_prefix = "refs/tags";
     }
+
+    if (version_cache_path == NULL)
+        version_cache_path = cache_stringf (
+            "%s/crap/version-cache%s%s.txt",
+            git_dir, *remote ? "." : "", remote);
 
     // Set up git_dir.
     {
