@@ -1,7 +1,6 @@
+crap-clone
 *.o
 *~
 *.a
-crap-clone
-rlog_parse
 .deps
 *.log

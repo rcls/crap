@@ -1,7 +1,7 @@
 
 LD=$(CC)
 
-all: crap-clone rlog_parse
+all: crap-clone
 
 %: %.o
 	$(LD) $(LDFLAGS) -o $@ $+ $($*_LIBS)
@@ -10,8 +10,6 @@ all: crap-clone rlog_parse
 
 crap-clone: libcrap.a
 crap-clone_LIBS=-lpipeline -lz -lm
-rlog_parse: libcrap.a
-rlog_parse_LIBS=-lpipeline -lz -lm
 
 libcrap.a: branch.o changeset.o cvs_connection.o database.o emission.o file.o \
 	filter.o fixup.o heap.o log.o log_parse.o string_cache.o utils.o
