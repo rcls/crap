@@ -5,6 +5,10 @@
 
 #include <limits.h>
 
+#ifndef LONG_BIT
+#define LONG_BIT (8 * sizeof(long))
+#endif
+
 /// A bitset that maintains a number of set bits.
 typedef struct bitset {
     unsigned long * bits;
