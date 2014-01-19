@@ -903,11 +903,6 @@ int main (int argc, char * const argv[])
             tag_prefix = "refs/tags";
     }
 
-    if (version_cache_path == NULL)
-        version_cache_path = cache_stringf (
-            "%s/crap/version-cache%s%s.txt",
-            git_dir, *remote ? "." : "", remote);
-
     // Set up git_dir.
     {
         pipeline * git_dir_pl = pipeline_new_command_args (
@@ -924,6 +919,11 @@ int main (int argc, char * const argv[])
             exit (EXIT_FAILURE);
         pipeline_free (git_dir_pl);
     }
+
+    if (version_cache_path == NULL)
+        version_cache_path = cache_stringf (
+            "%s/crap/version-cache%s%s.txt",
+            git_dir, *remote ? "." : "", remote);
 
     cvs_connection_t stream;
     connect_to_cvs (&stream, argv[optind]);
