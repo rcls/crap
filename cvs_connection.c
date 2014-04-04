@@ -187,11 +187,18 @@ void connect_to_ext (cvs_connection_t * conn,
     if (program == NULL)
         program = "ssh";
 
-    conn->remote_root = strchr (path, '/');
-    if (conn->remote_root == NULL)
+    // Split into host and directory as follows:  Find the first ':' or '/'.  A
+    // ':' separates the host and directory, a '/' starts the directory.
+    const char * sep = path + strcspn (path, ":/");
+    if (*sep == '\0')
         fatal ("Root '%s' has no remote root.\n", root);
-    const char * host = strndup (path, conn->remote_root - path);
-    ++conn->remote_root;
+
+    if (*sep == ':')
+        conn->remote_root = sep + 1;
+    else
+        conn->remote_root = sep;
+
+    const char * host = strndup (path, sep - path);
     connect_to_program (conn, program, host, "cvs", "server", NULL);
     xfree (host);
 }
