@@ -80,15 +80,15 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
     size_t host_len = path - host;
 
     const char * port = memchr (host, ':', host_len);
-    size_t port_len;
-    if (port == NULL) {
-        port = "2401";
-        port_len = 4;
-    }
-    else {
+    size_t port_len = 0;
+    if (port != NULL) {
         host_len = port - host;
         ++port;
         port_len = path - port;
+    }
+    if (port_len == 0) {
+        port = "2401";
+        port_len = 4;
     }
 
     const char * at = memchr (host, '@', host_len);
