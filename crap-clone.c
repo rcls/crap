@@ -806,9 +806,9 @@ static void usage (const char * prog, FILE * stream, int code)
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
-                         a changset (default 300 seconds).\n\
+                         a changeset (default 300 seconds).\n\
       --fuzz-gap=SECONDS The maximum time between two consecutive commits of a\n\
-                         changset (default 300 seconds).\n\
+                         changeset (default 300 seconds).\n\
   <ROOT>                 The CVS repository to access.\n\
   <MODULE>               The relative path within the CVS repository.\n",
              prog);

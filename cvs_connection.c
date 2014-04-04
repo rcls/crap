@@ -157,7 +157,7 @@ static void connect_to_program (cvs_connection_t * restrict conn,
     check (socketpair (AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockets),
            "socketpair failed");
 
-    // libpipeline doesn't cope with an FD being used twice.  So dup it.
+    // libpipeline doesn't cope with a FD being used twice.  So dup it.
     int sdup = check (open ("/dev/null", O_RDONLY|O_CLOEXEC), "open /dev/null");
     check (dup3 (sockets[1], sdup, O_CLOEXEC), "dup3");
 
