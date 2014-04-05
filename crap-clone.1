@@ -71,27 +71,27 @@ The relative path within the CVS repository.
 .SH "USAGE"
 .LP 
 Initial import:
-.br
-.nf
+.br 
+.nf 
  mkdir \fI<target>\fR
  cd \fI<target>\fR
  git init
  crap\-clone \fI<cvsroot>\fR \fI<cvsrepo>\fR
  git gc \-\-aggressive
-.fi
+.fi 
 
-.LP
+.LP 
 \fI<cvsroot>\fR is the usual cvs string to identify a cvs repo:
-.br
+.br 
  For a local repo, just the absolute path, e.g., \fB/home/cvs\fR.
-.br
+.br 
  For a pserver repo, the string from \fB~/.cvspass\fR should work, e.g., \fB:pserver:anonymous@example.com:2401/home/cvs\fR for a default CVS server or :ext:<user>@<host>/<path>\fR for ssh/rsh access.  Note that crap\-clone defaults to ssh, not rsh.
 
 .LP 
 Incremental imports:
-.br
+.br 
 Rerun the same \fBcrap\-clone\fR command in the git repo.
-.br
+.br 
 Note that "incremental" is a lie, in that re\-running crap\-clone re\-analyses the
 entire cvs history, and recreates the entire git history.  However, the most
 expensive part of the import \- extracting the file contents \- is cached, giving
@@ -101,14 +101,14 @@ a huge speed\-up over an initial import.
 \fBcrap\-clone\fR is written in C and I've attempted to keep memory and CPU use low.
 It should be able to cope with even very large CVS repos just fine.  The largest
 CVS repo I regularly deal with has:
-.RE
-.nf
+.br 
+.nf 
 * several thousand files (up to 100MB in size).
 * many thousands of tags.
 * tens of millions of file\-tags.
 * many hundreds of branches.
 * several tens of thousands of commits.
-.fi
+.fi 
 .LP 
 A from\-scratch import of this archive takes around an hour; the bottleneck is
 using the '\fBcvs\fR' to retrieve all the versions.  An incremental re\-import into an
@@ -259,14 +259,15 @@ Use the \fB\-\-compress\fR option to compress the network traffic.
 .SH "EXAMPLES"
 .LP 
 To clone a remote repository, use:
-.br
+.br 
 \fBcrap\-clone \-z9 :pserver:anoncvs@cvs.example.com:/cvs reponame\fR
 .LP 
 To clone a repository over SSH, use:
-.br
+.br 
 \fBcrap\-clone \-z9 :ext:anoncvs@cvs.example.com:/cvs reponame\fR
 .LP 
 In some cases, CVS modules may be used to "alias" repositories located elsewhere in the CVS tree. For these, you will get a message resembling: "\fBRCS file name '/path/to/some/directory/file,v' does not start with prefix '/path/directory'\fR". In these cases, you will have to manually update your commandline to reflect the real path:
+.br 
 \fBcrap\-clone \-z9 :pserver:anoncvs@cvs.example.com:/path to/some/directory\fR
 .SH "BUGS / CAVEATS"
 .LP 
