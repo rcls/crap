@@ -45,7 +45,7 @@ Add a file listing the CVS versions to each directory in the git repository.
 \fB\-m\fR, \fB\-\-master=\fINAME\fP\fR
 Use branch NAME for the cvs trunk instead of 'master'.
 .TP 
-\fB\-\fRr, \fB\-\-remote=\fINAME\fP\fR
+\fB\-r\fR, \fB\-\-remote=\fINAME\fP\fR
 Import to remote NAME; implies appropriate \-b, \-t and \-c.
 .TP 
 \fB\-c\fR, \fB\-\-version\-cache=\fIPATH\fP\fR
@@ -166,7 +166,7 @@ re\-compress\-when\-closing\-the\-pack\-file option.]
 What is the 'cached\-versions' file.
 This is the list of git SHA1 identifiers for the CVS file versions, used to
 re\-use existing versions when doing incremental imports.  It can be given a
-different name using the \fB\-\-cache\fR option.
+different name using the \fB\-\-version-cache\fR option.
 
 .TP 
 I use character set XXXX. How do I cope with that?
@@ -181,8 +181,10 @@ Currently, all CVS access is done with \fB\-kk\fR.  That's an arbitrary choice,
 patches welcome.
 
 .TP 
-Can I use CVS with a git working copy?
-I use \fBgit cvsexportcommit\fR to commit.
+Can I use CVS with a git working copy?  I use \fBgit cvsexportcommit\fR to
+commit.  If you are going to regularly use crap-clone to pull from upstream CVS
+into a working-copy, then using the \fB\-r\fR flag will the upstream branches
+separate from your working-copy branches.
 
 The \fB\-e\fR option to crap\-clone adds files to git containing lists of cvs
 versions.  It should not be too difficult to write a script that creates CVS
