@@ -135,9 +135,10 @@ static bool parse_cvs_date (time_t * time, time_t * offset, const char * date)
 
 
 /// Is a version string value?  I.e., non-empty even-length '.' separated
-/// numbers.
+/// numbers.  The numbers should be non-zero, except for the special case n.0.
 static bool valid_version (const char * s)
 {
+    bool first = true;
     do {
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
@@ -150,7 +151,11 @@ static bool valid_version (const char * s)
         ++s;
 
         if (*s < '1' || *s > '9')
-            return false;               // Bogus.
+            // Special case: n.0 is allowed.
+            if (!first || *s != '0' || (s[1] != 0 && s[1] != '.'))
+                return false;           // Bogus.
+
+        first = false;
 
         for (; is_digit (*s); ++s);
 
@@ -178,9 +183,12 @@ static bool predecessor (char * s)
         return true;
     }
 
-    // Decrement the last component.
+    // Decrement the last component.  Except if it's zero, quit.
     char * end = s + strlen (s);
     char * p = end;
+    if (p - s >= 2 && p[-1] == '0' && p[-2] == '.')
+        return false;
+
     while (*--p == '0')
         *p = '9';
 
@@ -199,6 +207,8 @@ static bool predecessor (char * s)
 /// branch tags to 'x.y.z'.
 static bool normalise_tag_version (char * s)
 {
+    bool first = true;
+
     do {
         if (*s < '1' || *s > '9')
             return false;               // Bogus.
@@ -209,7 +219,11 @@ static bool normalise_tag_version (char * s)
             return true;                // x.y.z style branch.
 
         if (*s++ != '.' || *s < '1' || *s > '9')
-            return false;               // Bogus.
+            // Special case: n.0 is allowed.
+            if (!first || *s != '0' || (s[1] != 0 && s[1] != '.'))
+                return false;           // Bogus.
+
+        first = false;
 
         for (; is_digit (*s); ++s);
 
