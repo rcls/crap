@@ -39,6 +39,10 @@ int compare_paths (const char * A, const char * B);
 void * find_string (const void * array, size_t count, size_t size,
                     size_t position, const char * needle);
 
+/// Like @ref find_string but use strverscmp.
+void * find_version_string (const void * array, size_t count, size_t size,
+                             size_t position, const char * needle);
+
 /// Does @c haystack start with @c needle?
 static inline bool starts_with (const char * haystack, const char * needle)
 {

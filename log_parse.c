@@ -255,7 +255,7 @@ static int compare_version (const void * AA, const void * BB)
     const version_t * A = AA;
     const version_t * B = BB;
     if (A->version != B->version)
-        return strcmp (A->version, B->version);
+        return strverscmp (A->version, B->version);
     else
         return A->implicit_merge - B->implicit_merge;
 }

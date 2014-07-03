@@ -21,8 +21,9 @@ version_t * file_new_version (file_t * f)
 version_t * file_find_version (const file_t * f, const char * s)
 {
     return version_normalise (
-        find_string (f->versions, f->versions_end - f->versions,
-                     sizeof (version_t), offsetof (version_t, version), s));
+        find_version_string (
+            f->versions, f->versions_end - f->versions,
+            sizeof (version_t), offsetof (version_t, version), s));
 }
 
 
