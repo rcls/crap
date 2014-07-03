@@ -71,12 +71,13 @@ static void print_fixups (FILE * out, const database_t * db,
                           cvs_connection_t * s);
 
 
-static const char * format_date (const time_t * time)
+static const char * format_date (const time_t * time, bool utc)
 {
     struct tm dtm;
     static char date[32];
-    size_t dl = strftime (date, sizeof date, "%F %T %Z",
-                          localtime_r (time, &dtm));
+    size_t dl = 0;
+    if (!utc)
+        dl = strftime (date, sizeof date, "%F %T %Z", localtime_r (time, &dtm));
     if (dl == 0)
         // Maybe someone gave us a crap timezone?
         dl = strftime (date, sizeof date, "%F %T %Z", gmtime_r (time, &dtm));
@@ -347,7 +348,7 @@ static void grab_versions (FILE * out, const database_t * db,
 
         grab_by_option (out, db, s,
                         fetch[0]->branch->tag[0] ? fetch[0]->branch->tag : NULL,
-                        format_date (&dmax),
+                        format_date (&dmax, true),
                         fetch, fetch_end);
 
         for (version_t ** i = fetch; i != fetch_end; ++i)
@@ -455,7 +456,7 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
             ARRAY_APPEND (fetch, cv);
     }
 
-    fprintf (stderr, "%s COMMIT", format_date (&cs->time));
+    fprintf (stderr, "%s COMMIT", format_date (&cs->time, false));
 
     // Get the versions.
     grab_versions (out, db, s, fetch, fetch_end);
@@ -500,7 +501,7 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
                        cvs_connection_t * s)
 {
     fprintf (stderr, "%s %s %s\n",
-             format_date (&tag->changeset.time),
+             format_date (&tag->changeset.time, false),
              tag->branch_versions ? "BRANCH" : "TAG",
              tag->tag);
 
