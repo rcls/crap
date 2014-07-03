@@ -80,7 +80,7 @@ static const char * format_date (const time_t * time, bool utc)
         dl = strftime (date, sizeof date, "%F %T %Z", localtime_r (time, &dtm));
     if (dl == 0)
         // Maybe someone gave us a crap timezone?
-        dl = strftime (date, sizeof date, "%F %T %Z", gmtime_r (time, &dtm));
+        dl = strftime (date, sizeof date, "%F %T GMT", gmtime_r (time, &dtm));
 
     assert (dl != 0);
     return date;
