@@ -358,6 +358,7 @@ static tag_t * find_branch (const file_t * f,
 /// Fill in the parent, sibling and children links.
 static void fill_in_parents (file_t * file)
 {
+    version_t * last_trunk = NULL;
     for (version_t * v = file->versions_end; v != file->versions;) {
         --v;
         char vers[1 + strlen (v->version)];
@@ -378,6 +379,17 @@ static void fill_in_parents (file_t * file)
                 break;
             }
         }
+        // Special case:  n.0 has the previous x.y version as parent.
+        const char * dot = strchr(v->version, '.');
+        if (!dot)
+            continue;
+        if (!v->parent && dot[1] == '0' && (dot[2] == 0 || dot[2] == '.')) {
+            v->parent = last_trunk;
+            v->sibling = v->parent->children;
+            v->parent->children = v;
+        }
+        if (strchr(dot + 1, '.') == NULL)
+            last_trunk = v;
     }
 }
 
@@ -396,17 +408,12 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
     // dead.  FIXME - maybe should insert a dead version instead of munging
     // the dead flag?
     if (attic) {
-        unsigned long max = 0;
         version_t * last = NULL;
-        for (version_t * i = file->versions; i != file->versions_end; ++i)
-            if (i->version[0] == '1' && i->version[1] == '.') {
-                char * tail = NULL;
-                unsigned long ver = strtoul (i->version + 2, &tail, 10);
-                if (tail != NULL && *tail == 0 && ver >= max) {
-                    last = i;
-                    max = ver;
-                }
-            }
+        for (version_t * i = file->versions; i != file->versions_end; ++i) {
+            const char * dot = strchr(i->version, '.');
+            if (dot && strchr(dot + 1, '.') == NULL)
+                last = i;
+        }
         if (last != NULL && !last->dead) {
             last->dead = true;
             fprintf (stderr, "Killing zombie version %s %s\n",
