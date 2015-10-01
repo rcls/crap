@@ -68,25 +68,26 @@ static inline bool ends_with (const char * haystack, const char * needle)
 /// Re-size an array with realloc().
 #define ARRAY_REALLOC(P,N) ((__typeof__ (P)) xrealloc (P, sizeof *(P) * (N)))
 
-/// Extend an array by one item.  P_end should be the end pointer.
-#define ARRAY_EXTEND(P) do {                                    \
-        size_t ITEMS = P##_end - P;                             \
-        if (ITEMS & (ITEMS - 1)) {                              \
-            ++P##_end;                                          \
-            break;                                              \
-        }                                                       \
-        P = ARRAY_REALLOC (P, ITEMS * 2 + (ITEMS == 0));        \
-        P##_end = P + ITEMS + 1;                                \
+/// Extend an array by one item.  P_end should be the end pointer.  We keep the
+/// size of the array as 1 less than a power of 2.
+#define ARRAY_EXTEND(P) do {                    \
+        size_t ITEMS = P##_end - P;             \
+        if (ITEMS & (ITEMS + 1)) {              \
+            ++P##_end;                          \
+            break;                              \
+        }                                       \
+        P = ARRAY_REALLOC (P, ITEMS * 2 + 1);   \
+        P##_end = P + ITEMS + 1;                \
     } while (0)
 
 /// Extend an array by one item.  P_end should be the end pointer.
-#define ARRAY_APPEND(P,I) do {                                  \
-        size_t ITEMS = P##_end - P;                             \
-        if ((ITEMS & (ITEMS - 1)) == 0) {                       \
-            P = ARRAY_REALLOC (P, ITEMS * 2 + (ITEMS == 0));    \
-            P##_end = P + ITEMS;                                \
-        }                                                       \
-        *(P##_end)++ = I;                                       \
+#define ARRAY_APPEND(P,I) do {                          \
+        size_t ITEMS = P##_end - P;                     \
+        if ((ITEMS & (ITEMS + 1)) == 0) {               \
+            P = ARRAY_REALLOC (P, ITEMS * 2 + 1);       \
+            P##_end = P + ITEMS;                        \
+        }                                               \
+        *(P##_end)++ = I;                               \
     } while (0)
 
 /// Resize an array to it's exact size.
