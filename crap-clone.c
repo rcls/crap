@@ -56,6 +56,9 @@ static const char * remote = "";
 static const char * tag_prefix;
 static const char * version_cache_path;
 
+static const char ** directory_list;
+static const char ** directory_list_end;
+
 static bool force;
 
 static long mark_counter;
@@ -805,6 +808,8 @@ static void usage (const char * prog, FILE * stream, int code)
                          and -c.\n\
   -c, --version-cache=PATH     File path for version cache.\n\
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
+  -d, --directory=PATH   Limit the clone to certain paths within the CVS MODULE.\n\
+                         This option may be given multiple times.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
                          a changeset (default 300 seconds).\n\
@@ -821,12 +826,16 @@ static void usage (const char * prog, FILE * stream, int code)
 static void process_opts (int argc, char * const argv[])
 {
     while (1)
-        switch (getopt_long (argc, argv, "b:c:e:F:fhz:m:o:r:t:", opts, NULL)) {
+        switch (getopt_long (argc, argv,
+                             "b:c:d:e:F:fhz:m:o:r:t:", opts, NULL)) {
         case 'b':
             branch_prefix = optarg;
             break;
         case 'c':
             version_cache_path = optarg;
+            break;
+        case 'd':
+            ARRAY_APPEND(directory_list, optarg);
             break;
         case 'e':
             entries_name = optarg;
@@ -937,9 +946,13 @@ int main (int argc, char * const argv[])
 
     cvs_printff (&stream,
                  "Global_option -q\n"
-                 "Argument --\n"
-                 "Argument %s\n"
-                 "rlog\n", stream.module);
+                 "Argument --\n");
+    if (directory_list == directory_list_end)
+        cvs_printff (&stream, "Argument %s\n", stream.module);
+    else
+        for (const char ** i = directory_list; i != directory_list_end; ++i)
+            cvs_printff (&stream, "Argument %s/%s\n", stream.module, *i);
+    cvs_printff (&stream, "rlog\n");
 
     database_t db;
 
