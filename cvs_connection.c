@@ -265,6 +265,11 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
         connect_to_fork(conn, root + 7);
     else if (starts_with(root, ":fork:"))
         connect_to_fork(conn, root + 6);
+    else if (starts_with(root, "./"))
+        // CVS would try and interpret ./foo as host "." and path "/foo".  But
+        // "." has no A or AAAA DNS records, so it is safe to take this as a
+        // relative path.
+        connect_to_fork(conn, root);
     else if (root[0] != '/' && root[strcspn(root, "/:")])
         connect_to_ext (conn, root, root);
     else
