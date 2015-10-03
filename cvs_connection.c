@@ -75,7 +75,7 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
     const char * path = strchr (host, '/');
     if (path == NULL)
         fatal ("No path in CVS root '%s'\n", root);
-    conn->remote_root = path;
+    conn->remote_root = xstrdup(path);
 
     size_t host_len = path - host;
 
@@ -175,7 +175,19 @@ static void connect_to_program (cvs_connection_t * restrict conn,
 
 static void connect_to_fork (cvs_connection_t * conn, const char * path)
 {
-    conn->remote_root = path;
+    if (path[0] == '/') {
+        conn->remote_root = xstrdup(path);
+    }
+    else {
+        const char * cwd = getcwd(NULL, 0);
+        if (cwd == NULL)
+            fatal("getcwd() failed: %m");
+        const char * sep = "";
+        if (path[0] && !ends_with(cwd, "/"))
+            sep = "/";
+        conn->remote_root = xasprintf("%s%s%s", cwd, sep, path);
+        xfree(cwd);
+    }
     connect_to_program (conn, "cvs", "server", NULL);
 }
 
@@ -194,9 +206,9 @@ void connect_to_ext (cvs_connection_t * conn,
         fatal ("Root '%s' has no remote root.\n", root);
 
     if (*sep == ':')
-        conn->remote_root = sep + 1;
+        conn->remote_root = xstrdup(sep + 1);
     else
-        conn->remote_root = sep;
+        conn->remote_root = xstrdup(sep);
 
     const char * host = strndup (path, sep - path);
     connect_to_program (conn, program, host, "cvs", "server", NULL);
@@ -214,7 +226,7 @@ static void connect_to_fake (cvs_connection_t * conn, const char * root)
     if (colon2 == NULL)
         fatal ("Root '%s' has no remote root\n", root);
 
-    conn->remote_root = colon2 + 1;
+    conn->remote_root = xstrdup(colon2 + 1);
     program = strndup (program, colon1 - program);
     const char * argument = strndup (colon1 + 1, colon2 - colon1 - 1);
     connect_to_program (conn, program, argument, NULL);
@@ -241,6 +253,7 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
 
     conn->module = NULL;
     conn->prefix = NULL;
+    conn->remote_root = NULL;
 
     if (starts_with (root, ":pserver:"))
         connect_to_pserver (conn, root);
@@ -248,7 +261,11 @@ void connect_to_cvs (cvs_connection_t * conn, const char * root)
         connect_to_fake (conn, root);
     else if (starts_with (root, ":ext:"))
         connect_to_ext (conn, root, root + 5);
-    else if (root[0] != '/' && strchr (root, ':') != NULL)
+    else if (starts_with(root, ":local:"))
+        connect_to_fork(conn, root + 7);
+    else if (starts_with(root, ":fork:"))
+        connect_to_fork(conn, root + 6);
+    else if (root[0] != '/' && root[strcspn(root, "/:")])
         connect_to_ext (conn, root, root);
     else
         connect_to_fork (conn, root);
@@ -478,6 +495,7 @@ void cvs_connection_destroy (cvs_connection_t * s)
 {
     xfree (s->module);
     xfree (s->prefix);
+    xfree (s->remote_root);
 
     close (s->socket);
     if (s->log)

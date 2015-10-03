@@ -944,7 +944,11 @@ int main (int argc, char * const argv[])
         cvs_connection_compress (&stream, zlevel);
 
     stream.module = xstrdup (argv[optind + 1]);
-    stream.prefix = xasprintf ("%s/%s/", stream.remote_root, stream.module);
+    int root_len = strlen(stream.remote_root);
+    while (root_len > 0 && stream.remote_root[root_len - 1] == '/')
+        --root_len;
+    stream.prefix = xasprintf ("%.*s/%s/", root_len, stream.remote_root,
+                               stream.module);
 
     cvs_printff (&stream,
                  "Global_option -q\n"
