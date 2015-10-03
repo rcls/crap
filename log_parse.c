@@ -614,7 +614,8 @@ static void read_file_version (file_t * file, cvs_connection_t * s)
     const char * vstr = s->line + 11;
     char * tab = strchr (vstr, '\t');
 
-    version->version = cache_string_n (vstr, tab ? tab - vstr : strlen (vstr));
+    version->version = cache_string_n (
+        vstr, tab ? (size_t) (tab - vstr) : strlen (vstr));
     if (!valid_version (version->version))
         fatal ("Log (%s) has malformed version %s\n",
                file->rcs_path, version->version);

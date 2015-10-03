@@ -30,7 +30,6 @@ void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
 /// Generate the commit message for a fixup list.
 char * fixup_commit_comment (const struct database * db,
                              struct version * const * base_versions,
-                             struct tag * tag,
                              fixup_ver_t * fixups,
                              fixup_ver_t * fixups_end);
 

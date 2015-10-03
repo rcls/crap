@@ -160,7 +160,7 @@ void create_changesets (database_t * db)
                offsetof (version_t, ready_index), version_compare_heap);
 
     prepare_for_emission (db, &ready_versions);
-    size_t emitted_changesets = 0;
+    ssize_t emitted_changesets = 0;
     changeset_t * changeset;
     while ((changeset = next_changeset_split (db, &ready_versions))) {
         changeset_emitted (db, &ready_versions, changeset);

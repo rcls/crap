@@ -172,7 +172,7 @@ void fixup_list (fixup_ver_t ** fixups, fixup_ver_t ** fixups_end,
 
 
 char * fixup_commit_comment (const database_t * db,
-                             version_t * const * base_versions, tag_t * tag,
+                             version_t * const * base_versions,
                              fixup_ver_t * fixups,
                              fixup_ver_t * fixups_end)
 {

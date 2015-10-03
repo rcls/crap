@@ -265,7 +265,7 @@ static void grab_by_option (FILE * out,
     ARRAY_SORT (paths, (int(*)(const void *, const void *)) strcmp);
 
     const char * d = NULL;
-    size_t d_len = SIZE_MAX;
+    ssize_t d_len = SSIZE_MAX;
 
     for (const char ** i = paths; i != paths_end; ++i) {
         const char * slash = strrchr (*i, '/');
@@ -1049,7 +1049,7 @@ int main (int argc, char * const argv[])
     fprintf (out, "feature done\n");
 
     // Output the changesets to git-filter-branch.
-    size_t emitted_commits = 0;
+    ssize_t emitted_commits = 0;
     for (changeset_t ** p = serial; p != serial_end; ++p) {
         changeset_t * changeset = *p;
         if (changeset->type == ct_tag) {

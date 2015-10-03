@@ -235,8 +235,8 @@ static void branch_tag_point (database_t * db, tag_t * branch, tag_t * tag)
     }
 
     changeset_t * best_cs = &branch->changeset;
-    ssize_t best_hit = hit.count;
-    ssize_t best_extra = extra.count;
+    size_t best_hit = hit.count;
+    size_t best_extra = extra.count;
 
     for (changeset_t ** i = branch->changeset.children;
          i != branch->changeset.children_end; ++i) {

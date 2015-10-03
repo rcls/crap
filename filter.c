@@ -73,7 +73,7 @@ static void filter_input (database_t * db, FILE * in)
             line[--len] = 0;
         if (len == 0)
             continue;
-        if (strlen (line) != len)
+        if (strlen (line) != (size_t) len)
             fatal ("Line with NUL from filter\n");
         if (starts_with (line, "DELETE TAG ")) {
             tag_t * tag = database_find_tag (db, line + 11);

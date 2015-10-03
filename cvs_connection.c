@@ -390,12 +390,12 @@ static void cvs_send (cvs_connection_t * s, const unsigned char * data,
     assert (length <= INT_MAX);
 
     if (!s->compress) {
-        if (length > out_max (s) - s->out_next) {
+        if (length > (size_t) (out_max (s) - s->out_next)) {
             // Flush current data.
             do_write (s, s->out, s->out_next - s->out);
             s->out_next = s->out;
         }
-        if (length > out_max (s) - s->out_next)
+        if (length > (size_t) (out_max (s) - s->out_next))
             // Do big writes immediately.
             do_write (s, data, length);
         else {
