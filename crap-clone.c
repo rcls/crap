@@ -40,6 +40,7 @@ static const struct option opts[] = {
     { "remote",        required_argument, NULL, 'r' },
     { "tag-prefix",    required_argument, NULL, 't' },
     { "version-cache", required_argument, NULL, 'c' },
+    { "directory",     required_argument, NULL, 'd' },
     { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
     { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
     { NULL, 0, NULL, 0 }
@@ -808,9 +809,10 @@ static void usage (const char * prog, FILE * stream, int code)
                          and -c.\n\
   -c, --version-cache=PATH     File path for version cache.\n\
   -b, --branch-prefix=PREFIX   Place branches in PREFIX instead of 'refs/heads'.\n\
-  -d, --directory=PATH   Limit the clone to certain paths within the CVS MODULE.\n\
-                         This option may be given multiple times.\n\
   -t, --tag-prefix=PREFIX      Place tags in PREFIX instead of 'refs/tags'.\n\
+  -d, --directory=PATH   Limit the clone to certain paths within the CVS MODULE.\n\
+                         This option may be given multiple times, and despite\n\
+                         the name, works for file.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
                          a changeset (default 300 seconds).\n\
       --fuzz-gap=SECONDS The maximum time between two consecutive commits of a\n\
