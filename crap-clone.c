@@ -61,8 +61,8 @@ static const char ** directory_list_end;
 
 static bool force;
 
-static long mark_counter;
-static long cached_marks;
+static size_t mark_counter;
+static size_t cached_marks;
 
 // FIXME - assumes signed time_t!
 #define TIME_MIN (sizeof (time_t) == sizeof (int) ? INT_MIN : LONG_MIN)
@@ -471,7 +471,7 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
 
     fprintf (out, "commit %s/%s\n",
              branch_prefix, *v->branch->tag ? v->branch->tag : master);
-    fprintf (out, "mark :%lu\n", cs->mark);
+    fprintf (out, "mark :%zu\n", cs->mark);
     fprintf (out, "committer %s <%s> %ld +0000\n",
              v->author, v->author, cs->time);
     fprintf (out, "data %zu\n%s\n", strlen (v->log), v->log);
@@ -481,7 +481,7 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
         else if ((*i)->mark == mark_counter)
             fprintf (stderr, "Whoops, self-ref\n");
         else
-            fprintf (out, "merge :%lu\n", (*i)->mark);
+            fprintf (out, "merge :%zu\n", (*i)->mark);
 
     const char * last_path = NULL;
     for (version_t ** i = cs->versions; i != cs->versions_end; ++i)
@@ -550,7 +550,7 @@ static void print_tag (FILE * out, const database_t * db, tag_t * tag,
                  tag->branch_versions ? branch_prefix : tag_prefix,
                  *tag->tag ? tag->tag : master);
         if (tag->changeset.mark != 0)
-            fprintf (out, "from :%lu\n", tag->changeset.mark);
+            fprintf (out, "from :%zu\n", tag->changeset.mark);
     }
 
     if (tag->branch_versions == NULL)
@@ -597,7 +597,7 @@ void print_fixups (FILE * out, const database_t * db,
     xfree (fetch);
 
     tag->fixup = true;
-    unsigned long from = tag->changeset.mark;
+    size_t from = tag->changeset.mark;
     tag->changeset.mark = ++mark_counter;
 
     if (tag->deleted)
@@ -607,17 +607,17 @@ void print_fixups (FILE * out, const database_t * db,
                  tag->branch_versions ? branch_prefix : tag_prefix,
                  *tag->tag ? tag->tag : master);
 
-    fprintf (out, "mark :%lu\n", tag->changeset.mark);
+    fprintf (out, "mark :%zu\n", tag->changeset.mark);
 
     fprintf (out, "committer crap <crap> %ld +0000\n",
              tag->branch_versions && tag->last
              ? tag->last->time : tag->changeset.time);
     const char * comment = fixup_commit_comment (
-        db, base_versions, tag, fixups, fixups_end);
+        db, base_versions, fixups, fixups_end);
     fprintf (out, "data %zu\n%s", strlen (comment), comment);
     xfree (comment);
     if (tag->deleted)
-        fprintf (out, "from :%lu\n", from);
+        fprintf (out, "from :%zu\n", from);
 
     // We need a list of versions for updating the entries files.  If we are
     // working on a branch, then we need to update that anyway.  Else take a
@@ -720,7 +720,7 @@ static void initial_process_marks (const database_t * db)
         if (v) {
             v->mark = ++mark_counter;
             v->exec = mode == 'x';
-            fprintf (output_marks, ":%lu %08x%08x%08x%08x%08x\n",
+            fprintf (output_marks, ":%zu %08x%08x%08x%08x%08x\n",
                      mark_counter, sha[0], sha[1], sha[2], sha[3], sha[4]);
         }
     }
@@ -751,13 +751,13 @@ static void final_process_marks (const database_t * db)
     uint32_t * shas = xcalloc (mark_counter * 20 + 20);
 
     while (true) {
-        long mark;
+        size_t mark;
         uint32_t sha[5];
-        if (fscanf (marks, ":%lu %8x%8x%8x%8x%8x\n",
+        if (fscanf (marks, ":%zu %8x%8x%8x%8x%8x\n",
                     &mark, &sha[0], &sha[1], &sha[2], &sha[3], &sha[4]) < 6)
             break;
 
-        if (mark >=0 && mark <= mark_counter)
+        if (mark <= mark_counter)
             memcpy (shas + mark * 5, sha, 20);
     }
 
@@ -773,7 +773,7 @@ static void final_process_marks (const database_t * db)
 
     for (const file_t * f = db->files; f != db->files_end; ++f)
         for (const version_t * v = f->versions; v != f->versions_end; ++v) {
-            if (v->mark < 0 || v->mark > mark_counter)
+            if (v->mark > mark_counter)
                 continue;
             const uint32_t * p = shas + 5 * v->mark;
             if (p[0] | p[1] | p[2] | p[3] | p[4])
