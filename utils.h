@@ -91,14 +91,17 @@ static inline bool ends_with (const char * haystack, const char * needle)
     } while (0)
 
 /// Resize an array to it's exact size.
-#define ARRAY_TRIM(P) do {                      \
+#define ARRAY_TRIM(P) do                        \
         if (P != P##_end) {                     \
             size_t ITEMS = P##_end - P;         \
             P = ARRAY_REALLOC (P, ITEMS);       \
             P##_end = P + ITEMS;                \
-        } } while (0)
+        } while (0)
 
 /// Sort an array using qsort.
-#define ARRAY_SORT(P, F) qsort (P, P##_end - P, sizeof *(P), F)
+#define ARRAY_SORT(P, F) do                             \
+        if (P##_end != P)                               \
+            qsort (P, P##_end - P, sizeof *(P), F);     \
+    while (0)
 
 #endif
