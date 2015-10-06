@@ -106,7 +106,6 @@ static void cycle_split (database_t * db, changeset_t * cs)
 
     changeset_t * new = database_new_changeset (db);
     new->type = ct_commit;
-    new->time = cs->time;               // FIXME.
     version_t ** cs_v = cs->versions;
     for (version_t ** v = cs->versions; v != cs->versions_end; ++v)
         if ((*v)->ready_index == SIZE_MAX)
@@ -123,6 +122,17 @@ static void cycle_split (database_t * db, changeset_t * cs)
     assert (new->versions != new->versions_end);
     ARRAY_TRIM (cs->versions);
     ARRAY_TRIM (new->versions);
+
+    // Recalculate the dates on both.
+    cs->time = cs->versions[0]->time;
+    for (version_t ** p = cs->versions; p != cs->versions_end; ++p)
+        if ((*p)->time < cs->time)
+            cs->time = (*p)->time;
+
+    new->time = new->versions[0]->time;
+    for (version_t ** p = new->versions; p != new->versions_end; ++p)
+        if ((*p)->time < new->time)
+            new->time = (*p)->time;
 
     heap_insert (&db->ready_changesets, new);
 
