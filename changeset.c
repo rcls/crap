@@ -29,8 +29,10 @@ void changeset_init (changeset_t * cs)
 
 static bool strings_match (const version_t * A, const version_t * B)
 {
+    // We used to compare the CVS commitid here also.  However, a user reported
+    // that they were seeing commits being broken up unnecessarily, and removing
+    // the commitid improved things.
     return A->author   == B->author
-        && A->commitid == B->commitid
         && A->branch   == B->branch
         && A->log      == B->log
         && A->implicit_merge == B->implicit_merge;
@@ -39,11 +41,7 @@ static bool strings_match (const version_t * A, const version_t * B)
 
 static int version_compare (const version_t * A, version_t * B)
 {
-    int r = cache_strcmp (A->commitid, B->commitid);
-    if (r != 0)
-        return r;
-
-    r = cache_strcmp (A->author, B->author);
+    int r = cache_strcmp (A->author, B->author);
     if (r != 0)
         return r;
 
