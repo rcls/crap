@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 Building
 --------
 
-I've only built on Linux, but it should not be too hard to get going on
+I've only built on Linux.  It should not be too hard to get going on
 other C99 / Posix platforms.
 
 Just run `make`; the binary is named `crap-clone`.
@@ -50,6 +50,10 @@ The non-portabilities I know of are are:
 * Uses the Linux `asprintf()` and `getopt_long()` functions.
 * Use of gcc attributes (format checking, noreturn). `-D__attribute__(X)=`
   should fix that.
+* The `%m` format flag.
+* An anonymous union (legal C11, gcc allows this even in C99, except
+  very old gcc versions may need `-fms-extensions`).
+* Using `SOCK_CLOEXEC` and `open()` and `dup3()` with `O_CLOEXEC`.
 
 
 Usage

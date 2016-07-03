@@ -15,7 +15,9 @@ libcrap.a: branch.o changeset.o cvs_connection.o database.o emission.o file.o \
 	filter.o fixup.o heap.o log.o log_parse.o string_cache.o utils.o
 	ar crv $@ $+
 
-CFLAGS=-O2 -Wall -Wextra -Werror -std=c11 -D_GNU_SOURCE -g3 \
+# For old versions of gcc, you might need to add -std=c99 -fms-extensions.
+# or " -Wno-pointer-arith -fms-extensions -pedantic -Wno-format "
+CFLAGS=-O2 -std=c99 -Wall -Wextra -Werror -D_GNU_SOURCE -g3 \
 	-MMD -MP -MF.deps/$(subst /,:,$@).d
 CC=gcc
 
