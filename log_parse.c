@@ -452,10 +452,11 @@ static void fill_in_versions_and_parents (file_t * file, bool attic,
 
         // We try and find a predecessor version, to use as the branch point.
         // If none exists, that's fine, it makes sense as a branch addition.
-        if (i->version[0] == 0)
+        const char * dot = strrchr(i->version, '.');
+        if (dot == NULL)
             continue;                   // All trunk files are trunk additions.
 
-        size_t len = strrchr (i->version, '.') - i->version;
+        size_t len = dot - i->version;
         char vers[len + 1];
         memcpy (vers, i->version, len);
         vers[len] = 0;
