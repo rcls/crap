@@ -767,6 +767,7 @@ static void final_process_marks (const database_t * db)
     // FIXME - bounce via temporary.
     marks = fopen (version_cache_path, "w");
     if (marks == NULL) {
+        free (shas);
         warning ("opening %s failed: %s\n",
                  version_cache_path, strerror (errno));
         return;
