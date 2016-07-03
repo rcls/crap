@@ -663,7 +663,7 @@ static void initial_process_marks (const database_t * db)
 {
     const char * crap_dir = xasprintf ("%s/crap", git_dir);
     // Ignore errors; we only care if we can end up using the directory.
-    mkdir (crap_dir, 0777);
+    (void) mkdir (crap_dir, 0777);
     xfree (crap_dir);
 
     const char * marks_path = xasprintf (
