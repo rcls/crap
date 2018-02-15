@@ -1,15 +1,15 @@
 .\" Man page composed by Matt Lewandowsky <matt@greenviolet.net> (lewellyn), based on README.txt.
 .TH "crap-clone" "1" "April 5, 2014" "crap" "Open Source"
 .SH "NAME"
-.LP 
+.LP
 \fBcrap\-clone\fR \- Cvs Remote Access Program
 .SH "SYNTAX"
-.LP 
+.LP
 \fBcrap\-clone\fR \fI[options]\fR \fB<ROOT>\fR \fB<MODULE>\fR
 .SH "DESCRIPTION"
-.LP 
+.LP
 This is yet another cvs\-to\-git importer.
-.LP 
+.LP
 Features:
 .HP
 * Good performance; attention has been paid to keeping both memory and CPU use low.  It does not use an external database other than the VCSs.
@@ -22,44 +22,44 @@ Features:
 .HP
 * Merge detection is supported via external scripting.
 .SH "OPTIONS"
-.LP 
-.TP 
+.LP
+.TP
 \fB\-z\fR, \fB\-\-compress=\fI[0\-9]\fP\fR
 Compress the CVS network traffic.
-.TP 
+.TP
 \fB\-h\fR, \fB\-\-help\fR
 This message.
-.TP 
+.TP
 \fB\-o\fR, \fB\-\-output=\fIFILE\fP\fR
 Send output to a file instead of git\-fast\-import. If FILE starts with '|' then pipe to a command.
-.TP 
+.TP
 \fB\-F\fR, \fB\-\-filter=\fICOMMAND\fP\fR
 Use COMMAND as a filter on the version/branch/tag information, to detect merges etc.
-.TP 
+.TP
 \fB\-f\fR, \fB\-\-force\fR
 Pass \-\-force to git\-fast\-import.
-.TP 
+.TP
 \fB\-e\fR, \fB\-\-entries=\fINAME\fP\fR
 Add a file listing the CVS versions to each directory in the git repository.
-.TP 
+.TP
 \fB\-m\fR, \fB\-\-master=\fINAME\fP\fR
 Use branch NAME for the cvs trunk instead of 'master'.
-.TP 
+.TP
 \fB\-r\fR, \fB\-\-remote=\fINAME\fP\fR
 Import to remote NAME; implies appropriate \-b, \-t and \-c.
-.TP 
+.TP
 \fB\-c\fR, \fB\-\-version\-cache=\fIPATH\fP\fR
 File path for version cache.
-.TP 
+.TP
 \fB\-b\fR, \fB\-\-branch\-prefix=\fIPREFIX\fP\fR
 Place branches in PREFIX instead of 'refs/heads'.
-.TP 
+.TP
 \fB\-t\fR, \fB\-\-tag\-prefix=\fIPREFIX\fP\fR
 Place tags in PREFIX instead of 'refs/tags'.
-.TP 
+.TP
 \fB\-\-fuzz\-span=\fISECONDS\fP\fR
 The maximum time between the first and last commits of a changeset (default 300 seconds).
-.TP 
+.TP
 \fB\-\-fuzz\-gap=\fISECONDS\fP\fR
 The maximum time between two consecutive commits of a changeset (default 300 seconds).
 .TP
@@ -69,74 +69,74 @@ The keyword expansion mode to use. All CVS valid ones are supported:
 .TP
 \fI<ROOT>\fP
 The CVS repository to access.
-.TP 
+.TP
 \fI<MODULE>\fP
 The relative path within the CVS repository.
 .SH "USAGE"
-.LP 
+.LP
 Initial import:
-.br 
-.nf 
+.br
+.nf
  mkdir \fI<target>\fR
  cd \fI<target>\fR
  git init
  crap\-clone \fI<cvsroot>\fR \fI<cvsrepo>\fR
  git gc \-\-aggressive
-.fi 
+.fi
 
-.LP 
+.LP
 \fI<cvsroot>\fR is the usual cvs string to identify a cvs repo:
-.br 
+.br
  For a local repo, just the absolute path, e.g., \fB/home/cvs\fR.
-.br 
+.br
  For a pserver repo, the string from \fB~/.cvspass\fR should work, e.g., \fB:pserver:anonymous@example.com:2401/home/cvs\fR for a default CVS server or :ext:<user>@<host>/<path>\fR for ssh/rsh access.  Note that crap\-clone defaults to ssh, not rsh.
 
-.LP 
+.LP
 Incremental imports:
-.br 
+.br
 Rerun the same \fBcrap\-clone\fR command in the git repo.
-.br 
+.br
 Note that "incremental" is a lie, in that re\-running crap\-clone re\-analyses the
 entire cvs history, and recreates the entire git history.  However, the most
 expensive part of the import \- extracting the file contents \- is cached, giving
 a huge speed\-up over an initial import.
 .SH "PERFORMANCE"
-.LP 
+.LP
 \fBcrap\-clone\fR is written in C and I've attempted to keep memory and CPU use low.
 It should be able to cope with even very large CVS repos just fine.  The largest
 CVS repo I regularly deal with has:
-.br 
-.nf 
+.br
+.nf
 * several thousand files (up to 100MB in size).
 * many thousands of tags.
 * tens of millions of file\-tags.
 * many hundreds of branches.
 * several tens of thousands of commits.
-.fi 
-.LP 
+.fi
+.LP
 A from\-scratch import of this archive takes around an hour; the bottleneck is
 using the '\fBcvs\fR' to retrieve all the versions.  An incremental re\-import into an
 existing archive takes less than 2 minutes, so long as the version\-cache file is
 present.
 
 .SS "Memory Usage"
-.LP 
+.LP
 Because CVS records each file independently, CVS has a non\-linear scalability
 issue; each tag needs to be processed independently for each file, so we end up
 with O(<number of tags> * <number of files>) memory usage.
-.LP 
+.LP
 This is made worse by the fact that CVS repos often contain large numbers of
 tags created in an attempt to cover up deficiencies in CVS.  [E.g., tag every
 build, tag source & target of every merge.]  As a result a large CVS repo may
 contain hundreds of millions of file\-tags.
-.LP 
+.LP
 \fBcrap\-clone\fR limits the per\-file\-per\-tag memory usage to one pointer (two for
 branches), so even a huge CVS repo can be comfortably processed on a machine
 with a GB or so of memory.  [I started developing \fBcrap\-clone\fR on a machine with
 192MB memory, so memory usage was a major issue then.  Less so now.]
 
 .SS "Bottlenecks"
-.LP 
+.LP
 \fBcrap\-clone\fR uses \fBcvs\fR to access the CVS repo, and \fBcvs\fR
 is the main bottleneck for the processing:
 .HP
@@ -152,7 +152,7 @@ is the main bottleneck for the processing:
 .HP
   + Now ask for diffs between 1.2 and 1.3.  Because of the previous step, \fBcvs\fR thinks it has version 1.2 in the server\-side working directory [when it actually has a diff].  CVS ends up sending you nonsense.]
 .SH "QUESTIONS & ANSWERS"
-.TP 
+.TP
 Why yet another cvs\-to\-git import?
 I started writing this in 2008 when the options were \fBgit\-cvsimport\fR
 [which does not handle the complex messes in the CVS repos I deal with] and
@@ -160,19 +160,19 @@ I started writing this in 2008 when the options were \fBgit\-cvsimport\fR
 around 24 hours on some of the repos I deal with.]  If \fBgit2cvs\fR had
 existed back then, I probably wouldn't have bothered with \fBcrap\-clone\fR.
 
-.TP 
+.TP
 I've just done an import.  Why is my git archive so big?
 Run \fBgit gc \-\-aggressive\fR.  The pack\-files generated by \fBgit\-fast\-import\fR
 are often not well compressed. [\fBgit\-fast\-import\fR could usefully provide a
 re\-compress\-when\-closing\-the\-pack\-file option.]
 
-.TP 
+.TP
 What is the 'cached\-versions' file.
 This is the list of git SHA1 identifiers for the CVS file versions, used to
 re\-use existing versions when doing incremental imports.  It can be given a
 different name using the \fB\-\-version-cache\fR option.
 
-.TP 
+.TP
 I use character set XXXX. How do I cope with that?
 Like \fBgit\fR and \fBcvs\fR, \fBcrap\-clone\fR treats text as
 byte\-sequences. This is transparent to all character sets, but has the
@@ -189,36 +189,36 @@ The \fB\-e\fR option to crap\-clone adds files to git containing lists of cvs
 versions.  It should not be too difficult to write a script that creates CVS
 subdirectories from those, if you wanted.
 
-.TP 
+.TP
 I did an incremental import and got an error from git\-fast\-import: \fBNot updating XXX (new tip YYY does not contain ZZZ)\fR
 The reconstructed CVS history has changed for some reason; because we use
 heuristics to reconstruct lots of information that CVS does not maintain
 explicitly, this can happen occassionally.  Use the \fB\-\-force\fR option (which gets
 passed through to \fBgit\-fast\-import\fR).
 
-.TP 
+.TP
 \fBcrap\-clone\fR [or \fBcvs\fR or \fBgit\-fast\-import\fR] core\-dumped / aborted / failed.
 Please let me <suckfish@ihug.co.nz> know.  Preferably let me have access to your
 CVS repo; in order of preference: \fBrsync\fR access or a tar\-ball; ssh or pserver
 access to the server; the output of \fBcvs rlog\fR on the module.
 
-.TP 
+.TP
 Can I control the usernames / timezones used for the git commits?
 Not at present.  Patches welcome.  (One approach would be to upgrade the commit
 filter mechanism to do this.)
 
-.TP 
+.TP
 Can I import to remote refs rather than local?
 Use the \fB\-\-remote\fR option, or for more detailed control, \fB\-\-branch\fR and \fB\-\-tag\fR.
 
-.TP 
+.TP
 What is this 'Fix\-up commit generated by crap\-clone'?
 Sometimes crap needs to add a git commit that does not correspond to any commit
 in the CVS repository, e.g., because a tag or branch could not be placed exactly
 in the parent branch.  The commit comment has a summary of the changes in the
 commit.
 
-.TP 
+.TP
 How does the commit filter work?
 Some information about the commit history is piped to the filter program, and
 then the filter may produce output editing the history, such as creating merge
@@ -248,64 +248,64 @@ DELETE TAG <num>
 
   remove a tag, <num> is the sequence number from the filter input.
 .SH "REMOTE CVS ACCESS"
-.LP 
+.LP
 \fBcrap\-clone\fR can access a remote cvs server just fine.  However, note that
 \fBcrap\-clone\fR currently downloads each file version completely, the network traffic
 may be huge.  For an initial import over a wide\-area network, you are better
 off \fBrsync\fR'ing the CVS repo to local disk and running everything locally.
-.LP 
+.LP
 Use the \fB\-\-compress\fR option to compress the network traffic.
 .SH "EXAMPLES"
-.LP 
+.LP
 To clone a remote repository, use:
-.br 
+.br
 \fBcrap\-clone \-z9 :pserver:anoncvs@cvs.example.com:/cvs reponame\fR
-.LP 
+.LP
 To clone a repository over SSH, use:
-.br 
+.br
 \fBcrap\-clone \-z9 :ext:anoncvs@cvs.example.com:/cvs reponame\fR
-.LP 
+.LP
 In some cases, CVS modules may be used to "alias" repositories located elsewhere in the CVS tree. For these, you will get a message resembling: "\fBRCS file name '/path/to/some/directory/file,v' does not start with prefix '/path/directory'\fR". In these cases, you will have to manually update your commandline to reflect the real path:
-.br 
+.br
 \fBcrap\-clone \-z9 :pserver:anoncvs@cvs.example.com:/path to/some/directory\fR
 .SH "BUGS / CAVEATS"
-.LP 
+.LP
 The heuristic for placing late\-branching could be improved. [This is the case
 where '\fBcvs tag \-b\fR' is used to add new files to an existing branch; we have to
 guess which files are branched late and when they were branched.]
-.LP 
+.LP
 The implicit merge from a '\fBcvs import\fR' to the main branch is currently broken.
 [I think the code is there, it's just not working.] Implicit merges to branches
 other than 1.x are not supported at all.
-.LP 
+.LP
 The use of CVS the modules file to stich together different parts of the cvs
 repo is not supported.
-.LP 
+.LP
 We just drop "zombie" versions \-\- where a ,v file is in the Attic but the last
 version on the trunk is not marked as deleted.  This matches the CVS checkout
 behaviour, but we could be smarter by keeping the last trunk version and then
 faking a delete commit.
-.LP 
+.LP
 The current interface to the merge detection script is not very good.  It
 doesn't give enough information, tell lies, and does not cope with the case
 where a detected merge requires reordering of commits.
 .SH "AUTHORS"
-.LP 
+.LP
 Ralph Loader <suckfish@ihug.co.nz>
 .SH "LICENSE"
-.LP 
+.LP
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
 the Free Software Foundation, either version 3 of the License, or
 (at your option) any later version.
-.LP 
+.LP
 This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
-.LP 
+.LP
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 .SH "SEE ALSO"
-.LP 
+.LP
 \fBcvs(1)\fR \fBgit(1)\fR \fBgitcvs\-migration(7)\fR
