@@ -43,17 +43,17 @@ static const struct option opts[] = {
     { "directory",     required_argument, NULL, 'd' },
     { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
     { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
-    { "substitution-mode", required_argument, NULL, 's'},
+    { "keywords", required_argument, NULL, 'k'},
     { NULL, 0, NULL, 0 }
 };
 
 /* Valid CVS substitution modes
    (http://cvsman.com/cvs-1.12.12/cvs_103.php#SEC103)
  */
-static const char * substitution_modes[] = {
-    "kkv", "kkv1", "kk", "ko", "kb", "kv"
+static const char * keyword_modes[] = {
+    "kv", "kv1", "k", "o", "b", "v"
 };
-static int substitution_mode_count = 6;
+static int keyword_mode_count = 6;
 
 static unsigned long zlevel;
 static const char * branch_prefix;
@@ -65,7 +65,7 @@ static const char * output_path;
 static const char * remote = "";
 static const char * tag_prefix;
 static const char * version_cache_path;
-static const char * substitution_mode;
+static const char * keyword_mode;
 
 static const char ** directory_list;
 static const char ** directory_list_end;
@@ -239,11 +239,11 @@ static void grab_version (FILE * out, const database_t * db,
                 (int) strlen (s->prefix) - 1, s->prefix);
 
     cvs_printff (s,
-                 "Argument -%s\n"
+                 "Argument -k%s\n"
                  "Argument -r%s\n"
                  "Argument --\n"
                  "Argument %s\nupdate\n",
-                 substitution_mode, version->version, version->file->path);
+                 keyword_mode, version->version, version->file->path);
 
     read_versions (out, db, s);
 
@@ -306,7 +306,7 @@ static void grab_by_option (FILE * out,
     if (D_arg)
         cvs_printf (s, "Argument -D%s\n", D_arg);
 
-    cvs_printf (s, "Argument -%s\n" "Argument --\n", substitution_mode);
+    cvs_printf (s, "Argument -k%s\n" "Argument --\n", keyword_mode);
 
     for (const char ** i = paths; i != paths_end; ++i)
         cvs_printf (s, "Argument %s\n", *i);
@@ -828,7 +828,7 @@ static void usage (const char * prog, FILE * stream, int code)
                          a changeset (default 300 seconds).\n\
       --fuzz-gap=SECONDS The maximum time between two consecutive commits of a\n\
                          changeset (default 300 seconds).\n\
-  --substitution-mode=MODE  The CVS substitution mode to use (default: 'kk')\n\
+      --keywords=MODE    The CVS substitution mode to use (default: 'kk')\n\
   <ROOT>                 The CVS repository to access.\n\
   <MODULE>               The relative path within the CVS repository.\n",
              prog);
@@ -841,7 +841,7 @@ static void process_opts (int argc, char * const argv[])
 {
     while (1)
         switch (getopt_long (argc, argv,
-                             "b:c:d:e:F:fhz:m:o:r:t:", opts, NULL)) {
+                             "b:c:d:e:F:fhz:m:o:r:t:k:", opts, NULL)) {
         case 'b':
             branch_prefix = optarg;
             break;
@@ -889,8 +889,8 @@ static void process_opts (int argc, char * const argv[])
             break;
         case -1:
             return;
-        case 's':
-            substitution_mode = optarg;
+        case 'k':
+            keyword_mode = optarg;
             break;
         default:
             abort();
@@ -931,14 +931,14 @@ int main (int argc, char * const argv[])
     }
 
     int i;
-    if (substitution_mode == NULL) {
-        substitution_mode = "kk";
+    if (keyword_mode == NULL) {
+        keyword_mode = "k";
     }
-    for (i=0; i<substitution_mode_count; i++) {
-        if(strcmp(substitution_mode, substitution_modes[i]) == 0) break;
+    for (i=0; i<keyword_mode_count; i++) {
+        if(strcmp(keyword_mode, keyword_modes[i]) == 0) break;
     }
-    if (i == substitution_mode_count) {
-        fatal("%s is not a valid CVS substitution mode\n", substitution_mode);
+    if (i == keyword_mode_count) {
+        fatal("%s is not a valid CVS substitution mode\n", keyword_mode);
     }
 
     // Set up git_dir.
