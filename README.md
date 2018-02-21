@@ -188,8 +188,9 @@ character set is in use.  If you can do better than that, patches welcome.
 
 * How is CVS keyword expansion handled?
 
-Currently, all CVS access is done with '-kk'.  That's an arbitrary choice,
-patches welcome.
+The desired mode can be passed with the long option `--keywords`
+or the short option `-k`, which is designed to imitate CVS itself:
+`-kkv`, `-kk`, etc.
 
 
 * Can I use CVS with a git working copy?
