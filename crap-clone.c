@@ -22,6 +22,59 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <string.h>
+
+struct author_list { /* table entry: */
+    struct author_list *next; /* next entry in chain */
+    const char *name; /* defined name */
+    const char *author_name; /* replacement text */
+    const char *author_mail; /* replacement text */
+};
+
+#define HASHSIZE 101
+static struct author_list *hashtab[HASHSIZE]; /* pointer table */
+
+/* hash: form hash value for string s */
+unsigned hash(const char *s)
+{
+    unsigned hashval;
+    for (hashval = 0; *s != '\0'; s++)
+      hashval = *s + 31 * hashval;
+    return hashval % HASHSIZE;
+}
+
+/* lookup: look for s in hashtab */
+struct author_list *lookup(const char *s)
+{
+    struct author_list *np;
+    for (np = hashtab[hash(s)]; np != NULL; np = np->next)
+        if (strcmp(s, np->name) == 0)
+          return np; /* found */
+    return NULL; /* not found */
+}
+
+/* install: put (name, author_name, author_mail) in hashtab */
+struct author_list *install(const char *name, const char *author_name, const char *author_mail)
+{
+    struct author_list *np;
+    unsigned hashval;
+    if ((np = lookup(name)) == NULL) { /* not found */
+        np = (struct author_list *) malloc(sizeof(*np));
+        if (np == NULL || (np->name = strdup(name)) == NULL)
+          return NULL;
+        hashval = hash(name);
+        np->next = hashtab[hashval];
+        hashtab[hashval] = np;
+    } else { /* already there */
+        free((void *) np->author_name); /*free previous author_name */
+        free((void *) np->author_mail); /*free previous author_mail */
+	}
+    if ((np->author_name = strdup(author_name)) == NULL)
+       return NULL;
+    if ((np->author_mail = strdup(author_mail)) == NULL)
+       return NULL;
+    return np;
+}
 
 enum {
     opt_fuzz_span = 256,
@@ -29,21 +82,22 @@ enum {
 };
 
 static const struct option opts[] = {
-    { "branch-prefix", required_argument, NULL, 'b' },
-    { "compress",      required_argument, NULL, 'z' },
-    { "entries",       required_argument, NULL, 'e' },
-    { "filter",        required_argument, NULL, 'F' },
-    { "force",         no_argument,       NULL, 'f' },
-    { "help",          no_argument,       NULL, 'h' },
-    { "master",        required_argument, NULL, 'm' },
-    { "output",        required_argument, NULL, 'o' },
-    { "remote",        required_argument, NULL, 'r' },
-    { "tag-prefix",    required_argument, NULL, 't' },
-    { "version-cache", required_argument, NULL, 'c' },
-    { "directory",     required_argument, NULL, 'd' },
-    { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
-    { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
-    { "keywords", required_argument, NULL, 'k'},
+    { "author-conv-file", required_argument, NULL, 'A' },
+    { "branch-prefix",    required_argument, NULL, 'b' },
+    { "compress",         required_argument, NULL, 'z' },
+    { "entries",          required_argument, NULL, 'e' },
+    { "filter",           required_argument, NULL, 'F' },
+    { "force",            no_argument,       NULL, 'f' },
+    { "help",             no_argument,       NULL, 'h' },
+    { "master",           required_argument, NULL, 'm' },
+    { "output",           required_argument, NULL, 'o' },
+    { "remote",           required_argument, NULL, 'r' },
+    { "tag-prefix",       required_argument, NULL, 't' },
+    { "version-cache",    required_argument, NULL, 'c' },
+    { "directory",        required_argument, NULL, 'd' },
+    { "fuzz-span",        required_argument, NULL, opt_fuzz_span },
+    { "fuzz-gap",         required_argument, NULL, opt_fuzz_gap },
+    { "keywords",         required_argument, NULL, 'k'},
     { NULL, 0, NULL, 0 }
 };
 
@@ -480,11 +534,23 @@ static void print_commit (FILE * out, const database_t * db, changeset_t * cs,
     cs->mark = ++mark_counter;
     v->branch->changeset.mark = cs->mark;
 
+	const char * author_name;
+	const char * author_mail;
+
+	struct author_list * a = lookup (v->author);
+	if(a == NULL ) {
+		author_name=v->author;
+		author_mail=v->author;
+	} else {
+		author_name=a->author_name;
+		author_mail=a->author_mail;
+	}
+
     fprintf (out, "commit %s/%s\n",
              branch_prefix, *v->branch->tag ? v->branch->tag : master);
     fprintf (out, "mark :%zu\n", cs->mark);
     fprintf (out, "committer %s <%s> %ld +0000\n",
-             v->author, v->author, cs->time);
+             author_name, author_mail, cs->time);
     fprintf (out, "data %zu\n%s\n", strlen (v->log), v->log);
     for (changeset_t ** i = cs->merge; i != cs->merge_end; ++i)
         if ((*i)->mark == 0)
@@ -829,6 +895,11 @@ static void usage (const char * prog, FILE * stream, int code)
       --fuzz-gap=SECONDS The maximum time between two consecutive commits of a\n\
                          changeset (default 300 seconds).\n\
       --keywords=MODE    The CVS substitution mode to use (default: 'kk')\n\
+  -A, --author-conv-file=FILE  CVS by default uses the Unix username when\n\
+                               writing its commit logs. Using this option and\n\
+                               an author-conv-file maps the name recorded in\n\
+                               CVS to author name and e-mail:\n\
+https://git-scm.com/docs/git-cvsimport#Documentation/git-cvsimport.txt--Altauthor-conv-filegt\n\
   <ROOT>                 The CVS repository to access.\n\
   <MODULE>               The relative path within the CVS repository.\n",
              prog);
@@ -836,12 +907,43 @@ static void usage (const char * prog, FILE * stream, int code)
     exit (code);
 }
 
+char* rtrim(char* string, char junk)
+{
+    char* original = string + strlen(string);
+    while(*--original == junk);
+    *(original + 1) = '\0';
+    return string;
+}
 
 static void process_opts (int argc, char * const argv[])
 {
     while (1)
         switch (getopt_long (argc, argv,
-                             "b:c:d:e:F:fhz:m:o:r:t:k:", opts, NULL)) {
+                             "A:b:c:d:e:F:fhz:m:o:r:t:k:", opts, NULL)) {
+        case 'A': {
+			FILE * fid=fopen(optarg, "r");
+			
+			char c[1000];
+  
+			char author_cvs[1000];
+			char author_name[1000];
+			char author_mail[1000];
+  
+			if(fid==NULL) {
+				printf("Could not open author file: %s\n", optarg);
+				abort();
+			}
+
+			// read as many line as you can
+			while (fscanf(fid,"%[^=]=%[^<]<%[^>]>%[^\n]\n", author_cvs, author_name, author_mail, c) != EOF)
+			{
+				printf("Mapping author:\n%s\n%s\n%s\n", author_cvs, author_name, author_mail);
+				install (rtrim(author_cvs, ' '), rtrim(author_name, ' '), rtrim(author_mail, ' '));
+			}
+			fclose(fid);
+			
+           	break;
+		}
         case 'b':
             branch_prefix = optarg;
             break;
