@@ -13,6 +13,9 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#define EMPTY_PASSWORD ""
+#define FALLBACK_PASSWORD EMPTY_PASSWORD
+
 static inline unsigned char * in_max (cvs_connection_t * s)
 {
     return s->in + sizeof s->in;
@@ -25,25 +28,26 @@ static inline unsigned char * out_max (cvs_connection_t * s)
 }
 
 
-static const char * pserver_password (const char * root)
+static const char * lookup_password_in_cvspass_file (const char * pserver_root)
 {
-    size_t root_len = strlen (root);
+    fprintf (stderr, "Looking up password in $HOME/.cvspass...\n");
+    size_t root_len = strlen (pserver_root);
     const char * home = getenv ("HOME");
     if (home == NULL)
         fatal ("Cannot get home directory");
 
     const char * path = xasprintf ("%s/.cvspass", home);
 
-    FILE * cvspass = fopen (path, "r");
+    FILE * cvspass_file = fopen (path, "r");
     xfree (path);
-    if (cvspass == NULL)
-        return xstrdup ("A");
+    if (cvspass_file == NULL)
+        return NULL;
 
     char * lineptr = NULL;
     size_t n = 0;
 
     ssize_t len;
-    while ((len = getline (&lineptr, &n, cvspass)) >= 0) {
+    while ((len = getline (&lineptr, &n, cvspass_file)) >= 0) {
         if (len > 0 && lineptr[len - 1] == '\n') {
             --len;
             lineptr[len] = 0;
@@ -54,8 +58,8 @@ static const char * pserver_password (const char * root)
             len -= 3;
         }
 
-        if (strncmp (l, root, root_len) == 0 && l[root_len] == ' ') {
-            fclose (cvspass);
+        if (strncmp (l, pserver_root, root_len) == 0 && l[root_len] == ' ') {
+            fclose (cvspass_file);
             size_t plen = strlen (l + root_len + 1);
             memmove (lineptr, l + root_len + 1, plen);
             lineptr[plen] = 0;
@@ -63,8 +67,8 @@ static const char * pserver_password (const char * root)
         }
     }
 
-    fclose (cvspass);
-    return xstrdup ("A");
+    fclose (cvspass_file);
+    return NULL;
 }
 
 
@@ -133,12 +137,24 @@ static void connect_to_pserver (cvs_connection_t * conn, const char * root)
     xfree (port);
     freeaddrinfo (ai);
 
-    const char * password = pserver_password (root);
-    fprintf (stderr, "Password '%s'\n", password);
+    if (conn->password == NULL) {
+        conn->password = lookup_password_in_cvspass_file (root);
+        if (conn->password == NULL) {
+            conn->password = FALLBACK_PASSWORD;
+            fprintf (stderr, "No password supplied and none found; will try an empty password.\n");
+        }
+        else {
+            conn->password_is_malloced = true;
+        }
+    }
+    fprintf (stderr, "Password '%s'\n", conn->password);
     cvs_printff (conn,
                 "BEGIN AUTH REQUEST\n%s\n%.*s\n%s\nEND AUTH REQUEST\n",
-                 path, (int) user_len, user, password);
-    xfree (password);
+                 path, (int) user_len, user, conn->password);
+    if (conn->password_is_malloced) {
+        xfree (conn->password);
+        conn->password_is_malloced = false;
+    }
 
     next_line (conn);
     if (strcmp (conn->line, "I LOVE YOU") != 0)
