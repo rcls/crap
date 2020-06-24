@@ -9,6 +9,8 @@
 typedef struct cvs_connection {
     int socket;
     const char * remote_root;
+    const char * password;
+    bool password_is_malloced;
     const char * module;
     const char * prefix;
 

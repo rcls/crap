@@ -41,6 +41,7 @@ static const struct option opts[] = {
     { "tag-prefix",    required_argument, NULL, 't' },
     { "version-cache", required_argument, NULL, 'c' },
     { "directory",     required_argument, NULL, 'd' },
+    { "password",      required_argument, NULL, 'p' },
     { "fuzz-span",     required_argument, NULL, opt_fuzz_span },
     { "fuzz-gap",      required_argument, NULL, opt_fuzz_gap },
     { "keywords", required_argument, NULL, 'k'},
@@ -63,6 +64,9 @@ static const char * git_dir;
 static const char * master = "master";
 static const char * output_path;
 static const char * remote = "";
+static const char * password = NULL;
+// Note: a NULL value here means the user is not overridden the password;
+// it does not mean that the cvs connection should use an _empty_ password.
 static const char * tag_prefix;
 static const char * version_cache_path;
 static const char * keyword_mode;
@@ -824,6 +828,9 @@ static void usage (const char * prog, FILE * stream, int code)
   -d, --directory=PATH   Limit the clone to certain paths within the CVS MODULE.\n\
                          This option may be given multiple times, and despite\n\
                          the name, works for file.\n\
+  -p, --password=PWD     Set the password with which to authenticate to a remote.\n\
+                         CVS server. This setting overrides the value in your\n\
+                         .cvspass file.\n\
       --fuzz-span=SECONDS The maximum time between the first and last commits of\n\
                          a changeset (default 300 seconds).\n\
       --fuzz-gap=SECONDS The maximum time between two consecutive commits of a\n\
@@ -841,7 +848,7 @@ static void process_opts (int argc, char * const argv[])
 {
     while (1)
         switch (getopt_long (argc, argv,
-                             "b:c:d:e:F:fhz:m:o:r:t:k:", opts, NULL)) {
+                             "b:c:d:p:e:F:fhz:m:o:r:t:k:", opts, NULL)) {
         case 'b':
             branch_prefix = optarg;
             break;
@@ -868,6 +875,9 @@ static void process_opts (int argc, char * const argv[])
             break;
         case 'r':
             remote = optarg;
+            break;
+        case 'p':
+            password = optarg;
             break;
         case 't':
             tag_prefix = optarg;
@@ -964,6 +974,7 @@ int main (int argc, char * const argv[])
             git_dir, *remote ? "." : "", remote);
 
     cvs_connection_t stream;
+    stream.password = password; // Remember: Might be NULL
     connect_to_cvs (&stream, argv[optind]);
 
     if (zlevel != 0)
