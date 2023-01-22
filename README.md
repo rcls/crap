@@ -39,6 +39,14 @@ Building
 I've only built on Linux.  It should not be too hard to get going on
 other C99 / Posix platforms.
 
+Under Debian/Ubuntu:
+
+    sudo apt-get install build-essential libpipeline-dev git
+    # assuming already checked out via:
+    #    git clone https://github.com/rcls/crap.git
+    #    cd crap
+    make
+
 Just run `make`; the binary is named `crap-clone`.
 
 The only build-time external dependency is `libpipeline` for handling
@@ -67,6 +75,7 @@ cd <target>
 git init
 crap-clone <cvsroot> <cvsrepo>
 git gc --aggressive
+git push REMOTE --mirror
 ```
 `<cvsroot>` is the usual CVS string to identify a CVS repo:
 
